@@ -201,6 +201,27 @@ const SPORTS = {
       { name: "Coach Wins", variants: ["Career total","Single season"] },
     ]
   },
+  basketball_boys: {
+    label: "Boys Basketball", icon: "🏀",
+    statCategories: [
+      { name: "Games Played", variants: ["Career total","Single season"] },
+      { name: "Wins", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
+      { name: "Assists", variants: ["Career total","Single season","Single game"] },
+      { name: "Total Rebounds", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
+      { name: "Offensive Rebounds", variants: ["Career total","Single season","Single game"] },
+      { name: "Defensive Rebounds", variants: ["Career total","Single season","Single game"] },
+      { name: "Steals", variants: ["Career total","Single season"] },
+      { name: "Blocks", variants: ["Career total","Single season"] },
+      { name: "Field Goals Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Field Goals Attempted", variants: ["Career total","Single season","Single game"] },
+      { name: "Three Pointers Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Three Pointers Attempted", variants: ["Career total","Single season","Single game"] },
+      { name: "Free Throws Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Free Throws Attempted", variants: ["Career total","Single season","Single game"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
   soccer: {
     label: "Soccer", icon: "⚽",
     statCategories: [
@@ -4537,7 +4558,6 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      saveSchools(next);
       return next;
     });
   }, []);
