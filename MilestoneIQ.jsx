@@ -1,3 +1,901 @@
+import { useState, useCallback } from "react";
+
+const SPORTS = {
+  football: {
+    label: "Football", icon: "🏈",
+    categories: ["Passing Yards","Passing TDs","Rushing Yards","Rushing TDs","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Forced Fumbles","Games Played"]
+  },
+  basketball: {
+    label: "Basketball", icon: "🏀",
+    categories: ["Points","Rebounds","Assists","Steals","Blocks","Field Goals Made","Three Pointers","Free Throws","Games Played","Minutes Played"]
+  },
+  baseball: {
+    label: "Baseball", icon: "⚾",
+    categories: ["Batting Average","Home Runs","RBIs","Hits","Stolen Bases","Strikeouts (P)","ERA","Wins (P)","Innings Pitched","Games Played"]
+  },
+  softball: {
+    label: "Softball", icon: "🥎",
+    categories: ["Batting Average","Home Runs","RBIs","Hits","Stolen Bases","Strikeouts (P)","ERA","Wins (P)","Games Played"]
+  },
+  soccer: {
+    label: "Soccer", icon: "⚽",
+    categories: ["Goals","Assists","Saves","Clean Sheets","Games Played","Minutes Played","Yellow Cards","Red Cards"]
+  },
+  wrestling: {
+    label: "Wrestling", icon: "🤼",
+    categories: ["Wins","Pins","Tech Falls","Major Decisions","Decisions","Losses","Win %","Tournament Titles"]
+  },
+  track: {
+    label: "Track & Field", icon: "🏃",
+    categories: ["Events Won","Personal Records","State Qualifications","Conference Titles","Relay Wins"]
+  },
+  volleyball: {
+    label: "Volleyball", icon: "🏐",
+    categories: ["Kills","Aces","Digs","Assists","Blocks","Service Aces","Games Played"]
+  }
+};
+
+const ROUND_MILESTONES = [100,200,250,500,750,1000,1500,2000,2500,3000,4000,5000,10000];
+
+const SEED_SCHOOLS = [
+  {
+    id: "s1", name: "Douglas Christian HS", mascot: "Eagles", sport: "football",
+    primaryColor: "#1a3a6b",
+    athletes: [
+      { id:"a1", name:"Marcus Johnson", position:"QB", gradYear:2025,
+        stats:{"Passing Yards":2847,"Passing TDs":28,"Rushing Yards":312,"Total Yards":3159,"Total TDs":31,"Games Played":10} },
+      { id:"a2", name:"Devon Williams", position:"RB", gradYear:2025,
+        stats:{"Rushing Yards":987,"Rushing TDs":11,"Receiving Yards":143,"Total Yards":1130,"Total TDs":12,"Games Played":10} },
+      { id:"a3", name:"Tyler Brooks", position:"WR", gradYear:2026,
+        stats:{"Receiving Yards":743,"Receiving TDs":8,"Total Yards":743,"Total TDs":8,"Games Played":10} },
+      { id:"a4", name:"Jordan Ellis", position:"LB", gradYear:2025,
+        stats:{"Tackles":187,"Sacks":8,"Interceptions":4,"Forced Fumbles":3,"Games Played":10} },
+      { id:"a5", name:"Cam Rivera", position:"CB", gradYear:2026,
+        stats:{"Tackles":94,"Interceptions":6,"Forced Fumbles":2,"Games Played":10} },
+    ],
+    coachRecord: { name:"Coach T. Williams", wins:193, threshold:200 },
+    schoolRecords: {
+      "Passing Yards":3847,"Passing TDs":34,"Rushing Yards":1842,"Rushing TDs":19,
+      "Receiving Yards":1203,"Total Yards":4101,"Tackles":218,"Interceptions":9
+    }
+  },
+  {
+    id: "s2", name: "Riverside Academy", mascot: "Hawks", sport: "basketball",
+    primaryColor: "#7b1a1a",
+    athletes: [
+      { id:"b1", name:"Aiden Foster", position:"PG", gradYear:2025,
+        stats:{"Points":987,"Assists":234,"Steals":67,"Games Played":24,"Rebounds":112,"Three Pointers":89} },
+      { id:"b2", name:"Zoe Martinez", position:"SF", gradYear:2026,
+        stats:{"Points":743,"Rebounds":389,"Blocks":45,"Games Played":24,"Assists":67,"Field Goals Made":298} },
+      { id:"b3", name:"Noah Chen", position:"C", gradYear:2025,
+        stats:{"Points":612,"Rebounds":478,"Blocks":89,"Games Played":24,"Field Goals Made":247} },
+    ],
+    coachRecord: { name:"Coach M. Davis", wins:187, threshold:200 },
+    schoolRecords: { "Points":1247,"Rebounds":612,"Assists":312,"Steals":98,"Blocks":134 }
+  }
+];
+
+function getMilestoneAlerts(athlete, schoolRecords) {
+  const alerts = [];
+  for (const [cat, val] of Object.entries(athlete.stats)) {
+    if (typeof val !== "number") continue;
+    const rec = schoolRecords[cat];
+    if (rec) {
+      const pct = val / rec;
+      if (pct >= 0.85 && pct < 1) {
+        alerts.push({ type: "record", category: cat, current: val, target: rec, pct, label: "School record" });
+      } else if (pct >= 1) {
+        alerts.push({ type: "record_broken", category: cat, current: val, target: rec, pct, label: "Record broken!" });
+      }
+    }
+    for (const ms of ROUND_MILESTONES) {
+      if (val >= ms * 0.9 && val < ms) {
+        alerts.push({ type: "milestone", category: cat, current: val, target: ms, pct: val / ms, label: `${ms.toLocaleString()} ${cat}` });
+        break;
+      } else if (val >= ms && val < ms * 1.05 && val < (ROUND_MILESTONES[ROUND_MILESTONES.indexOf(ms)+1] || Infinity)) {
+        alerts.push({ type: "milestone_hit", category: cat, current: val, target: ms, pct: 1, label: `${ms.toLocaleString()} ${cat} reached!` });
+        break;
+      }
+    }
+  }
+  return alerts;
+}
+
+function pct(v, t) { return Math.min(100, Math.round((v / t) * 100)); }
+
+function ProgressBar({ value, max, color = "#1a56db" }) {
+  const p = pct(value, max);
+  return (
+    <div style={{ height: 6, background: "#f0f0ee", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ width: `${p}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.6s ease" }} />
+    </div>
+  );
+}
+
+function AlertBadge({ alert }) {
+  const isHit = alert.type.includes("hit") || alert.type.includes("broken");
+  const isRecord = alert.type.includes("record");
+  const bg = isHit ? "#f0fdf4" : isRecord ? "#fefce8" : "#eff6ff";
+  const border = isHit ? "#86efac" : isRecord ? "#fde047" : "#bfdbfe";
+  const text = isHit ? "#14532d" : isRecord ? "#713f12" : "#1e3a5f";
+  const icon = isHit ? "🎉" : isRecord ? "🏆" : "📈";
+  return (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "8px 12px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: text }}>{alert.label}</div>
+        <div style={{ fontSize: 12, color: text, opacity: 0.8 }}>
+          {alert.current.toLocaleString()} / {alert.target.toLocaleString()} — {pct(alert.current, alert.target)}%
+        </div>
+        <ProgressBar value={alert.current} max={alert.target} color={isHit ? "#22c55e" : isRecord ? "#eab308" : "#3b82f6"} />
+      </div>
+    </div>
+  );
+}
+
+function CSVUploadModal({ school, onClose, onImport }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState(null);
+
+  const parseCSV = (text) => {
+    const lines = text.trim().split("\n").filter(l => l.trim());
+    if (lines.length < 2) throw new Error("CSV must have at least a header row and one data row");
+    const headers = lines[0].split(",").map(h => h.trim().replace(/"/g, ""));
+    const rows = lines.slice(1).map(line => {
+      const vals = line.split(",").map(v => v.trim().replace(/"/g, ""));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = isNaN(vals[i]) ? vals[i] : Number(vals[i]); });
+      return obj;
+    });
+    return { headers, rows };
+  };
+
+  const handleFile = (file) => {
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = parseCSV(e.target.result);
+        setPreview(parsed);
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".csv")) handleFile(file);
+    else setError("Please drop a .csv file");
+  };
+
+  const sampleCSV = `Player Name,Position,Grad Year,Passing Yards,Passing TDs,Rushing Yards,Total TDs,Tackles,Games Played
+Alex Thompson,QB,2025,1847,18,243,21,0,9
+Sam Rivera,RB,2026,0,0,934,10,0,9
+Jordan Lee,LB,2025,0,0,0,0,156,9`;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Import stats — {school.name}</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#666" }}>Upload a CSV from MaxPreps, Hudl, GameChanger, or your own sheet</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#666" }}>✕</button>
+        </div>
+
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          style={{ border: `2px dashed ${dragOver ? "#1a56db" : "#ddd"}`, borderRadius: 12, padding: 32, textAlign: "center", background: dragOver ? "#eff6ff" : "#fafafa", marginBottom: 16, transition: "all 0.2s" }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+          <div style={{ fontWeight: 600, color: "#333", marginBottom: 4 }}>Drop your CSV here</div>
+          <div style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>or click to browse</div>
+          <input type="file" accept=".csv" onChange={e => e.target.files[0] && handleFile(e.target.files[0])}
+            style={{ display: "none" }} id="csv-input" />
+          <label htmlFor="csv-input" style={{ background: "#1a56db", color: "#fff", padding: "8px 20px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Choose file</label>
+        </div>
+
+        {error && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: 12, color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
+        {preview && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: "#111", marginBottom: 8, fontSize: 14 }}>Preview — {preview.rows.length} athletes found</div>
+            <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb" }}>
+                    {preview.headers.slice(0, 6).map(h => <th key={h} style={{ padding: "8px 12px", textAlign: "left", color: "#374151", fontWeight: 600, borderBottom: "1px solid #e5e7eb" }}>{h}</th>)}
+                    {preview.headers.length > 6 && <th style={{ padding: "8px 12px", color: "#9ca3af" }}>+{preview.headers.length - 6} more</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.slice(0, 4).map((row, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      {preview.headers.slice(0, 6).map(h => <td key={h} style={{ padding: "7px 12px", color: "#374151" }}>{String(row[h] ?? "—")}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={() => { onImport(preview); onClose(); }}
+              style={{ marginTop: 12, background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 600, fontSize: 14, cursor: "pointer", width: "100%" }}>
+              Import {preview.rows.length} athletes
+            </button>
+          </div>
+        )}
+
+        <details style={{ marginTop: 8 }}>
+          <summary style={{ fontSize: 13, color: "#6b7280", cursor: "pointer", userSelect: "none" }}>View sample CSV format</summary>
+          <pre style={{ background: "#f9fafb", borderRadius: 8, padding: 12, fontSize: 11, overflowX: "auto", color: "#374151", marginTop: 8 }}>{sampleCSV}</pre>
+        </details>
+
+        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["MaxPreps export", "Hudl export", "GameChanger export"].map(src => (
+            <div key={src} style={{ background: "#f3f4f6", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: "#6b7280", display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", display: "inline-block" }}></span>
+              {src} compatible
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddAthleteModal({ onClose, onAdd, sport }) {
+  const sportDef = SPORTS[sport] || SPORTS.football;
+  const [form, setForm] = useState({ name: "", position: "", gradYear: new Date().getFullYear() + 2 });
+  const [stats, setStats] = useState({});
+
+  const handleSubmit = () => {
+    if (!form.name.trim()) return;
+    onAdd({ id: `a${Date.now()}`, ...form, gradYear: Number(form.gradYear), stats });
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 500, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Add athlete</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#666" }}>✕</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          {[["name","Full name","text"],["position","Position","text"],["gradYear","Grad year","number"]].map(([k,label,type]) => (
+            <div key={k} style={{ gridColumn: k === "name" ? "1/-1" : "auto" }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>{label}</label>
+              <input type={type} value={form[k]} onChange={e => setForm(f => ({...f, [k]: e.target.value}))}
+                style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box" }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 10 }}>Career stats (optional)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {sportDef.categories.map(cat => (
+            <div key={cat}>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{cat}</label>
+              <input type="number" value={stats[cat] || ""} onChange={e => setStats(s => ({...s, [cat]: Number(e.target.value)}))}
+                placeholder="0"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 10px", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+          ))}
+        </div>
+        <button onClick={handleSubmit}
+          style={{ marginTop: 20, width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+          Add athlete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MilestoneSetupModal({ school, onClose, onSave }) {
+  const sportDef = SPORTS[school.sport] || SPORTS.football;
+  const [records, setRecords] = useState({ ...school.schoolRecords });
+  const [coachWins, setCoachWins] = useState(school.coachRecord?.threshold || 200);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 500, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>School records & milestones</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#666" }}>Set records — alerts fire at 90%, 95%, and 100%</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ background: "#eff6ff", borderRadius: 8, padding: 12, fontSize: 13, color: "#1e3a5f", marginBottom: 16 }}>
+          💡 Round-number milestones (1,000 yards, 200 wins, etc.) are tracked automatically for every athlete.
+        </div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 10 }}>School records — {school.name}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {sportDef.categories.map(cat => (
+            <div key={cat}>
+              <label style={{ display: "block", fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{cat}</label>
+              <input type="number" value={records[cat] || ""} onChange={e => setRecords(r => ({...r, [cat]: Number(e.target.value)}))}
+                placeholder="—"
+                style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 10px", fontSize: 13, boxSizing: "border-box" }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 8 }}>Coach win milestone</div>
+        <input type="number" value={coachWins} onChange={e => setCoachWins(Number(e.target.value))}
+          style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box", marginBottom: 16 }} />
+        <button onClick={() => { onSave(records, coachWins); onClose(); }}
+          style={{ width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: 11, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+          Save milestones
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmailPreviewModal({ alerts, school, onClose }) {
+  const [sent, setSent] = useState(false);
+  const totalAlerts = alerts.reduce((acc, a) => acc + a.alerts.length, 0);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 580, maxHeight: "85vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Alert email preview</h2>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#666" }}>{totalAlerts} milestone{totalAlerts !== 1 ? "s" : ""} to report for {school.name}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ background: "#1a56db", padding: "16px 20px", color: "#fff" }}>
+            <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 2 }}>FROM: alerts@milestoneiq.com</div>
+            <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 8 }}>TO: coach@{school.name.toLowerCase().replace(/\s/g,"")}.edu, ad@school.edu</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>🏆 {school.name} milestone alert — {new Date().toLocaleDateString()}</div>
+          </div>
+          <div style={{ padding: 20, fontSize: 14, color: "#374151", lineHeight: 1.7 }}>
+            <p>Hi Coach,</p>
+            <p>Here's your weekly milestone update for <strong>{school.name} {SPORTS[school.sport]?.label}</strong>. The following athletes are approaching or have reached significant milestones:</p>
+            {alerts.map(({ athlete, alerts: ats }) => ats.length > 0 && (
+              <div key={athlete.id} style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#111", marginBottom: 6 }}>
+                  {athlete.name} · {athlete.position}
+                </div>
+                {ats.map((a, i) => (
+                  <div key={i} style={{ paddingLeft: 12, borderLeft: "3px solid #1a56db", marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600 }}>{a.label}</div>
+                    <div style={{ fontSize: 13, color: "#6b7280" }}>
+                      Currently at {a.current.toLocaleString()} — {pct(a.current, a.target)}% of {a.target.toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <p style={{ fontSize: 13, color: "#6b7280", marginTop: 16 }}>
+              This alert was generated automatically by MilestoneIQ. Log in to your dashboard to update stats, adjust thresholds, or manage notification settings.
+            </p>
+          </div>
+        </div>
+        {sent
+          ? <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 12, textAlign: "center", color: "#14532d", fontWeight: 600 }}>✓ Alert sent to coaching staff</div>
+          : <button onClick={() => setSent(true)}
+              style={{ width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: 11, fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+              Send alert now
+            </button>
+        }
+      </div>
+    </div>
+  );
+}
+
+function SchoolDashboard({ school, onBack, onUpdate }) {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showUpload, setShowUpload] = useState(false);
+  const [showAddAthlete, setShowAddAthlete] = useState(false);
+  const [showMilestones, setShowMilestones] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [selectedAthlete, setSelectedAthlete] = useState(null);
+
+  const sport = SPORTS[school.sport] || SPORTS.football;
+  const allAlerts = school.athletes.map(a => ({
+    athlete: a,
+    alerts: getMilestoneAlerts(a, school.schoolRecords || {})
+  })).filter(x => x.alerts.length > 0);
+
+  const coachAlert = school.coachRecord && school.coachRecord.wins >= school.coachRecord.threshold * 0.9
+    ? { name: school.coachRecord.name, wins: school.coachRecord.wins, threshold: school.coachRecord.threshold }
+    : null;
+
+  const handleImport = (parsed) => {
+    const nameCol = parsed.headers.find(h => /name/i.test(h));
+    const posCol = parsed.headers.find(h => /pos/i.test(h));
+    const gradCol = parsed.headers.find(h => /grad|year/i.test(h));
+    const newAthletes = parsed.rows.map((row, i) => {
+      const statKeys = parsed.headers.filter(h => h !== nameCol && h !== posCol && h !== gradCol);
+      const stats = {};
+      statKeys.forEach(k => { if (typeof row[k] === "number") stats[k] = row[k]; });
+      return {
+        id: `imported_${Date.now()}_${i}`,
+        name: nameCol ? String(row[nameCol]) : `Athlete ${i+1}`,
+        position: posCol ? String(row[posCol]) : "—",
+        gradYear: gradCol ? Number(row[gradCol]) : new Date().getFullYear() + 2,
+        stats
+      };
+    });
+    onUpdate({ ...school, athletes: [...school.athletes, ...newAthletes] });
+  };
+
+  const tabs = ["overview", "athletes", "milestones", "alerts", "export"];
+
+  return (
+    <div style={{ fontFamily: "'Crimson Pro', Georgia, serif", minHeight: "100vh", background: "#f8f7f4" }}>
+      {showUpload && <CSVUploadModal school={school} onClose={() => setShowUpload(false)} onImport={handleImport} />}
+      {showAddAthlete && <AddAthleteModal onClose={() => setShowAddAthlete(false)} sport={school.sport} onAdd={a => { onUpdate({...school, athletes: [...school.athletes, a]}); }} />}
+      {showMilestones && <MilestoneSetupModal school={school} onClose={() => setShowMilestones(false)} onSave={(records, cw) => onUpdate({...school, schoolRecords: records, coachRecord: {...school.coachRecord, threshold: cw}})} />}
+      {showEmailPreview && <EmailPreviewModal alerts={allAlerts} school={school} onClose={() => setShowEmailPreview(false)} />}
+
+      <div style={{ background: "#fff", borderBottom: "1px solid #e8e4dd", padding: "0 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0 0" }}>
+          <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+            ← All schools
+          </button>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: school.primaryColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                {sport.icon}
+              </div>
+              <div>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111", fontFamily: "'Crimson Pro', serif" }}>{school.name}</h1>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>{school.mascot} · {sport.label} · {school.athletes.length} athletes tracked</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShowUpload(true)}
+              style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              ↑ Import CSV
+            </button>
+            <button onClick={() => setShowEmailPreview(true)}
+              style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              📧 Send alerts ({allAlerts.length})
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 0, marginTop: 16 }}>
+          {tabs.map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{ background: "none", border: "none", borderBottom: activeTab === tab ? "2px solid #1a56db" : "2px solid transparent",
+                padding: "10px 16px", fontSize: 13, fontWeight: activeTab === tab ? 700 : 400,
+                color: activeTab === tab ? "#1a56db" : "#6b7280", cursor: "pointer", textTransform: "capitalize" }}>
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: 24 }}>
+        {activeTab === "overview" && (
+          <div>
+            {(allAlerts.length > 0 || coachAlert) && (
+              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#92400e", marginBottom: 12 }}>
+                  🔔 {allAlerts.reduce((a,x)=>a+x.alerts.length,0) + (coachAlert?1:0)} active milestone alerts
+                </div>
+                {coachAlert && (
+                  <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px", marginBottom: 6, display:"flex", alignItems:"center", gap:10 }}>
+                    <span style={{fontSize:16}}>🏅</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13, fontWeight:600, color:"#713f12"}}>{coachAlert.name} — career win milestone</div>
+                      <div style={{fontSize:12,color:"#92400e"}}>{coachAlert.wins} / {coachAlert.threshold} wins — {pct(coachAlert.wins,coachAlert.threshold)}%</div>
+                      <ProgressBar value={coachAlert.wins} max={coachAlert.threshold} color="#f59e0b" />
+                    </div>
+                  </div>
+                )}
+                {allAlerts.slice(0,3).map(({athlete,alerts:ats}) => ats.slice(0,1).map((a,i) => (
+                  <AlertBadge key={`${athlete.id}-${i}`} alert={a} />
+                )))}
+                {allAlerts.length > 3 && <div style={{fontSize:13,color:"#6b7280",marginTop:8,cursor:"pointer"}} onClick={()=>setActiveTab("alerts")}>View all {allAlerts.reduce((a,x)=>a+x.alerts.length,0)} alerts →</div>}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+              {[
+                ["Athletes tracked", school.athletes.length, "👤"],
+                ["Active milestones", allAlerts.reduce((a,x)=>a+x.alerts.length,0), "🎯"],
+                ["School records set", Object.keys(school.schoolRecords||{}).length, "📋"],
+                ["Sports tracked", 1, "🏆"]
+              ].map(([label,val,icon]) => (
+                <div key={label} style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", border: "1px solid #e8e4dd" }}>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#111", fontFamily: "Georgia, serif" }}>{val}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e8e4dd", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f0ea", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#111" }}>Athlete leaderboard</div>
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: "#fafaf8" }}>
+                    <th style={{ padding:"10px 20px", textAlign:"left", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea" }}>Athlete</th>
+                    {sport.categories.slice(0,4).map(c => (
+                      <th key={c} style={{ padding:"10px 12px", textAlign:"right", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea" }}>{c}</th>
+                    ))}
+                    <th style={{ padding:"10px 12px", textAlign:"center", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea" }}>Alerts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {school.athletes.map((a,i) => {
+                    const ats = getMilestoneAlerts(a, school.schoolRecords||{});
+                    return (
+                      <tr key={a.id} onClick={() => { setSelectedAthlete(a); setActiveTab("athletes"); }}
+                        style={{ borderBottom:"1px solid #f9f7f4", cursor:"pointer", background: i%2===0?"#fff":"#fafaf8" }}>
+                        <td style={{ padding:"11px 20px" }}>
+                          <div style={{ fontWeight:600, color:"#111" }}>{a.name}</div>
+                          <div style={{ fontSize:12, color:"#9ca3af" }}>{a.position} · Class of {a.gradYear}</div>
+                        </td>
+                        {sport.categories.slice(0,4).map(c => (
+                          <td key={c} style={{ padding:"11px 12px", textAlign:"right", color: a.stats[c] ? "#111":"#d1d5db", fontWeight: a.stats[c]?500:400 }}>
+                            {a.stats[c] != null ? a.stats[c].toLocaleString() : "—"}
+                          </td>
+                        ))}
+                        <td style={{ padding:"11px 12px", textAlign:"center" }}>
+                          {ats.length > 0
+                            ? <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:12, padding:"2px 8px", fontSize:12, fontWeight:700 }}>{ats.length}</span>
+                            : <span style={{ color:"#d1d5db" }}>—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "athletes" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Athletes</h2>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => setShowUpload(true)}
+                  style={{ background:"#f3f4f6", border:"1px solid #e5e7eb", borderRadius:8, padding:"8px 14px", fontSize:13, cursor:"pointer" }}>
+                  ↑ Import CSV
+                </button>
+                <button onClick={() => setShowAddAthlete(true)}
+                  style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"8px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                  + Add athlete
+                </button>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px,1fr))", gap:12 }}>
+              {school.athletes.map(athlete => {
+                const ats = getMilestoneAlerts(athlete, school.schoolRecords||{});
+                const isSelected = selectedAthlete?.id === athlete.id;
+                return (
+                  <div key={athlete.id} onClick={() => setSelectedAthlete(isSelected ? null : athlete)}
+                    style={{ background:"#fff", borderRadius:12, border:`1px solid ${isSelected?"#1a56db":"#e8e4dd"}`, padding:16, cursor:"pointer", transition:"all 0.15s" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:15, color:"#111" }}>{athlete.name}</div>
+                        <div style={{ fontSize:12, color:"#6b7280" }}>{athlete.position} · Class of {athlete.gradYear}</div>
+                      </div>
+                      {ats.length > 0 && <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:12, padding:"3px 10px", fontSize:12, fontWeight:700 }}>{ats.length} 🔔</span>}
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                      {Object.entries(athlete.stats).slice(0,6).map(([k,v]) => (
+                        <div key={k} style={{ background:"#f9fafb", borderRadius:6, padding:"6px 8px" }}>
+                          <div style={{ fontSize:10, color:"#9ca3af" }}>{k}</div>
+                          <div style={{ fontSize:14, fontWeight:600, color:"#111" }}>{typeof v==="number" ? v.toLocaleString() : v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {isSelected && ats.length > 0 && (
+                      <div style={{ marginTop:12, borderTop:"1px solid #f3f0ea", paddingTop:10 }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:"#374151", marginBottom:6 }}>Milestone alerts</div>
+                        {ats.map((a,i) => <AlertBadge key={i} alert={a} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "milestones" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <div>
+                <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Milestones & records</h2>
+                <p style={{ margin:"4px 0 0", fontSize:13, color:"#6b7280" }}>Alerts fire automatically at 90%, 95%, and 100% of each threshold</p>
+              </div>
+              <button onClick={() => setShowMilestones(true)}
+                style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"8px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                Edit records
+              </button>
+            </div>
+
+            <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", marginBottom:16, overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid #f3f0ea", fontWeight:700, fontSize:14, color:"#111" }}>
+                School records — {sport.label}
+              </div>
+              <div style={{ padding:16, display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px,1fr))", gap:10 }}>
+                {sport.categories.map(cat => {
+                  const rec = (school.schoolRecords||{})[cat];
+                  const leaders = school.athletes.filter(a => a.stats[cat] != null).sort((a,b) => b.stats[cat]-a.stats[cat]);
+                  const leader = leaders[0];
+                  return (
+                    <div key={cat} style={{ background:"#f9fafb", borderRadius:8, padding:12 }}>
+                      <div style={{ fontSize:11, color:"#9ca3af", marginBottom:3 }}>{cat}</div>
+                      <div style={{ fontSize:18, fontWeight:700, color:"#111" }}>{rec ? rec.toLocaleString() : "—"}</div>
+                      {leader && <div style={{ fontSize:11, color:"#6b7280", marginTop:3 }}>
+                        Current leader: {leader.name} ({leader.stats[cat].toLocaleString()})
+                        {rec && <div style={{ marginTop:4 }}><ProgressBar value={leader.stats[cat]} max={rec} color="#1a56db" /></div>}
+                      </div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", overflow:"hidden" }}>
+              <div style={{ padding:"14px 20px", borderBottom:"1px solid #f3f0ea", fontWeight:700, fontSize:14, color:"#111" }}>
+                Round-number milestones (auto-tracked)
+              </div>
+              <div style={{ padding:16 }}>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+                  {ROUND_MILESTONES.map(m => (
+                    <span key={m} style={{ background:"#eff6ff", color:"#1e3a5f", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:600 }}>
+                      {m.toLocaleString()}
+                    </span>
+                  ))}
+                </div>
+                <p style={{ fontSize:13, color:"#6b7280", margin:0 }}>
+                  MilestoneIQ automatically watches for athletes approaching these round numbers in any tracked stat category.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "alerts" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Active milestone alerts</h2>
+              <button onClick={() => setShowEmailPreview(true)}
+                style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"8px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+                📧 Send all alerts
+              </button>
+            </div>
+            {coachAlert && (
+              <div style={{ background:"#fff", borderRadius:12, border:"1px solid #fde68a", padding:16, marginBottom:12 }}>
+                <div style={{ fontWeight:700, fontSize:15, color:"#111", marginBottom:4 }}>{coachAlert.name}</div>
+                <div style={{ fontSize:12, color:"#6b7280", marginBottom:8 }}>Head Coach</div>
+                <AlertBadge alert={{ type:"milestone", category:"Career wins", current:coachAlert.wins, target:coachAlert.threshold, label:`${coachAlert.threshold} career wins` }} />
+              </div>
+            )}
+            {allAlerts.length === 0 && !coachAlert
+              ? <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", padding:32, textAlign:"center", color:"#6b7280" }}>
+                  No active milestone alerts. Athletes will appear here when they reach 90% of a record or round-number milestone.
+                </div>
+              : allAlerts.map(({athlete, alerts:ats}) => (
+                <div key={athlete.id} style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", padding:16, marginBottom:12 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:15, color:"#111" }}>{athlete.name}</div>
+                      <div style={{ fontSize:12, color:"#6b7280" }}>{athlete.position} · Class of {athlete.gradYear}</div>
+                    </div>
+                    <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:12, padding:"3px 10px", fontSize:12, fontWeight:700 }}>
+                      {ats.length} alert{ats.length>1?"s":""}
+                    </span>
+                  </div>
+                  {ats.map((a,i) => <AlertBadge key={i} alert={a} />)}
+                </div>
+              ))
+            }
+          </div>
+        )}
+
+        {activeTab === "export" && (
+          <div>
+            <h2 style={{ margin:"0 0 8px", fontSize:18, fontWeight:700, color:"#111" }}>Export & integrations</h2>
+            <p style={{ margin:"0 0 20px", fontSize:14, color:"#6b7280" }}>Generate spreadsheets matching your existing record-book format</p>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
+              {[
+                { icon:"📊", label:"Record-book spreadsheet", desc:"Full career stats in your existing format, one tab per stat category", status:"active" },
+                { icon:"📧", label:"Weekly digest email", desc:"Auto-sent every Monday to coaches and ADs", status:"active" },
+                { icon:"🔗", label:"MaxPreps sync", desc:"Automatic daily pull from MaxPreps", status:"coming" },
+                { icon:"🎮", label:"Hudl integration", desc:"Connect your Hudl account for automatic stat import", status:"coming" },
+                { icon:"⚾", label:"GameChanger sync", desc:"For baseball, softball and more via GameChanger API", status:"coming" },
+                { icon:"📱", label:"Social milestone graphics", desc:"Auto-generated graphics for Instagram/Twitter", status:"coming" }
+              ].map(item => (
+                <div key={item.label} style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", padding:16, display:"flex", gap:12, alignItems:"flex-start" }}>
+                  <div style={{ fontSize:24, flexShrink:0 }}>{item.icon}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                      <div style={{ fontWeight:600, fontSize:14, color:"#111" }}>{item.label}</div>
+                      <span style={{ fontSize:11, padding:"2px 8px", borderRadius:12, fontWeight:600,
+                        background: item.status==="active"?"#f0fdf4":"#f3f4f6",
+                        color: item.status==="active"?"#14532d":"#6b7280" }}>
+                        {item.status==="active" ? "✓ Active" : "Coming soon"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize:13, color:"#6b7280" }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"11px 24px", fontWeight:600, fontSize:14, cursor:"pointer" }}>
+              ↓ Export record-book spreadsheet
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddSchoolModal({ onClose, onAdd }) {
+  const [form, setForm] = useState({ name:"", mascot:"", sport:"football", primaryColor:"#1a3a6b" });
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
+      <div style={{ background:"#fff", borderRadius:16, padding:28, width:440 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Add school</h2>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer" }}>✕</button>
+        </div>
+        {[["name","School name"],["mascot","Mascot / team name"]].map(([k,label]) => (
+          <div key={k} style={{ marginBottom:12 }}>
+            <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#374151", marginBottom:4 }}>{label}</label>
+            <input value={form[k]} onChange={e => setForm(f=>({...f,[k]:e.target.value}))}
+              style={{ width:"100%", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box" }} />
+          </div>
+        ))}
+        <div style={{ marginBottom:12 }}>
+          <label style={{ display:"block", fontSize:12, fontWeight:600, color:"#374151", marginBottom:4 }}>Primary sport</label>
+          <select value={form.sport} onChange={e => setForm(f=>({...f,sport:e.target.value}))}
+            style={{ width:"100%", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 12px", fontSize:14 }}>
+            {Object.entries(SPORTS).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+        </div>
+        <button onClick={() => { if(form.name) { onAdd({ id:`s${Date.now()}`, ...form, athletes:[], schoolRecords:{}, coachRecord:{name:"Head Coach",wins:0,threshold:200} }); onClose(); }}}
+          style={{ width:"100%", background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:11, fontWeight:600, fontSize:14, cursor:"pointer" }}>
+          Add school
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  return <div>MilestoneIQ App</div>
+  const [schools, setSchools] = useState(SEED_SCHOOLS);
+  const [activeSchool, setActiveSchool] = useState(null);
+  const [showAddSchool, setShowAddSchool] = useState(false);
+  const [view, setView] = useState("dashboard");
+
+  const updateSchool = useCallback((updated) => {
+    setSchools(s => s.map(sc => sc.id === updated.id ? updated : sc));
+    setActiveSchool(updated);
+  }, []);
+
+  if (activeSchool) {
+    return <SchoolDashboard school={activeSchool} onBack={() => setActiveSchool(null)} onUpdate={updateSchool} />;
+  }
+
+  const totalAlerts = schools.reduce((acc, sc) =>
+    acc + sc.athletes.reduce((a, athlete) => a + getMilestoneAlerts(athlete, sc.schoolRecords||{}).length, 0), 0);
+
+  return (
+    <div style={{ fontFamily:"'Crimson Pro', Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
+      {showAddSchool && <AddSchoolModal onClose={() => setShowAddSchool(false)} onAdd={s => setSchools(sc => [...sc, s])} />}
+
+      <div style={{ background:"#111", padding:"0 24px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:16, height:56 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:32, height:32, background:"#1a56db", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🏆</div>
+            <span style={{ color:"#fff", fontWeight:700, fontSize:18, letterSpacing:"-0.3px", fontFamily:"'Crimson Pro',serif" }}>MilestoneIQ</span>
+          </div>
+          <div style={{ flex:1 }} />
+          <div style={{ display:"flex", gap:8 }}>
+            {totalAlerts > 0 && (
+              <div style={{ background:"#fef3c7", color:"#92400e", borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
+                🔔 {totalAlerts} active alerts
+              </div>
+            )}
+            <div style={{ background:"#1e293b", color:"#94a3b8", borderRadius:20, padding:"4px 14px", fontSize:12 }}>
+              ⭐ Pro plan
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:20 }}>
+          <div>
+            <h1 style={{ margin:0, fontSize:28, fontWeight:700, color:"#111", fontFamily:"'Crimson Pro',serif" }}>Your schools</h1>
+            <p style={{ margin:"4px 0 0", fontSize:14, color:"#6b7280" }}>
+              {schools.length} school{schools.length!==1?"s":""} · {schools.reduce((a,s)=>a+s.athletes.length,0)} athletes tracked · {totalAlerts} active alerts
+            </p>
+          </div>
+          <button onClick={() => setShowAddSchool(true)}
+            style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"10px 18px", fontWeight:600, fontSize:14, cursor:"pointer" }}>
+            + Add school
+          </button>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px,1fr))", gap:14 }}>
+          {schools.map(school => {
+            const sport = SPORTS[school.sport] || SPORTS.football;
+            const alerts = school.athletes.reduce((a, athlete) => a + getMilestoneAlerts(athlete, school.schoolRecords||{}).length, 0);
+            const topAthlete = [...school.athletes].sort((a,b) => {
+              const aTotal = Object.values(a.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
+              const bTotal = Object.values(b.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
+              return bTotal - aTotal;
+            })[0];
+            return (
+              <div key={school.id} onClick={() => setActiveSchool(school)}
+                style={{ background:"#fff", borderRadius:14, border:"1px solid #e8e4dd", overflow:"hidden", cursor:"pointer", transition:"transform 0.15s", boxShadow:"0 1px 3px rgba(0,0,0,0.06)" }}
+                onMouseEnter={e => e.currentTarget.style.transform="translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform="translateY(0)"}>
+                <div style={{ background: school.primaryColor, padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ color:"rgba(255,255,255,0.7)", fontSize:12, marginBottom:2 }}>{sport.icon} {sport.label}</div>
+                    <div style={{ color:"#fff", fontWeight:700, fontSize:17, fontFamily:"'Crimson Pro',serif" }}>{school.name}</div>
+                    <div style={{ color:"rgba(255,255,255,0.7)", fontSize:12 }}>{school.mascot}</div>
+                  </div>
+                  {alerts > 0 && (
+                    <div style={{ background:"#fef3c7", color:"#92400e", borderRadius:12, padding:"4px 10px", fontSize:13, fontWeight:700 }}>
+                      🔔 {alerts}
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding:16 }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:12 }}>
+                    {[
+                      [school.athletes.length, "athletes"],
+                      [alerts, "alerts"],
+                      [Object.keys(school.schoolRecords||{}).length, "records"]
+                    ].map(([v,l]) => (
+                      <div key={l} style={{ textAlign:"center", background:"#f9fafb", borderRadius:8, padding:"8px 4px" }}>
+                        <div style={{ fontWeight:700, fontSize:18, color:"#111" }}>{v}</div>
+                        <div style={{ fontSize:11, color:"#9ca3af" }}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {topAthlete && (
+                    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 10px", background:"#f9fafb", borderRadius:8 }}>
+                      <div style={{ width:28, height:28, borderRadius:"50%", background: school.primaryColor+"22", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color: school.primaryColor }}>
+                        {topAthlete.name.split(" ").map(n=>n[0]).join("")}
+                      </div>
+                      <div>
+                        <div style={{ fontSize:12, fontWeight:600, color:"#111" }}>{topAthlete.name}</div>
+                        <div style={{ fontSize:11, color:"#9ca3af" }}>Top athlete by total stats</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <div onClick={() => setShowAddSchool(true)}
+            style={{ borderRadius:14, border:"2px dashed #d1d5db", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:32, cursor:"pointer", color:"#9ca3af", minHeight:160, transition:"all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor="#1a56db"; e.currentTarget.style.color="#1a56db"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor="#d1d5db"; e.currentTarget.style.color="#9ca3af"; }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>+</div>
+            <div style={{ fontWeight:600, fontSize:14 }}>Add school</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
