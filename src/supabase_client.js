@@ -1,4 +1,49 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL  = 'https://odirpbptemubzysrvajh.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kaXJwYnB0ZW11Ynp5c3J2YWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDEwNzQsImV4cCI6MjA5NTkxNzA3NH0.Ikr03FPjiYcXdwr0ng5aNKA-cyHH2tnRpOieeCuy1JI'
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
+
+export const signUp = (email, password, fullName) =>
+  supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } })
+
+export const signIn = (email, password) =>
+  supabase.auth.signInWithPassword({ email, password })
+
+export const signOut = () => supabase.auth.signOut()
+
+export const getSession = () => supabase.auth.getSession()
+
+export const getProfile = async (userId) => {
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+  return { data, error }
+}
+
+export const getUserOrgs = async (userId) => {
+  const { data, error } = await supabase.from('org_members').select('role, organizations(*)').eq('user_id', userId)
+  return { data, error }
+}
+
+export const getPrograms = async (orgId) => {
+  const { data, error } = await supabase.from('programs').select('*').eq('org_id', orgId).order('created_at')
+  return { data, error }
+}
+
+export const getAthletes = async (programId) => {
+  const { data, error } = await supabase.from('athletes').select('*').eq('program_id', programId).order('name')
+  return { data, error }
+}
+
+export const getAllTimePlayers = async (programId) => {
+  const { data, error } = await supabase.from('all_time_players').select('*').eq('program_id', programId).order('name')
+  return { data, error }
+}
+
+export const getRecords = async (programId) => {
+  const { data, error } = await supabase.from('records').select('*').eq('program_id', programId).order('stat_name
+cat > src/supabase_client.js << 'EOF'
+import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL  = 'https://odirpbptemubzysrvajh.supabase.co'
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kaXJwYnB0ZW11Ynp5c3J2YWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNDEwNzQsImV4cCI6MjA5NTkxNzA3NH0.Ikr03FPjiYcXdwr0ng5aNKA-cyHH2tnRpOieeCuy1JI'
