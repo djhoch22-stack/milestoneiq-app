@@ -5095,7 +5095,7 @@ export default function App() {
             <div>
               <div style={{ fontWeight:700,fontSize:15,color:"#111" }}>Admin User</div>
               <div style={{ fontSize:13,color:"#6b7280" }}>admin@denchristian.org</div>
-              <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>Pro plan</div>
+              <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>Program plan</div>
             </div>
             <div style={{ marginLeft:"auto",display:"flex",gap:8 }}>
               <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#374151" }}>Change photo</button>
@@ -5125,43 +5125,38 @@ export default function App() {
 
         {/* Subscription */}
         <Section title="⭐ Subscription">
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12,marginBottom:16 }}>
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16 }}>
             {[
-              { plan:"Starter", price:"Free", annual:"", features:[
+              { plan:"Program", price:"$12/mo", annual:"$120/yr — save $24", features:[
                   "1 program",
-                  "Up to 20 athletes",
-                  "Basic milestones",
-                  "No email alerts",
-                ], current:false, highlight:false },
-              { plan:"Pro", price:"$19/mo", annual:"$190/yr — save $38", features:[
-                  "1 school, unlimited programs",
                   "Unlimited athletes",
                   "Custom milestones & alerts",
                   "Email alerts",
                   "All-time records & seasons",
-                  "Multi-coach access",
+                  "7-day free trial",
                 ], current:true, highlight:true },
-              { plan:"School", price:"$49/mo", annual:"$490/yr — save $98", features:[
-                  "1 school, unlimited programs",
-                  "Everything in Pro",
+              { plan:"School", price:"$79/mo", annual:"$790/yr — save $158", features:[
+                  "Unlimited programs",
+                  "Everything in Program",
                   "Multi-coach access",
                   "Admin dashboard",
                   "Priority support",
+                  "7-day free trial",
                 ], current:false, highlight:false },
-              { plan:"District", price:"$149/mo", annual:"$1,490/yr — save $298", features:[
-                  "Multiple schools",
+              { plan:"School Plus", price:"$149/mo", annual:"$1,490/yr — save $298", features:[
+                  "Unlimited programs",
                   "Everything in School",
                   "District admin dashboard",
                   "Bulk program setup",
                   "Dedicated support",
+                  "7-day free trial",
                 ], current:false, highlight:false },
             ].map(({ plan, price, annual, features, current, highlight }) => (
               <div key={plan} style={{ border:`2px solid ${highlight?"#1a56db":"#e5e7eb"}`,borderRadius:12,padding:16,position:"relative",display:"flex",flexDirection:"column" }}>
                 {current && <div style={{ position:"absolute",top:-1,right:12,background:"#1a56db",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:"0 0 6px 6px" }}>Current</div>}
                 <div style={{ fontWeight:700,fontSize:15,color:"#111",marginBottom:2 }}>{plan}</div>
                 <div style={{ fontSize:22,fontWeight:700,color:highlight?"#1a56db":"#374151",marginBottom:2 }}>{price}</div>
-                {annual && <div style={{ fontSize:11,color:"#22c55e",fontWeight:600,marginBottom:10 }}>{annual}</div>}
-                {!annual && <div style={{ marginBottom:10 }} />}
+                <div style={{ fontSize:11,color:"#22c55e",fontWeight:600,marginBottom:10 }}>{annual}</div>
                 <div style={{ flex:1 }}>
                   {features.map(f => (
                     <div key={f} style={{ display:"flex",alignItems:"flex-start",gap:6,fontSize:11,color:"#374151",marginBottom:5 }}>
@@ -5169,14 +5164,9 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                {!current && plan !== "Starter" && (
+                {!current && (
                   <button style={{ width:"100%",marginTop:12,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,cursor:"pointer" }}>
                     Upgrade to {plan}
-                  </button>
-                )}
-                {!current && plan === "Starter" && (
-                  <button style={{ width:"100%",marginTop:12,background:"none",color:"#991b1b",border:"1px solid #fca5a5",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,cursor:"pointer" }}>
-                    Downgrade
                   </button>
                 )}
               </div>
@@ -5188,7 +5178,7 @@ export default function App() {
           <div style={{ background:"#f9fafb",borderRadius:10,padding:14,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
             <div>
               <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>Billing</div>
-              <div style={{ fontSize:12,color:"#6b7280" }}>Next charge: $19.00 on July 1, 2026 · Visa ending 4242</div>
+              <div style={{ fontSize:12,color:"#6b7280" }}>Next charge: $12.00 on July 1, 2026 · Visa ending 4242</div>
             </div>
             <div style={{ display:"flex",gap:8 }}>
               <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",color:"#374151" }}>Switch to annual</button>
@@ -5352,7 +5342,7 @@ export default function App() {
           </div>
           <div style={{ flex:1 }} />
           {totalAlerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700 }}>🔔 {totalAlerts} active alerts</div>}
-          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ Pro plan</div>
+          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ Program plan</div>
           <button onClick={()=>signOut().then(()=>window.location.reload())}
             style={{ background:"none",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"5px 14px",fontSize:12,cursor:"pointer",color:"rgba(255,255,255,0.7)",fontWeight:600 }}>
             Sign out
