@@ -2601,11 +2601,12 @@ const SEED_SCHOOLS = [
       { id:"bm15", statName:"Free Throws Attempted",       values:[50,100,200,300],            alertPct:90 },
     ],
     seasons: [
+      { season:"2026-2027", wins:0,  losses:0,  leagueWins:0,  leagueLosses:0,    coach:"Steve Schimpeler" },
       { season:"2025-2026", wins:13, losses:12, leagueWins:3,  leagueLosses:6,    coach:"Dennis Burrage", notes:"Sweet 16" },
-      { season:"2024-2025", wins:10, losses:14, leagueWins:2,  leagueLosses:7,    coach:"Dennis Burrage" },
-      { season:"2023-2024", wins:18, losses:7,  leagueWins:8,  leagueLosses:3,    coach:"Wesley Burke", notes:"Elite Eight" },
+      { season:"2024-2025", wins:10, losses:14, leagueWins:2,  leagueLosses:7,    coach:"Dennis Burrage", notes:"Round of 32" },
+      { season:"2023-2024", wins:18, losses:7,  leagueWins:8,  leagueLosses:3,    coach:"Wesley Burke", notes:"Elite 8" },
       { season:"2022-2023", wins:14, losses:10, leagueWins:10, leagueLosses:2,    coach:"Wesley Burke", notes:"League Champions/Sweet 16" },
-      { season:"2021-2022", wins:21, losses:4,  leagueWins:11, leagueLosses:1,    coach:"Kevin Boley", notes:"League Champions/Final Four" },
+      { season:"2021-2022", wins:21, losses:4,  leagueWins:11, leagueLosses:1,    coach:"Kevin Boley", notes:"League Champions/Final 4" },
       { season:"2020-2021", wins:13, losses:3,  leagueWins:9,  leagueLosses:1,    coach:"Billy Berglund" },
       { season:"2019-2020", wins:18, losses:6,  leagueWins:10, leagueLosses:2,    coach:"Billy Berglund" },
       { season:"2018-2019", wins:17, losses:8,  leagueWins:10, leagueLosses:2,    coach:"Ben Dirksen" },
@@ -5333,6 +5334,10 @@ export default function App() {
           <div style={{ flex:1 }} />
           {totalAlerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700 }}>🔔 {totalAlerts} active alerts</div>}
           <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ Pro plan</div>
+          <button onClick={()=>signOut().then(()=>window.location.reload())}
+            style={{ background:"none",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"5px 14px",fontSize:12,cursor:"pointer",color:"rgba(255,255,255,0.7)",fontWeight:600 }}>
+            Sign out
+          </button>
         </div>
       </div>
 
