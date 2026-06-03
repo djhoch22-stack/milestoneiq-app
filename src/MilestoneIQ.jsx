@@ -2754,7 +2754,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
     onUpdate({ ...school, athletes: updated });
   };
 
-  const tabs = ["overview","athletes","records","milestones","alerts","all-time",
+  const tabs = ["overview","athletes","milestones","alerts","records","all-time",
     ...(school.seasons?.length ? ["seasons"] : []),
     "hof","export"];
 
