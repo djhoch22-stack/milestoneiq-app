@@ -3042,12 +3042,15 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                   const recStatIdx = (n) => { const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i; };
                   const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)"];
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
+                  // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
+                  const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
                   const byGroup = {};
                   (school.records||[]).forEach(r => {
-                    const grp = getGroup(r.statName);
+                    const tileStat = PCT_PARENT[r.statName] || r.statName;
+                    const grp = getGroup(tileStat);
                     if (!byGroup[grp]) byGroup[grp] = {};
-                    if (!byGroup[grp][r.statName]) byGroup[grp][r.statName] = [];
-                    byGroup[grp][r.statName].push(r);
+                    if (!byGroup[grp][tileStat]) byGroup[grp][tileStat] = [];
+                    byGroup[grp][tileStat].push(r);
                   });
 
                   return Object.entries(byGroup).map(([grpName, statMap]) => (
@@ -3067,14 +3070,15 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                               {leader&&<div style={{ fontSize:12,color:"#6b7280" }}>Current leader: <strong>{leader.name}</strong> ({leader.stats[statName].toLocaleString()})</div>}
                             </div>
                             <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8 }}>
-                              {[...recs].sort((a,b)=>recVariantIdx(a.variant)-recVariantIdx(b.variant)).map(rec=>{
+                              {[...recs].sort((a,b)=>((PCT_PARENT[a.statName]?100:0)+recVariantIdx(a.variant))-((PCT_PARENT[b.statName]?100:0)+recVariantIdx(b.variant))).map(rec=>{
+                                const isPct = !!PCT_PARENT[rec.statName];
                                 const leaderVal = leader?.stats[statName];
                                 const p = leaderVal && rec.variant==="Career total" ? pct(leaderVal, rec.value) : null;
                                 return (
                                   <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
                                     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
-                                      <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{rec.variant}</span>
-                                      <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{rec.value.toLocaleString()}</span>
+                                      <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? "Best %" : rec.variant}</span>
+                                      <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
                                     </div>
                                     {rec.holderName&&<div style={{ fontSize:12,color:"#6b7280" }}>🏅 {rec.holderName}{rec.holderYear?` · ${rec.holderYear}`:""}</div>}
                                     {p!==null&&rec.variant==="Career total"&&(
@@ -3143,7 +3147,8 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                 .sort((a, b) => b.season.localeCompare(a.season))[0]?.coach || null;
               const currentCoachWins = (school.seasons || [])
                 .filter(s => s.coach === currentCoach)
-                .reduce((sum, s) => sum + (s.wins || 0), 0);
+                .reduce((sum, s) => sum + (s.wins || 0), 0)
+                + (currentCoach && COACH_PRIOR_STATS[currentCoach] ? (COACH_PRIOR_STATS[currentCoach].wins || 0) : 0);
               const coachLeaders = currentCoach
                 ? [{ id: currentCoach, name: currentCoach, wins: currentCoachWins }]
                 : [];
