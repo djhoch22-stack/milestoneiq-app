@@ -20,7 +20,7 @@ import {
   getSeasons,
 } from './supabase_client';
 import Auth, { LockedScreen } from './Auth';
-import App from './App';
+import App from './MilestoneIQ';
 
 const TIER_LIMITS = {
   program: { maxPrograms: 1 },
