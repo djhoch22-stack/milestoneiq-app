@@ -2024,6 +2024,12 @@ function hofTier(score) {
 
 // ── Coach HOF Engine ──────────────────────────────────────────────────────────
 
+// Wins/record a coach earned at a PREVIOUS school, folded into their MilestoneIQ
+// profile here ("for now" — there's no per-coach DB field yet). Matched by exact name.
+const COACH_PRIOR_STATS = {
+  "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
+};
+
 function buildCoachStats(seasons) {
   const coaches = {};
   (seasons || []).forEach(s => {
@@ -2048,6 +2054,16 @@ function buildCoachStats(seasons) {
     if (/sweet.?16/.test(notes))                         co.sweetSixteens  += 1;
     if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
     if (/league champ/.test(notes))                      co.leagueChamps   += 1;
+  });
+  // Fold in any wins/record a coach brought from a previous school.
+  Object.entries(COACH_PRIOR_STATS).forEach(([name, prior]) => {
+    if (!coaches[name]) {
+      coaches[name] = { name, wins:0, losses:0, leagueWins:0, leagueLosses:0, seasons:0,
+        stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0,
+        playoffs:0, leagueChamps:0 };
+    }
+    const co = coaches[name];
+    Object.keys(prior).forEach(k => { if (typeof co[k] === "number") co[k] += prior[k]; });
   });
   return Object.values(coaches);
 }
