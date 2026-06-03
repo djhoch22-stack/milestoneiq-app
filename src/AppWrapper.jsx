@@ -170,19 +170,29 @@ export default function AppWrapper() {
 
   const handleUpdateSchool = async (updated) => {
     setSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    // DB primary keys are uuids (always contain a "-"); seed/in-app ids ("bb026",
+    // "br5", "s4"…) do not. Send undefined for those so the DB assigns a fresh uuid.
+    const isUuid = (v) => typeof v === 'string' && v.includes('-');
+
+    // Program-level fields
     await supabase
       .from('programs')
       .update({
+        name: updated.name,
         mascot: updated.mascot,
+        sport: updated.sport,
         primary_color: updated.primaryColor,
         logo_url: updated.logo || null,
+        incoming_coach: updated.incomingCoach || null,
         coach_hof: updated.coachHof || {},
         dismissed_alerts: updated.dismissedAlerts || [],
       })
       .eq('id', updated.id);
+
+    // Athletes
     if (updated.athletes?.length) {
       const rows = updated.athletes.map((a) => ({
-        id: a.id?.startsWith?.('s') ? undefined : a.id,
+        id: isUuid(a.id) ? a.id : undefined,
         program_id: updated.id,
         name: a.name,
         position: a.position,
@@ -193,30 +203,76 @@ export default function AppWrapper() {
       }));
       await supabase.from('athletes').upsert(rows, { onConflict: 'id' });
     }
-    for (const p of updated.allTimeRoster || []) {
-      if (p.id) {
-        await supabase
-          .from('all_time_players')
-          .update({
-            school_hall_of_fame: p.schoolHallOfFame || false,
-            state_hall_of_fame: p.stateHallOfFame || false,
-            is_active: p.isActive || false,
-          })
-          .eq('id', p.id);
+
+    // All-time roster — full upsert so edited stats persist (not just HOF flags)
+    if (updated.allTimeRoster?.length) {
+      const rows = updated.allTimeRoster.map((p) => ({
+        id: isUuid(p.id) ? p.id : undefined,
+        program_id: updated.id,
+        name: p.name,
+        first_year: p.firstYear || null,
+        last_year: p.lastYear || null,
+        grad_year: p.gradYear || null,
+        is_current: p.isCurrent || false,
+        is_active: p.isActive || false,
+        school_hall_of_fame: p.schoolHallOfFame || false,
+        state_hall_of_fame: p.stateHallOfFame || false,
+        stats: p.stats || {},
+      }));
+      for (let i = 0; i < rows.length; i += 500) {
+        await supabase.from('all_time_players').upsert(rows.slice(i, i + 500), { onConflict: 'id' });
       }
     }
+
+    // Records
     if (updated.records) {
       const rows = updated.records.map((r) => ({
-        id: r.id?.includes?.('-') ? r.id : undefined,
+        id: isUuid(r.id) ? r.id : undefined,
         program_id: updated.id,
         stat_name: r.statName,
         variant: r.variant,
         holder_name: r.holderName,
-        holder_year: r.holderYear,
+        holder_year: r.holderYear || r.season || null,
         value: r.value,
         sport: updated.sport,
       }));
       await supabase.from('records').upsert(rows, { onConflict: 'id' });
+    }
+
+    // Seasons — replace wholesale (app season objects carry no stable id)
+    if (updated.seasons) {
+      await supabase.from('seasons').delete().eq('program_id', updated.id);
+      if (updated.seasons.length) {
+        await supabase.from('seasons').insert(
+          updated.seasons.map((s) => ({
+            program_id: updated.id,
+            season: s.season,
+            wins: s.wins,
+            losses: s.losses,
+            league_wins: s.leagueWins ?? null,
+            league_losses: s.leagueLosses ?? null,
+            coach: s.coach || null,
+            notes: s.notes || null,
+            win_pct: s.winPct ?? null,
+          }))
+        );
+      }
+    }
+
+    // Milestones — replace wholesale (handles reordering)
+    if (updated.milestones) {
+      await supabase.from('milestones').delete().eq('program_id', updated.id);
+      if (updated.milestones.length) {
+        await supabase.from('milestones').insert(
+          updated.milestones.map((m, i) => ({
+            program_id: updated.id,
+            stat_name: m.statName,
+            values: m.values,
+            alert_pct: m.alertPct || 90,
+            sort_order: i,
+          }))
+        );
+      }
     }
   };
 
