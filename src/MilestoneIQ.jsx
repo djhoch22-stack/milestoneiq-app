@@ -2560,6 +2560,7 @@ const SEED_SCHOOLS = [
       { id:"br4",  statName:"Wins",                      variant:"Single season", holderName:"Alex Terpstra",    value:26,   season:"2011-2012" },
       { id:"br5",  statName:"Points",                    variant:"Career total",  holderName:"Craig Matthies",   value:1899, season:"1975-1979" },
       { id:"br6",  statName:"Points",                    variant:"Single season", holderName:"Craig Matthies",   value:599,  season:"1978-1979" },
+      { id:"br6a", statName:"Points",                    variant:"Single game",   holderName:"Jeff Mains",       value:41,   season:"1966-1967" },
       { id:"br7",  statName:"Assists",                   variant:"Career total",  holderName:"Ethan Liebert",    value:219,  season:"2019-2022" },
       { id:"br8",  statName:"Assists",                   variant:"Single season", holderName:"Josh Vriesman",    value:166,  season:"2000-2001" },
       { id:"br9",  statName:"Total Rebounds",            variant:"Career total",  holderName:"Tom Dykstra",      value:385,  season:"1972-1973" },
