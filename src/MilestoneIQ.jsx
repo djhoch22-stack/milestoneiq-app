@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+import { signOut } from "./supabase_client";
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
 
@@ -177,6 +178,27 @@ const SPORTS = {
       { name: "Strikeouts (Pitching)", variants: ["Career total","Single season","Single game"] },
       { name: "Wins (Pitching)", variants: ["Career total","Single season"] },
       { name: "ERA", variants: ["Single season","Career total"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  basketball_boys: {
+    label: "Boys Basketball", icon: "🏀",
+    statCategories: [
+      { name: "Games Played", variants: ["Career total","Single season"] },
+      { name: "Wins", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
+      { name: "Assists", variants: ["Career total","Single season","Single game"] },
+      { name: "Total Rebounds", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
+      { name: "Offensive Rebounds", variants: ["Career total","Single season","Single game"] },
+      { name: "Defensive Rebounds", variants: ["Career total","Single season","Single game"] },
+      { name: "Steals", variants: ["Career total","Single season"] },
+      { name: "Blocks", variants: ["Career total","Single season"] },
+      { name: "Field Goals Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Field Goals Attempted", variants: ["Career total","Single season","Single game"] },
+      { name: "Three Pointers Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Three Pointers Attempted", variants: ["Career total","Single season","Single game"] },
+      { name: "Free Throws Made", variants: ["Career total","Single season","Single game"] },
+      { name: "Free Throws Attempted", variants: ["Career total","Single season","Single game"] },
       { name: "Coach Wins", variants: ["Career total","Single season"] },
     ]
   },
@@ -843,6 +865,10 @@ Rules: numeric stats only, exact stat names from document, unknown grad year = $
   // Sport-aware CSV template
   const SPORT_TEMPLATES = {
     basketball: {
+      headers: "Name,Grad Year,Games Played,Wins,Points,Assists,Total Rebounds,Offensive Rebounds,Defensive Rebounds,Steals,Blocks,Field Goals Made,Field Goals Attempted,Three Pointers Made,Three Pointers Attempted,Free Throws Made,Free Throws Attempted",
+      example:  "Alex Johnson,2026,28,22,394,54,186,62,124,41,8,142,298,38,102,72,95"
+    },
+    basketball_boys: {
       headers: "Name,Grad Year,Games Played,Wins,Points,Assists,Total Rebounds,Offensive Rebounds,Defensive Rebounds,Steals,Blocks,Field Goals Made,Field Goals Attempted,Three Pointers Made,Three Pointers Attempted,Free Throws Made,Free Throws Attempted",
       example:  "Alex Johnson,2026,28,22,394,54,186,62,124,41,8,142,298,38,102,72,95"
     },
@@ -2510,7 +2536,7 @@ const SEED_SCHOOLS = [
     ]
   },
   {
-    id:"s4", name:"Denver Christian", mascot:"Thunder (Boys)", sport:"basketball", primaryColor:"#1a3a6b", incomingCoach:"Steve Schimpeler",
+    id:"s4", name:"Denver Christian", mascot:"Thunder (Boys)", sport:"basketball_boys", primaryColor:"#1a3a6b", incomingCoach:"Steve Schimpeler",
     athletes: [
       { id:"s4p00", isActive:true, name:"Micah Warren", position:"G", gradYear:2028, jersey:0, stats:{"Games Played":17,"Wins":13,"Points":22,"Assists":2,"Total Rebounds":14,"Offensive Rebounds":4,"Defensive Rebounds":10,"Steals":5,"Field Goals Made":8,"Field Goals Attempted":26,"Three Pointers Made":5,"Three Pointers Attempted":17,"Free Throws Made":1,"Free Throws Attempted":2} },
       { id:"s4p01", isActive:true, name:"Bryce Peters", position:"G", gradYear:2028, jersey:1, stats:{"Games Played":24,"Wins":13,"Points":83,"Assists":16,"Total Rebounds":52,"Offensive Rebounds":19,"Defensive Rebounds":33,"Steals":23,"Blocks":2,"Field Goals Made":30,"Field Goals Attempted":81,"Three Pointers Made":11,"Three Pointers Attempted":39,"Free Throws Made":12,"Free Throws Attempted":22} },
@@ -5051,7 +5077,11 @@ export default function App() {
               <div style={{ fontSize:13,color:"#6b7280" }}>admin@denchristian.org</div>
               <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>Pro plan</div>
             </div>
-            <button style={{ marginLeft:"auto",background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#374151" }}>Change photo</button>
+            <div style={{ marginLeft:"auto",display:"flex",gap:8 }}>
+              <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#374151" }}>Change photo</button>
+              <button onClick={()=>signOut().then(()=>window.location.reload())}
+                style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#991b1b",fontWeight:600 }}>Sign out</button>
+            </div>
           </div>
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
             <Field label="First name"><Input defaultValue="Admin" /></Field>
