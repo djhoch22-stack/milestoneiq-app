@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -3340,24 +3340,38 @@ function saveSchools(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-export default function App() {
-  const [schools, setSchoolsRaw] = useState(() => loadSchools());
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut } = {}) {
+  const supabaseMode = !!orgId;
+  const [schools, setSchoolsRaw] = useState(() => supabaseMode ? (initialSchools || []) : loadSchools());
   const [activeSchool, setActiveSchool] = useState(null);
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [homeTab, setHomeTab] = useState("schools");
 
+  // In Supabase mode the database (delivered via AppWrapper's initialSchools) is the
+  // source of truth. We never fall back to SEED_SCHOOLS for a logged-in org, so one
+  // customer can never see another customer's (or Denver Christian's) data.
+  useEffect(() => {
+    if (supabaseMode) setSchoolsRaw(initialSchools || []);
+  }, [supabaseMode, initialSchools]);
+
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      saveSchools(next);
+      if (!orgId) saveSchools(next);   // localStorage is a cache for standalone/demo only
       return next;
     });
-  }, []);
+  }, [orgId]);
 
   const updateSchool = useCallback((updated) => {
     setSchools(s => s.map(sc => sc.id===updated.id ? updated : sc));
     setActiveSchool(updated);
-  }, [setSchools]);
+    if (onUpdateSchool) onUpdateSchool(updated);   // persist this program to Supabase
+  }, [setSchools, onUpdateSchool]);
+
+  const handleSignOut = useCallback(() => {
+    if (onSignOut) onSignOut();
+    else signOut().then(() => window.location.reload());
+  }, [onSignOut]);
 
   if (activeSchool) {
     return <SchoolDashboard school={activeSchool} onBack={()=>setActiveSchool(null)} onUpdate={updateSchool} />;
@@ -3416,12 +3430,12 @@ export default function App() {
             <div style={{ width:56,height:56,borderRadius:"50%",background:"#1a56db",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:20 }}>A</div>
             <div>
               <div style={{ fontWeight:700,fontSize:15,color:"#111" }}>Admin User</div>
-              <div style={{ fontSize:13,color:"#6b7280" }}>admin@denchristian.org</div>
-              <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>Program plan</div>
+              <div style={{ fontSize:13,color:"#6b7280" }}>{userEmail || "—"}</div>
+              <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>{({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"Program")} plan</div>
             </div>
             <div style={{ marginLeft:"auto",display:"flex",gap:8 }}>
               <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#374151" }}>Change photo</button>
-              <button onClick={()=>signOut().then(()=>window.location.reload())}
+              <button onClick={handleSignOut}
                 style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#991b1b",fontWeight:600 }}>Sign out</button>
             </div>
           </div>
@@ -3619,6 +3633,7 @@ export default function App() {
         {/* Danger zone */}
         <Section title="⚠️ Danger zone">
           <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
+            {!orgId && (
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",border:"1px solid #fcd34d",borderRadius:10,background:"#fffbeb" }}>
               <div>
                 <div style={{ fontSize:14,fontWeight:600,color:"#92400e" }}>Reset to demo data</div>
@@ -3627,6 +3642,7 @@ export default function App() {
               <button onClick={()=>{ if(window.confirm("Reset everything to the original demo data? All your changes will be lost.")) { localStorage.removeItem(LS_KEY); window.location.reload(); } }}
                 style={{ background:"#92400e",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Reset data</button>
             </div>
+            )}
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",border:"1px solid #fca5a5",borderRadius:10,background:"#fff5f5" }}>
               <div>
                 <div style={{ fontSize:14,fontWeight:600,color:"#991b1b" }}>Delete account</div>
@@ -3644,7 +3660,19 @@ export default function App() {
   return (
     <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
       <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
-      {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} onAdd={s=>setSchools(sc=>[...sc,s])} />}
+      {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} onAdd={async (s)=>{
+        if (orgId) {
+          if (tierLimits && schools.length >= tierLimits.maxPrograms) {
+            alert(`Your ${({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"current")} plan includes ${tierLimits.maxPrograms} program${tierLimits.maxPrograms===1?"":"s"}. Upgrade to add more.`);
+            return;
+          }
+          const { data, error } = await createProgram(orgId, { name:s.name, mascot:s.mascot, sport:s.sport, primary_color:s.primaryColor, logo_url:null });
+          if (error || !data) { alert("Could not create program: "+(error?.message||"unknown error")); return; }
+          setSchools(sc=>[...sc, { id:data.id, name:data.name, mascot:data.mascot, sport:data.sport, primaryColor:data.primary_color, logo:data.logo_url, athletes:[], allTimeRoster:[], records:[], milestones:[], seasons:[], coachHof:{}, dismissedAlerts:[] }]);
+        } else {
+          setSchools(sc=>[...sc, { ...s, allTimeRoster:s.allTimeRoster||[], milestones:s.milestones||[], seasons:s.seasons||[] }]);
+        }
+      }} />}
 
       <div style={{ background:"#111",padding:"0 24px" }}>
         <div style={{ display:"flex",alignItems:"center",gap:16,height:56 }}>
@@ -3664,8 +3692,9 @@ export default function App() {
           </div>
           <div style={{ flex:1 }} />
           {totalAlerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700 }}>🔔 {totalAlerts} active alerts</div>}
-          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ Program plan</div>
-          <button onClick={()=>signOut().then(()=>window.location.reload())}
+          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ {({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"Program")} plan</div>
+          {userEmail && <div style={{ color:"rgba(255,255,255,0.55)",fontSize:12 }}>{userEmail}</div>}
+          <button onClick={handleSignOut}
             style={{ background:"none",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"5px 14px",fontSize:12,cursor:"pointer",color:"rgba(255,255,255,0.7)",fontWeight:600 }}>
             Sign out
           </button>
@@ -3683,6 +3712,22 @@ export default function App() {
             </div>
             <button onClick={()=>setShowAddSchool(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer" }}>+ Add program</button>
           </div>
+
+          {supabaseMode && schools.length===0 && new URLSearchParams(window.location.search).get("seed")==="dc" && (
+            <div style={{ background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12,padding:20,marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center",gap:16 }}>
+              <div>
+                <div style={{ fontWeight:700,fontSize:15,color:"#1e40af",marginBottom:2 }}>Load Denver Christian historical data</div>
+                <div style={{ fontSize:13,color:"#3b5b8c" }}>One-time import: all programs, the full all-time roster, records, and season history.</div>
+              </div>
+              <button onClick={async ()=>{
+                if(!window.confirm("Import the full Denver Christian historical dataset into this account? This is a one-time setup action.")) return;
+                try { await seedDCPrograms(orgId, SEED_SCHOOLS); window.location.reload(); }
+                catch(e){ alert("Import failed: "+(e?.message||e)); }
+              }} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer",whiteSpace:"nowrap" }}>
+                Load data
+              </button>
+            </div>
+          )}
 
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14 }}>
             {schools.map(school=>{
