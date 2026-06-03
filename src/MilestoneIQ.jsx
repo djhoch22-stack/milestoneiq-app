@@ -3070,26 +3070,39 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                               {leader&&<div style={{ fontSize:12,color:"#6b7280" }}>Current leader: <strong>{leader.name}</strong> ({leader.stats[statName].toLocaleString()})</div>}
                             </div>
                             <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8 }}>
-                              {[...recs].sort((a,b)=>((PCT_PARENT[a.statName]?100:0)+recVariantIdx(a.variant))-((PCT_PARENT[b.statName]?100:0)+recVariantIdx(b.variant))).map(rec=>{
-                                const isPct = !!PCT_PARENT[rec.statName];
-                                const leaderVal = leader?.stats[statName];
-                                const p = leaderVal && rec.variant==="Career total" ? pct(leaderVal, rec.value) : null;
-                                return (
-                                  <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
-                                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
-                                      <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? "Best %" : rec.variant}</span>
-                                      <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
-                                    </div>
-                                    {rec.holderName&&<div style={{ fontSize:12,color:"#6b7280" }}>🏅 {rec.holderName}{rec.holderYear?` · ${rec.holderYear}`:""}</div>}
-                                    {p!==null&&rec.variant==="Career total"&&(
-                                      <div style={{ marginTop:8 }}>
-                                        <div style={{ fontSize:11,color:"#6b7280",marginBottom:3 }}>{leader.name}: {leaderVal.toLocaleString()} ({p}%)</div>
-                                        <ProgressBar value={leaderVal} max={rec.value} color={p>=85?"#f59e0b":"#1a56db"} />
+                              {(() => {
+                                const sorted = [...recs].sort((a,b)=>((PCT_PARENT[a.statName]?100:0)+recVariantIdx(a.variant))-((PCT_PARENT[b.statName]?100:0)+recVariantIdx(b.variant)));
+                                // Collapse tie records (same stat+variant+value) into one card with multiple holders
+                                const groups = []; const seen = {};
+                                sorted.forEach(r => {
+                                  const k = r.statName+"|"+r.variant+"|"+r.value;
+                                  if (seen[k]!=null) groups[seen[k]].push(r);
+                                  else { seen[k]=groups.length; groups.push([r]); }
+                                });
+                                return groups.map(group => {
+                                  const rec = group[0];
+                                  const isPct = !!PCT_PARENT[rec.statName];
+                                  const leaderVal = leader?.stats[statName];
+                                  const p = leaderVal && rec.variant==="Career total" ? pct(leaderVal, rec.value) : null;
+                                  return (
+                                    <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
+                                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
+                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? "Best %" : rec.variant}</span>
+                                        <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                      {group.map(r => r.holderName && (
+                                        <div key={r.id} style={{ fontSize:12,color:"#6b7280" }}>🏅 {r.holderName}{r.holderYear?` · ${r.holderYear}`:""}</div>
+                                      ))}
+                                      {p!==null&&rec.variant==="Career total"&&(
+                                        <div style={{ marginTop:8 }}>
+                                          <div style={{ fontSize:11,color:"#6b7280",marginBottom:3 }}>{leader.name}: {leaderVal.toLocaleString()} ({p}%)</div>
+                                          <ProgressBar value={leaderVal} max={rec.value} color={p>=85?"#f59e0b":"#1a56db"} />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
                         );
