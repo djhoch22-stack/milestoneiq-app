@@ -3022,6 +3022,10 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                     return g ? g.group : "Other";
                   };
 
+                  const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
+                  const recStatIdx = (n) => { const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i; };
+                  const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)"];
+                  const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   const byGroup = {};
                   (school.records||[]).forEach(r => {
                     const grp = getGroup(r.statName);
@@ -3037,7 +3041,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                         <div style={{ flex:1,height:1,background:"#e8e4dd" }} />
                         <span style={{ fontSize:12,color:"#9ca3af" }}>{Object.values(statMap).flat().length} records</span>
                       </div>
-                      {Object.entries(statMap).map(([statName, recs]) => {
+                      {Object.entries(statMap).sort((a,b)=>recStatIdx(a[0])-recStatIdx(b[0])).map(([statName, recs]) => {
                         const leaders = school.athletes.filter(a=>a.isActive!==false && a.stats[statName]!=null).sort((a,b)=>b.stats[statName]-a.stats[statName]);
                         const leader = leaders[0];
                         return (
@@ -3047,7 +3051,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                               {leader&&<div style={{ fontSize:12,color:"#6b7280" }}>Current leader: <strong>{leader.name}</strong> ({leader.stats[statName].toLocaleString()})</div>}
                             </div>
                             <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8 }}>
-                              {recs.map(rec=>{
+                              {[...recs].sort((a,b)=>recVariantIdx(a.variant)-recVariantIdx(b.variant)).map(rec=>{
                                 const leaderVal = leader?.stats[statName];
                                 const p = leaderVal && rec.variant==="Career total" ? pct(leaderVal, rec.value) : null;
                                 return (
@@ -3739,7 +3743,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                   a + getMilestoneAlerts(athlete,school.records||[],school.milestones||[])
                     .filter(al => !dismissed.has(`${athlete.id}|${al.statName}|${al.target}`)).length
                 , 0);
-              const topAthlete = [...school.athletes].sort((a,b)=>{
+              const topAthlete = [...school.athletes].filter(a=>a.isActive!==false).sort((a,b)=>{
                 const at=Object.values(a.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
                 const bt=Object.values(b.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
                 return bt-at;
