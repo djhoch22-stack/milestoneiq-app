@@ -41,9 +41,9 @@ Deno.serve(async (req) => {
       .from("org_members").select("role").eq("org_id", orgId).eq("user_id", user.id).maybeSingle();
     if (mem?.role !== "admin") return json({ error: "only a school admin can manage billing" }, 403);
 
-    const { data: org } = await admin
+    const { data: org, error: orgErr } = await admin
       .from("organizations").select("id, name, stripe_customer_id").eq("id", orgId).single();
-    if (!org) return json({ error: "org not found" }, 404);
+    if (orgErr || !org) return json({ error: `org lookup failed (orgId=${orgId}): ${orgErr?.message || "not found"}` }, 404);
 
     // Reuse or create the org's Stripe customer.
     let customerId = org.stripe_customer_id as string | null;
