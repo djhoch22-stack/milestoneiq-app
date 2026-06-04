@@ -1,5 +1,6 @@
 // ── Auth.jsx ──────────────────────────────────────────────────────────────────
 import { useState } from 'react';
+import raftersLogo from '../raftersiq-logo.png';
 import {
   signIn,
   signUp,
@@ -161,7 +162,7 @@ const s = {
 function Logo() {
   return (
     <div style={s.logo}>
-      <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+      <img src={raftersLogo} alt="RaftersIQ" style={{ width: 40, height: 40, objectFit: 'contain' }} />
       <span style={s.logoTxt}>RaftersIQ</span>
     </div>
   );
