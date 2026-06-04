@@ -3649,7 +3649,6 @@ function saveSchools(data) {
 // Settings → Billing card (admins only). Shows trial/plan status and opens the
 // shared ChoosePlan picker (→ Stripe checkout) or the Stripe billing portal.
 function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling }) {
-  const [showPlans, setShowPlans] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
@@ -3665,31 +3664,17 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
   const errStyle = { background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#991b1b" };
   return (
     <div style={{ background:"#fff",borderRadius:14,border:"1px solid #e8e4dd",marginBottom:20,overflow:"hidden" }}>
-      <div style={{ padding:"14px 24px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111" }}>💳 Billing &amp; plan</div>
+      <div style={{ padding:"14px 24px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111" }}>💳 Subscription &amp; billing</div>
       <div style={{ padding:"20px 24px" }}>
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10 }}>
-        <div>
-          <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{planLine}</div>
-          <div style={{ fontSize:13,color:"#6b7280" }}>{status === "active" ? "Change plan or update your card anytime." : "Subscribe to keep your school's access after the trial. Cancel anytime."}</div>
-        </div>
-        <div style={{ display:"flex",gap:8 }}>
-          <button onClick={()=>{ setErr(""); setShowPlans(true); }} style={{ background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer" }}>{status === "active" ? "Change plan" : "Choose a plan"}</button>
-          {status === "active" && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer" }}>Manage billing</button>}
-        </div>
-      </div>
-      {err && !showPlans && <div style={{ ...errStyle, marginTop:12 }}>{err}</div>}
-      {showPlans && (
-        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20 }} onClick={()=>!busy && setShowPlans(false)}>
-          <div style={{ background:"#fff",borderRadius:16,padding:28,width:880,maxWidth:"100%",maxHeight:"90vh",overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
-              <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Choose your plan</h2>
-              <button onClick={()=>!busy && setShowPlans(false)} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
-            </div>
-            {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
-            <ChoosePlan onSelect={select} busy={busy} ctaLabel="Continue to checkout →" />
+        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10,marginBottom:16 }}>
+          <div>
+            <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{planLine}</div>
+            <div style={{ fontSize:13,color:"#6b7280" }}>{status === "active" ? "You're subscribed. Pick a different plan below, or manage your card / cancel." : "Pick a plan below to subscribe — your data stays put either way."}</div>
           </div>
+          {status === "active" && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Manage billing</button>}
         </div>
-      )}
+        {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
+        <ChoosePlan onSelect={select} busy={busy} initial={tier} ctaLabel={status === "active" ? "Switch to selected plan →" : "Subscribe & continue →"} />
       </div>
     </div>
   );
@@ -3794,71 +3779,6 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
             <Field label="Confirm new password"><Input placeholder="••••••••" type="password" /></Field>
           </div>
           <SaveBtn label="Update password" />
-        </Section>
-
-        {/* Subscription */}
-        <Section title="⭐ Subscription">
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16 }}>
-            {[
-              { plan:"Program", price:"$12/mo", annual:"$120/yr — save $24", features:[
-                  "1 program",
-                  "Unlimited athletes",
-                  "Custom milestones & alerts",
-                  "Email alerts",
-                  "All-time records & seasons",
-                  "7-day free trial",
-                ], current:true, highlight:true },
-              { plan:"School", price:"$79/mo", annual:"$790/yr — save $158", features:[
-                  "Unlimited programs",
-                  "Everything in Program",
-                  "Multi-coach access",
-                  "Admin dashboard",
-                  "Priority support",
-                  "7-day free trial",
-                ], current:false, highlight:false },
-              { plan:"School Plus", price:"$149/mo", annual:"$1,490/yr — save $298", features:[
-                  "Unlimited programs",
-                  "Everything in School",
-                  "District admin dashboard",
-                  "Bulk program setup",
-                  "Dedicated support",
-                  "7-day free trial",
-                ], current:false, highlight:false },
-            ].map(({ plan, price, annual, features, current, highlight }) => (
-              <div key={plan} style={{ border:`2px solid ${highlight?"#1a56db":"#e5e7eb"}`,borderRadius:12,padding:16,position:"relative",display:"flex",flexDirection:"column" }}>
-                {current && <div style={{ position:"absolute",top:-1,right:12,background:"#1a56db",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:"0 0 6px 6px" }}>Current</div>}
-                <div style={{ fontWeight:700,fontSize:15,color:"#111",marginBottom:2 }}>{plan}</div>
-                <div style={{ fontSize:22,fontWeight:700,color:highlight?"#1a56db":"#374151",marginBottom:2 }}>{price}</div>
-                <div style={{ fontSize:11,color:"#22c55e",fontWeight:600,marginBottom:10 }}>{annual}</div>
-                <div style={{ flex:1 }}>
-                  {features.map(f => (
-                    <div key={f} style={{ display:"flex",alignItems:"flex-start",gap:6,fontSize:11,color:"#374151",marginBottom:5 }}>
-                      <span style={{ color:"#22c55e",fontWeight:700,flexShrink:0,marginTop:1 }}>✓</span> {f}
-                    </div>
-                  ))}
-                </div>
-                {!current && (
-                  <button style={{ width:"100%",marginTop:12,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,cursor:"pointer" }}>
-                    Upgrade to {plan}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <div style={{ background:"#eff6ff",borderRadius:10,padding:12,marginBottom:16,fontSize:12,color:"#1e40af" }}>
-            💡 <strong>Annual billing saves up to $298/year.</strong> Switch to annual at any time and we'll prorate the difference.
-          </div>
-          <div style={{ background:"#f9fafb",borderRadius:10,padding:14,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-            <div>
-              <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>Billing</div>
-              <div style={{ fontSize:12,color:"#6b7280" }}>Next charge: $12.00 on July 1, 2026 · Visa ending 4242</div>
-            </div>
-            <div style={{ display:"flex",gap:8 }}>
-              <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",color:"#374151" }}>Switch to annual</button>
-              <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",color:"#374151" }}>Update billing</button>
-              <button style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",color:"#991b1b" }}>Cancel plan</button>
-            </div>
-          </div>
         </Section>
 
         {/* Users & Access */}
