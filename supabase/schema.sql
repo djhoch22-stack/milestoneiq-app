@@ -464,6 +464,15 @@ begin
     where o.ad_email is not null and lower(o.ad_email) = lower(new.email)
     on conflict (org_id, user_id) do nothing;
   end if;
+
+  -- Consume any pre-authorized invites for this email (edge-function-free invites).
+  insert into public.org_members (org_id, user_id, role)
+  select pi.org_id, new.id, pi.role
+  from public.pending_invites pi
+  where lower(pi.email) = lower(new.email)
+  on conflict (org_id, user_id) do nothing;
+  delete from public.pending_invites where lower(email) = lower(new.email);
+
   return new;
 end;
 $$;
@@ -568,4 +577,25 @@ begin
     execute format('drop policy if exists %I on public.%I', r.policyname, r.tablename);
   end loop;
 end $$;
+NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.5 — Edge-function-free invites. An admin pre-authorizes an email+role; the
+-- signup trigger (handle_new_user) places that person on registration. No email
+-- sent yet (admin tells them to sign up); custom email can be layered on later.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.pending_invites (
+  id         uuid primary key default gen_random_uuid(),
+  org_id     uuid references public.organizations(id) on delete cascade,
+  email      text not null,
+  role       text not null default 'coach',
+  created_at timestamptz default now(),
+  unique (org_id, email)
+);
+alter table public.pending_invites enable row level security;
+drop policy if exists pi_all on public.pending_invites;
+create policy pi_all on public.pending_invites for all
+  using (public.is_school_admin(org_id))
+  with check (public.is_school_admin(org_id));
+grant all on public.pending_invites to anon, authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
