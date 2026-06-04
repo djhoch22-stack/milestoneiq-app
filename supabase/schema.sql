@@ -523,6 +523,8 @@ alter table public.profiles add column if not exists phone text;
 create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public, auth as $$
 begin
+  -- Detach references that would otherwise block deletion (created_by points at the user).
+  update public.organizations set created_by = null where created_by = auth.uid();
   -- Wipe the caller's app data (always permitted on these tables).
   delete from public.program_coaches where user_id = auth.uid();
   delete from public.org_members     where user_id = auth.uid();
