@@ -439,3 +439,9 @@ export const deleteMyAccount = async () => {
   const { error } = await supabase.rpc('delete_my_account');
   return { error };
 };
+
+// Permanently delete a program and all its data (cascades to athletes/records/seasons/etc).
+export const deleteProgram = async (programId) => {
+  const { error } = await supabase.from('programs').delete().eq('id', programId);
+  return { error };
+};
