@@ -18,6 +18,8 @@ import {
   getRecords,
   getMilestones,
   getSeasons,
+  createCheckout,
+  openBillingPortal,
 } from './supabase_client';
 import Auth, { LockedScreen } from './Auth';
 import App from './MilestoneIQ';
@@ -94,6 +96,7 @@ export default function AppWrapper() {
   const [profile, setProfile] = useState(null);
   const [schools, setSchools] = useState([]);
   const [orgId, setOrgId] = useState(null);
+  const [org, setOrg] = useState(null);
   const [role, setRole] = useState('coach');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -137,6 +140,7 @@ export default function AppWrapper() {
       setRole(orgs[0].role || 'coach');
       const org = orgs[0].organizations;
       setOrgId(org.id);
+      setOrg(org);
       const { data: programs } = await getPrograms(org.id);
       if (!programs?.length) {
         setLoading(false);
@@ -319,35 +323,30 @@ export default function AppWrapper() {
     );
   }
 
-  const tier = profile?.subscription_tier || 'program';
-  const status = profile?.subscription_status || 'active';
-  const trialEnd = profile?.trial_ends_at
-    ? new Date(profile.trial_ends_at)
-    : null;
-  const trialExpired =
-    trialEnd && trialEnd < new Date() && status === 'trialing';
+  const tier = org?.subscription_tier || 'program';
+  const status = org?.subscription_status || 'trialing';
+  const trialEnd = org?.trial_ends_at ? new Date(org.trial_ends_at) : null;
+  const trialValid = status === 'trialing' && trialEnd && trialEnd > new Date();
+  const unlocked = status === 'active' || trialValid;
 
-  if (trialExpired || status === 'canceled' || status === 'past_due') {
+  const goCheckout = async (priceId, tierId, billing) => {
+    const { data, error } = await createCheckout(orgId, priceId, tierId, billing);
+    if (error) { setError(error); return; }
+    if (data?.url) window.location.href = data.url;
+  };
+  const goPortal = async () => {
+    const { data, error } = await openBillingPortal(orgId);
+    if (error) { setError(error); return; }
+    if (data?.url) window.location.href = data.url;
+  };
+
+  if (!unlocked) {
     return (
       <LockedScreen
-        orgId={orgId}
-        onManageBilling={async () => {
-          const {
-            data: { session: authSession },
-          } = await supabase.auth.getSession();
-          const res = await fetch(
-            `https://odirpbptemubzysrvajh.supabase.co/functions/v1/create-portal`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authSession.access_token}`,
-              },
-            }
-          );
-          const { url } = await res.json();
-          if (url) window.location.href = url;
-        }}
+        role={role}
+        status={status}
+        onCheckout={goCheckout}
+        onManageBilling={goPortal}
       />
     );
   }
@@ -402,6 +401,10 @@ export default function AppWrapper() {
         userName={profile?.full_name || ''}
         userPhone={profile?.phone || ''}
         userId={session.user.id}
+        subscriptionStatus={status}
+        trialEndsAt={org?.trial_ends_at || null}
+        onCheckout={goCheckout}
+        onManageBilling={goPortal}
         onSignOut={() => supabase.auth.signOut()}
       />
     </>
