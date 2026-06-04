@@ -8,6 +8,7 @@
 // This wraps your existing MilestoneIQ app with auth + subscription gating
 
 import { useState, useEffect, useRef } from 'react';
+import raftersLogo from '../raftersiq-logo.png';
 import {
   supabase,
   getProfile,
@@ -107,6 +108,8 @@ export default function AppWrapper() {
   const checkoutResult = params.get('checkout');
 
   useEffect(() => {
+    const _icon = document.querySelector("link[rel='icon']");
+    if (_icon) _icon.href = raftersLogo;   // browser-tab favicon → the logo
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
@@ -313,7 +316,7 @@ export default function AppWrapper() {
         }}
       >
         <div style={{ textAlign: 'center' }}>
-          <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width: 72, height: 72, objectFit: 'contain', marginBottom: 12 }} />
+          <img src={raftersLogo} alt="RaftersIQ" style={{ width: 72, height: 72, objectFit: 'contain', marginBottom: 12 }} />
           <div style={{ fontSize: 16, color: '#6b7280' }}>
             Loading RaftersIQ…
           </div>
