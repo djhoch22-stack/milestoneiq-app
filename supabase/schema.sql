@@ -314,4 +314,156 @@ grant all privileges on all sequences in schema public to anon, authenticated, s
 alter default privileges in schema public grant all on tables    to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 
--- Done. Expect 10 tables under Database → Tables, each with RLS enabled.
+-- Done (base). Expect 10 tables under Database → Tables, each with RLS enabled.
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2 — School directory + role-based access (coaches own programs; AD sees all)
+-- Idempotent; safe to re-run. Layers on top of the base schema above.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 1) School (organizations) directory + AD fields
+alter table public.organizations add column if not exists address  text;
+alter table public.organizations add column if not exists zip      text;
+alter table public.organizations add column if not exists website  text;
+alter table public.organizations add column if not exists level    text;   -- 'HS' | 'MS'
+alter table public.organizations add column if not exists ad_name  text;
+alter table public.organizations add column if not exists ad_email text;
+
+-- 2) Program ownership
+alter table public.programs add column if not exists created_by uuid;
+
+create table if not exists public.program_coaches (
+  id         uuid primary key default gen_random_uuid(),
+  program_id uuid references public.programs(id) on delete cascade,
+  user_id    uuid references auth.users(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique (program_id, user_id)
+);
+create index if not exists idx_program_coaches_program on public.program_coaches(program_id);
+create index if not exists idx_program_coaches_user    on public.program_coaches(user_id);
+grant all privileges on public.program_coaches to anon, authenticated, service_role;
+
+-- 3) Membership / visibility helpers (SECURITY DEFINER → bypass RLS, no recursion)
+create or replace function public.is_school_admin(p_org uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.org_members m
+    where m.org_id = p_org and m.user_id = auth.uid() and m.role = 'admin'
+  );
+$$;
+
+create or replace function public.program_org(p_program uuid)
+returns uuid language sql stable security definer set search_path = public as $$
+  select org_id from public.programs where id = p_program;
+$$;
+
+create or replace function public.visible_program_ids()
+returns setof uuid language sql stable security definer set search_path = public as $$
+  select p.id from public.programs p
+  where exists (select 1 from public.program_coaches pc
+                where pc.program_id = p.id and pc.user_id = auth.uid())
+     or exists (select 1 from public.org_members m
+                where m.org_id = p.org_id and m.user_id = auth.uid() and m.role = 'admin');
+$$;
+
+-- 4) Searchable directory (non-sensitive columns only; intentionally school-wide)
+create or replace view public.schools_directory as
+  select id, name, state, city, level, website from public.organizations;
+grant select on public.schools_directory to anon, authenticated, service_role;
+
+-- 5) RLS rewrite — programs: a coach sees only assigned programs; an admin sees all.
+--    INSERT can't use visible_program_ids (row doesn't exist yet) → check org membership.
+drop policy if exists prog_all on public.programs;
+drop policy if exists prog_sel on public.programs;
+drop policy if exists prog_ins on public.programs;
+drop policy if exists prog_upd on public.programs;
+drop policy if exists prog_del on public.programs;
+create policy prog_sel on public.programs for select
+  using (id in (select public.visible_program_ids()));
+create policy prog_ins on public.programs for insert
+  with check (org_id in (select org_id from public.org_members where user_id = auth.uid()));
+create policy prog_upd on public.programs for update
+  using (id in (select public.visible_program_ids()))
+  with check (id in (select public.visible_program_ids()));
+create policy prog_del on public.programs for delete
+  using (id in (select public.visible_program_ids()));
+
+-- Child tables follow program visibility
+drop policy if exists ath_all  on public.athletes;
+create policy ath_all  on public.athletes        for all
+  using (program_id in (select public.visible_program_ids()))
+  with check (program_id in (select public.visible_program_ids()));
+drop policy if exists atp_all  on public.all_time_players;
+create policy atp_all  on public.all_time_players for all
+  using (program_id in (select public.visible_program_ids()))
+  with check (program_id in (select public.visible_program_ids()));
+drop policy if exists rec_all  on public.records;
+create policy rec_all  on public.records          for all
+  using (program_id in (select public.visible_program_ids()))
+  with check (program_id in (select public.visible_program_ids()));
+drop policy if exists ms_all   on public.milestones;
+create policy ms_all   on public.milestones       for all
+  using (program_id in (select public.visible_program_ids()))
+  with check (program_id in (select public.visible_program_ids()));
+drop policy if exists seas_all on public.seasons;
+create policy seas_all on public.seasons          for all
+  using (program_id in (select public.visible_program_ids()))
+  with check (program_id in (select public.visible_program_ids()));
+
+-- program_coaches: self or school admin (the create-trigger self-inserts the owner)
+alter table public.program_coaches enable row level security;
+drop policy if exists pc_sel on public.program_coaches;
+drop policy if exists pc_ins on public.program_coaches;
+drop policy if exists pc_del on public.program_coaches;
+create policy pc_sel on public.program_coaches for select
+  using (user_id = auth.uid() or public.is_school_admin(public.program_org(program_id)));
+create policy pc_ins on public.program_coaches for insert
+  with check (user_id = auth.uid() or public.is_school_admin(public.program_org(program_id)));
+create policy pc_del on public.program_coaches for delete
+  using (public.is_school_admin(public.program_org(program_id)));
+
+-- 6) Auto-link the creating coach to their new program
+create or replace function public.link_program_creator()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null then
+    insert into public.program_coaches (program_id, user_id)
+    values (new.id, auth.uid())
+    on conflict (program_id, user_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists on_program_created on public.programs;
+create trigger on_program_created after insert on public.programs
+  for each row execute function public.link_program_creator();
+
+-- 7) Invited users (AD or coach) auto-join their school + role on signup.
+--    (The base on_auth_user_created trigger already calls handle_new_user.)
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_org  uuid;
+  v_role text;
+begin
+  insert into public.profiles (id, full_name, email, subscription_status, trial_ends_at)
+  values (new.id, new.raw_user_meta_data->>'full_name', new.email, 'trialing', now() + interval '7 days')
+  on conflict (id) do nothing;
+
+  v_org  := nullif(new.raw_user_meta_data->>'invite_org_id','')::uuid;
+  v_role := coalesce(nullif(new.raw_user_meta_data->>'invite_role',''), 'coach');
+  if v_org is not null then
+    insert into public.org_members (org_id, user_id, role)
+    values (v_org, new.id, v_role)
+    on conflict (org_id, user_id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+-- 8) MIGRATION — promote existing owners to admin so they keep seeing all programs.
+--    WITHOUT THIS, the new RLS hides Denver Christian's programs from you.
+update public.org_members set role = 'admin'
+  where coalesce(role,'') not in ('coach','admin');
+
+-- Done (v2). Adds program_coaches + schools_directory; role-based per-program RLS.
