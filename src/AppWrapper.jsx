@@ -313,7 +313,7 @@ export default function AppWrapper() {
         }}
       >
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
+          <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width: 72, height: 72, objectFit: 'contain', marginBottom: 12 }} />
           <div style={{ fontSize: 16, color: '#6b7280' }}>
             Loading RaftersIQ…
           </div>
