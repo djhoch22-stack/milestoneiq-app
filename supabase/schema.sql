@@ -633,3 +633,22 @@ create policy sa_sel on public.sent_alerts for select
 grant select on public.sent_alerts to authenticated;
 grant all on public.sent_alerts to service_role;
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.7 — Billing moves to the SCHOOL (org): one subscription unlocks every member.
+-- Each new org auto-gets a 7-day trial (no card) via the column default. The
+-- stripe-webhook keeps subscription_status/tier in sync; AppWrapper gates the app
+-- on these org columns (unlock only when 'active' or a non-expired trial).
+-- ════════════════════════════════════════════════════════════════════════════
+alter table public.organizations add column if not exists subscription_status text default 'trialing';
+alter table public.organizations add column if not exists subscription_tier   text default 'program';
+alter table public.organizations add column if not exists trial_ends_at        timestamptz default (now() + interval '7 days');
+alter table public.organizations add column if not exists stripe_customer_id   text;
+-- Grandfather existing schools (e.g. Denver Christian) so we don't lock ourselves
+-- out while testing billing. New orgs created after this still default to 'trialing'.
+update public.organizations set subscription_status = 'active'
+  where subscription_status is null or subscription_status = 'trialing';
+-- Unique key so the stripe-webhook can upsert subscription rows on conflict.
+create unique index if not exists subscriptions_stripe_sub_uidx
+  on public.subscriptions (stripe_subscription_id);
+NOTIFY pgrst, 'reload schema';
