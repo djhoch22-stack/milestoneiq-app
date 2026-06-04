@@ -7,7 +7,7 @@
 //
 // This wraps your existing MilestoneIQ app with auth + subscription gating
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   supabase,
   getProfile,
@@ -101,6 +101,7 @@ export default function AppWrapper() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadedUserId = useRef(null);
 
   const params = new URLSearchParams(window.location.search);
   const checkoutResult = params.get('checkout');
@@ -108,18 +109,31 @@ export default function AppWrapper() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) loadUserData(session.user.id);
-      else setLoading(false);
+      if (session) {
+        if (session.user.id !== loadedUserId.current) {
+          loadedUserId.current = session.user.id;
+          loadUserData(session.user.id);
+        }
+      } else setLoading(false);
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) loadUserData(session.user.id);
-      else {
+      if (!session) {
+        loadedUserId.current = null;
         setLoading(false);
         setSchools([]);
         setProfile(null);
+        setOrg(null);
+        return;
+      }
+      // Only (re)load data when the actual user changes. Ignore token refreshes and
+      // same-user updates (e.g. a password change) so the current view — like the
+      // Settings tab — isn't reset out from under the user.
+      if (session.user.id !== loadedUserId.current) {
+        loadedUserId.current = session.user.id;
+        loadUserData(session.user.id);
       }
     });
     return () => subscription.unsubscribe();
