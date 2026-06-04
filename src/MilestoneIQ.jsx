@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
+import { ChoosePlan } from './Auth';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
 
@@ -3645,7 +3646,47 @@ function saveSchools(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone } = {}) {
+// Settings → Billing card (admins only). Shows trial/plan status and opens the
+// shared ChoosePlan picker (→ Stripe checkout) or the Stripe billing portal.
+function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling }) {
+  const [showPlans, setShowPlans] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
+  const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : null;
+  const planLine = status === "active" ? `${tierName} plan · active`
+    : status === "trialing" ? `Free trial${daysLeft != null ? ` — ${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : ""}`
+    : status === "past_due" ? "Payment past due"
+    : status === "canceled" ? "Subscription canceled"
+    : (status || "—");
+  const select = async (priceId, t, b) => { setBusy(true); await onCheckout?.(priceId, t, b); setBusy(false); };
+  return (
+    <Section title="💳 Billing & plan">
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10 }}>
+        <div>
+          <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{planLine}</div>
+          <div style={{ fontSize:13,color:"#6b7280" }}>{status === "active" ? "Change plan or update your card anytime." : "Subscribe to keep your school's access after the trial. Cancel anytime."}</div>
+        </div>
+        <div style={{ display:"flex",gap:8 }}>
+          <button onClick={()=>setShowPlans(true)} style={{ background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer" }}>{status === "active" ? "Change plan" : "Choose a plan"}</button>
+          {status === "active" && <button onClick={onManageBilling} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer" }}>Manage billing</button>}
+        </div>
+      </div>
+      {showPlans && (
+        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20 }} onClick={()=>!busy && setShowPlans(false)}>
+          <div style={{ background:"#fff",borderRadius:16,padding:28,width:880,maxWidth:"100%",maxHeight:"90vh",overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+              <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Choose your plan</h2>
+              <button onClick={()=>!busy && setShowPlans(false)} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
+            </div>
+            <ChoosePlan onSelect={select} busy={busy} ctaLabel="Continue to checkout →" />
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -3815,6 +3856,8 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
         <Section title="👥 Users & access">
           <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} />
         </Section>
+
+        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} />}
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
