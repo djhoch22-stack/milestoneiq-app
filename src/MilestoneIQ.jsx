@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -1298,6 +1298,72 @@ function MembersSection({ orgId, role, userId }) {
         <div style={{ fontSize:12,color:"#9ca3af" }}>Only your school's admin (AD) can invite or manage members.</div>
       )}
     </>
+  );
+}
+
+// Assign school coaches to a specific program (admin-only); gated by tier coach limit.
+function ProgramCoaches({ programId, orgId, tierLimits }) {
+  const [coaches, setCoaches] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [addUid, setAddUid] = useState("");
+  const max = (tierLimits && tierLimits.maxCoachesPerProgram) || 1;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: pc } = await getProgramCoaches(programId);
+    setCoaches(pc || []);
+    const { data: mem } = await getMembers(orgId);
+    setMembers(mem || []);
+    setLoading(false);
+  }, [programId, orgId]);
+  useEffect(() => { load(); }, [load]);
+
+  const nameOf = (uid) => {
+    const m = members.find(x => x.user_id === uid);
+    return m?.profiles?.full_name || m?.profiles?.email || "Coach";
+  };
+  const assigned = new Set(coaches.map(c => c.user_id));
+  const addable = members.filter(m => !assigned.has(m.user_id));
+  const atLimit = coaches.length >= max;
+
+  const add = async () => {
+    if (!addUid) return;
+    if (atLimit) { alert(`Your plan allows ${max} coach${max===1?"":"es"} per program. Upgrade to Program Plus to add more.`); return; }
+    const { error } = await addProgramCoach(programId, addUid);
+    if (error) { alert("Couldn't add coach: " + (error.message || error)); return; }
+    setAddUid(""); load();
+  };
+  const remove = async (uid) => {
+    const { error } = await removeProgramCoach(programId, uid);
+    if (error) { alert("Couldn't remove coach: " + (error.message || error)); return; }
+    load();
+  };
+
+  if (loading) return null;
+  return (
+    <div style={{ borderTop:"1px solid #e5e7eb",padding:"10px 16px",background:"#fff" }}>
+      <div style={{ fontSize:12,color:"#6b7280",fontWeight:600,marginBottom:6 }}>Coaches ({coaches.length}/{max===999?"∞":max})</div>
+      {coaches.length === 0
+        ? <div style={{ fontSize:12,color:"#9ca3af",marginBottom:6 }}>No coaches assigned yet.</div>
+        : coaches.map(c => (
+            <div key={c.id} style={{ display:"flex",alignItems:"center",gap:8,fontSize:13,padding:"3px 0" }}>
+              <span style={{ flex:1,color:"#374151" }}>{nameOf(c.user_id)}</span>
+              <button onClick={()=>remove(c.user_id)} style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",color:"#6b7280" }}>Remove</button>
+            </div>
+          ))
+      }
+      <div style={{ display:"flex",gap:6,marginTop:6 }}>
+        <select value={addUid} onChange={e=>setAddUid(e.target.value)} disabled={atLimit || addable.length===0}
+          style={{ flex:1,border:"1px solid #d1d5db",borderRadius:6,padding:"5px 8px",fontSize:12,color:"#374151" }}>
+          <option value="">{addable.length===0 ? "No more members to add" : "Add a coach…"}</option>
+          {addable.map(m => <option key={m.user_id} value={m.user_id}>{m.profiles?.full_name || m.profiles?.email || "Member"}</option>)}
+        </select>
+        <button onClick={add} disabled={!addUid || atLimit}
+          style={{ background:(!addUid||atLimit)?"#cbd5e1":"#1a56db",color:"#fff",border:"none",borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:600,cursor:(!addUid||atLimit)?"default":"pointer",whiteSpace:"nowrap" }}>Add</button>
+      </div>
+      {atLimit && <div style={{ fontSize:11,color:"#92400e",marginTop:6 }}>⭐ At your plan's coach limit — upgrade to Program Plus to add more coaches per program.</div>}
+    </div>
   );
 }
 
@@ -3782,6 +3848,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                         </>
                     }
                   </div>
+                  {role === "admin" && <ProgramCoaches programId={sc.id} orgId={orgId} tierLimits={tierLimits} />}
                 </div>
               );
             })}
