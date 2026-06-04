@@ -99,7 +99,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ width:34, height:34, background:'#1a3a6b', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>🏆</div>
-            <span style={{ fontWeight:700, fontSize:18, color:'#111' }}>MilestoneIQ</span>
+            <span style={{ fontWeight:700, fontSize:18, color:'#111' }}>RaftersIQ</span>
           </div>
           <span style={s.link} onClick={onSignOut}>Sign out</span>
         </div>
@@ -191,7 +191,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
             </div>
             <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} /></div>
             <div style={s.field}><label style={s.label}>Team color</label><input type="color" value={prog.color} onChange={e => setProg(p => ({ ...p, color: e.target.value }))} style={{ width:60, height:38, border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff' }} /></div>
-            <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open MilestoneIQ →'}</button>
+            <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open RaftersIQ →'}</button>
           </>
         )}
       </div>
