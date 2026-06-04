@@ -517,3 +517,14 @@ create policy om_del on public.org_members for delete
 
 -- v2.2 — store an optional phone number on the profile.
 alter table public.profiles add column if not exists phone text;
+
+-- v2.3 — self-service account deletion via RPC (no edge function / CORS needed).
+-- Deletes ONLY the calling user (auth.uid()); cascades to profiles/org_members/program_coaches.
+create or replace function public.delete_my_account()
+returns void language plpgsql security definer set search_path = public, auth as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+revoke all on function public.delete_my_account() from anon, public;
+grant execute on function public.delete_my_account() to authenticated;
