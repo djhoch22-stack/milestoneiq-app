@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -1193,6 +1193,7 @@ function MembersSection({ orgId, role, userId }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("coach");
   const [msg, setMsg] = useState("");
+  const [pending, setPending] = useState([]);
   const isAdmin = role === "admin";
 
   const load = useCallback(async () => {
@@ -1200,6 +1201,8 @@ function MembersSection({ orgId, role, userId }) {
     setLoading(true);
     const { data } = await getMembers(orgId);
     setMembers(data || []);
+    const { data: inv } = await getPendingInvites(orgId);
+    setPending(inv || []);
     setLoading(false);
   }, [orgId]);
   useEffect(() => { load(); }, [load]);
@@ -1217,10 +1220,17 @@ function MembersSection({ orgId, role, userId }) {
   };
   const sendInvite = async () => {
     if (!inviteEmail) return;
-    setMsg("Sending invite…");
+    setMsg("Inviting…");
     const { error } = await inviteMember(inviteEmail, orgId, inviteRole);
-    setMsg(error ? ("Invite failed: " + error) : `Invite sent to ${inviteEmail} ✓`);
-    if (!error) setInviteEmail("");
+    if (error) { setMsg("Invite failed: " + (error.message || error)); return; }
+    setMsg(`✓ ${inviteEmail} will join as ${inviteRole} when they sign up.`);
+    setInviteEmail("");
+    load();
+  };
+  const cancelOne = async (id) => {
+    const { error } = await cancelInvite(id);
+    if (error) { alert("Couldn't cancel invite: " + (error.message || error)); return; }
+    load();
   };
 
   if (loading) return <div style={{ fontSize:13,color:"#9ca3af" }}>Loading members…</div>;
@@ -1261,6 +1271,18 @@ function MembersSection({ orgId, role, userId }) {
       </div>
       {isAdmin ? (
         <>
+          {pending.length > 0 && (
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12,fontWeight:600,color:"#6b7280",marginBottom:6 }}>Pending invites</div>
+              {pending.map(pi => (
+                <div key={pi.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 0",fontSize:13,borderBottom:"1px solid #f3f4f6" }}>
+                  <span style={{ flex:1,color:"#374151" }}>{pi.email}</span>
+                  <span style={{ fontSize:11,color:"#9ca3af",textTransform:"capitalize" }}>{pi.role} · pending</span>
+                  <button onClick={()=>cancelOne(pi.id)} style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",color:"#6b7280" }}>Cancel</button>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ display:"flex",gap:8 }}>
             <input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="colleague@school.org" type="email"
               style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13 }} />
