@@ -331,13 +331,13 @@ export default function AppWrapper() {
 
   const goCheckout = async (priceId, tierId, billing) => {
     const { data, error } = await createCheckout(orgId, priceId, tierId, billing);
-    if (error) { setError(error); return; }
-    if (data?.url) window.location.href = data.url;
+    if (data?.url) { window.location.href = data.url; return null; }
+    return error || 'Could not start checkout';
   };
   const goPortal = async () => {
     const { data, error } = await openBillingPortal(orgId);
-    if (error) { setError(error); return; }
-    if (data?.url) window.location.href = data.url;
+    if (data?.url) { window.location.href = data.url; return null; }
+    return error || 'Could not open billing portal';
   };
 
   if (!unlocked) {
