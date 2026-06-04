@@ -3945,7 +3945,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
       <div style={{ background:"#111",padding:"0 24px" }}>
         <div style={{ display:"flex",alignItems:"center",gap:16,height:56 }}>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-            <div style={{ width:32,height:32,background:"#1a56db",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>🏆</div>
+            <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width:36,height:36,objectFit:"contain" }} />
             <span style={{ color:"#fff",fontWeight:700,fontSize:18,fontFamily:"Crimson Pro,serif" }}>RaftersIQ</span>
           </div>
           <div style={{ display:"flex",gap:0,marginLeft:16,border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,overflow:"hidden" }}>
