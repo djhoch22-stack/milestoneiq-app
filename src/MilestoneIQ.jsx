@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -1137,6 +1137,88 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
 }
 
 // ── Add School Modal ───────────────────────────────────────────────────────────
+// School roster + role management (admin only manages; everyone sees the list).
+function MembersSection({ orgId, role }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("coach");
+  const [msg, setMsg] = useState("");
+  const isAdmin = role === "admin";
+
+  const load = useCallback(async () => {
+    if (!orgId) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await getMembers(orgId);
+    setMembers(data || []);
+    setLoading(false);
+  }, [orgId]);
+  useEffect(() => { load(); }, [load]);
+
+  const changeRole = async (uid, newRole) => { await updateMemberRole(orgId, uid, newRole); load(); };
+  const removeOne = async (uid) => { if (!window.confirm("Remove this member from the school?")) return; await removeMember(orgId, uid); load(); };
+  const sendInvite = async () => {
+    if (!inviteEmail) return;
+    setMsg("Sending invite…");
+    const { error } = await inviteMember(inviteEmail, orgId, inviteRole);
+    setMsg(error ? ("Invite failed: " + error) : `Invite sent to ${inviteEmail} ✓`);
+    if (!error) setInviteEmail("");
+  };
+
+  if (loading) return <div style={{ fontSize:13,color:"#9ca3af" }}>Loading members…</div>;
+  return (
+    <>
+      <div style={{ marginBottom:16 }}>
+        {members.length===0
+          ? <div style={{ fontSize:13,color:"#9ca3af" }}>No members yet.</div>
+          : members.map((mb,i)=>{
+              const nm = mb.profiles?.full_name || mb.profiles?.email || "Member";
+              const em = mb.profiles?.email || "";
+              const initials = nm.split(" ").map(x=>x[0]||"").join("").slice(0,2).toUpperCase();
+              return (
+                <div key={mb.id} style={{ display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<members.length-1?"1px solid #f3f4f6":"none" }}>
+                  <div style={{ width:36,height:36,borderRadius:"50%",background:"#e0e7ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#4338ca",flexShrink:0 }}>{initials}</div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{nm}</div>
+                    <div style={{ fontSize:12,color:"#6b7280" }}>{em}</div>
+                  </div>
+                  {isAdmin ? (
+                    <>
+                      <select value={mb.role} onChange={e=>changeRole(mb.user_id, e.target.value)}
+                        style={{ border:"1px solid #e5e7eb",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#374151" }}>
+                        <option value="admin">Admin (sees all)</option>
+                        <option value="coach">Coach</option>
+                      </select>
+                      <button onClick={()=>removeOne(mb.user_id)} style={{ background:"none",border:"1px solid #fca5a5",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",color:"#991b1b" }}>Remove</button>
+                    </>
+                  ) : (
+                    <span style={{ fontSize:12,fontWeight:600,color:"#6b7280",textTransform:"capitalize" }}>{mb.role}</span>
+                  )}
+                </div>
+              );
+            })
+        }
+      </div>
+      {isAdmin ? (
+        <>
+          <div style={{ display:"flex",gap:8 }}>
+            <input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="colleague@school.org" type="email"
+              style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13 }} />
+            <select value={inviteRole} onChange={e=>setInviteRole(e.target.value)} style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151" }}>
+              <option value="coach">Coach</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button onClick={sendInvite} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",whiteSpace:"nowrap" }}>Send invite</button>
+          </div>
+          {msg && <div style={{ fontSize:12,color:"#6b7280",marginTop:8 }}>{msg}</div>}
+        </>
+      ) : (
+        <div style={{ fontSize:12,color:"#9ca3af" }}>Only your school's admin (AD) can invite or manage members.</div>
+      )}
+    </>
+  );
+}
+
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
 const AVAILABLE_SPORTS = ["basketball_boys", "basketball_girls"];
 
@@ -3464,11 +3546,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
       </button>
     );
 
-    const users = [
-      { name:"Bret McGatlin", email:"bmcgatlin@denchristian.org", role:"Admin", avatar:"BM" },
-      { name:"Chris Fuller",  email:"cfuller@denchristian.org",   role:"Coach", avatar:"CF" },
-      { name:"Athletic Director", email:"ad@denchristian.org",    role:"View only", avatar:"AD" },
-    ];
+    // School roster now loads live from the database via <MembersSection/>.
 
     return (
       <div style={{ padding:24, maxWidth:760, margin:"0 auto" }}>
@@ -3575,33 +3653,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Users & Access */}
         <Section title="👥 Users & access">
-          <div style={{ marginBottom:16 }}>
-            {users.map((u, i) => (
-              <div key={u.email} style={{ display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<users.length-1?"1px solid #f3f4f6":"none" }}>
-                <div style={{ width:36,height:36,borderRadius:"50%",background:"#e0e7ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#4338ca",flexShrink:0 }}>{u.avatar}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{u.name}</div>
-                  <div style={{ fontSize:12,color:"#6b7280" }}>{u.email}</div>
-                </div>
-                <select defaultValue={u.role} style={{ border:"1px solid #e5e7eb",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#374151" }}>
-                  <option>Admin</option>
-                  <option>Coach</option>
-                  <option>View only</option>
-                </select>
-                <button style={{ background:"none",border:"1px solid #fca5a5",borderRadius:6,padding:"4px 10px",fontSize:11,cursor:"pointer",color:"#991b1b" }}>Remove</button>
-              </div>
-            ))}
-          </div>
-          <div style={{ display:"flex",gap:8 }}>
-            <input placeholder="colleague@school.org" type="email"
-              style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13 }} />
-            <select style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151" }}>
-              <option>Coach</option>
-              <option>Admin</option>
-              <option>View only</option>
-            </select>
-            <button style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",whiteSpace:"nowrap" }}>Send invite</button>
-          </div>
+          <MembersSection orgId={orgId} role={role} />
         </Section>
 
         {/* Notifications */}
@@ -3697,7 +3749,8 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 <div style={{ fontSize:14,fontWeight:600,color:"#991b1b" }}>Delete account</div>
                 <div style={{ fontSize:12,color:"#6b7280" }}>Permanently delete your account and all data. This cannot be undone.</div>
               </div>
-              <button style={{ background:"#991b1b",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Delete account</button>
+              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+error); return; } handleSignOut(); }}
+                style={{ background:"#991b1b",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Delete account</button>
             </div>
           </div>
         </Section>
