@@ -433,18 +433,9 @@ export const removeMember = async (orgId, userId) => {
   return { error };
 };
 
-// Permanently delete the signed-in user's account (calls the delete-account edge function).
+// Permanently delete the signed-in user's account via the delete_my_account DB function
+// (RPC goes through PostgREST — same channel as every other query — so no CORS/edge-fn issues).
 export const deleteMyAccount = async () => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    });
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: out.error || `Delete failed (${res.status})` };
-    return { data: out };
-  } catch (e) {
-    return { error: e.message };
-  }
+  const { error } = await supabase.rpc('delete_my_account');
+  return { error };
 };
