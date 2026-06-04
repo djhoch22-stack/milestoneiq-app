@@ -698,9 +698,9 @@ function OnboardingScreen({ userId, onComplete, seedSchools }) {
 }
 
 // Reusable plan picker (monthly/annual toggle + tier tiles). onSelect(priceId, tier, billing).
-export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →' }) {
+export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial }) {
   const [billing, setBilling] = useState('monthly');
-  const [plan, setPlan] = useState('school');
+  const [plan, setPlan] = useState(PLANS.some((p) => p.id === initial) ? initial : 'school');
   const go = () => {
     const p = PLANS.find((x) => x.id === plan);
     if (p) onSelect(p[billing === 'annual' ? 'annualId' : 'monthlyId'], p.id, billing);
