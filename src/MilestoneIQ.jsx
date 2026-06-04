@@ -3384,7 +3384,7 @@ function saveSchools(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut } = {}) {
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
