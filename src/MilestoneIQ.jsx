@@ -3651,6 +3651,7 @@ function saveSchools(data) {
 function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling }) {
   const [showPlans, setShowPlans] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : null;
   const planLine = status === "active" ? `${tierName} plan · active`
@@ -3658,7 +3659,10 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
     : status === "past_due" ? "Payment past due"
     : status === "canceled" ? "Subscription canceled"
     : (status || "—");
-  const select = async (priceId, t, b) => { setBusy(true); await onCheckout?.(priceId, t, b); setBusy(false); };
+  const showErr = (e) => setErr(typeof e === "string" ? e : (e?.message || "Something went wrong"));
+  const select = async (priceId, t, b) => { setBusy(true); setErr(""); const e = await onCheckout?.(priceId, t, b); setBusy(false); if (e) showErr(e); };
+  const manage = async () => { setErr(""); const e = await onManageBilling?.(); if (e) showErr(e); };
+  const errStyle = { background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#991b1b" };
   return (
     <Section title="💳 Billing & plan">
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10 }}>
@@ -3667,10 +3671,11 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
           <div style={{ fontSize:13,color:"#6b7280" }}>{status === "active" ? "Change plan or update your card anytime." : "Subscribe to keep your school's access after the trial. Cancel anytime."}</div>
         </div>
         <div style={{ display:"flex",gap:8 }}>
-          <button onClick={()=>setShowPlans(true)} style={{ background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer" }}>{status === "active" ? "Change plan" : "Choose a plan"}</button>
-          {status === "active" && <button onClick={onManageBilling} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer" }}>Manage billing</button>}
+          <button onClick={()=>{ setErr(""); setShowPlans(true); }} style={{ background:"#1a3a6b",color:"#fff",border:"none",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer" }}>{status === "active" ? "Change plan" : "Choose a plan"}</button>
+          {status === "active" && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer" }}>Manage billing</button>}
         </div>
       </div>
+      {err && !showPlans && <div style={{ ...errStyle, marginTop:12 }}>{err}</div>}
       {showPlans && (
         <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20 }} onClick={()=>!busy && setShowPlans(false)}>
           <div style={{ background:"#fff",borderRadius:16,padding:28,width:880,maxWidth:"100%",maxHeight:"90vh",overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
@@ -3678,6 +3683,7 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
               <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Choose your plan</h2>
               <button onClick={()=>!busy && setShowPlans(false)} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
             </div>
+            {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
             <ChoosePlan onSelect={select} busy={busy} ctaLabel="Continue to checkout →" />
           </div>
         </div>
