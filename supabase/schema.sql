@@ -456,6 +456,13 @@ begin
     insert into public.org_members (org_id, user_id, role)
     values (v_org, new.id, v_role)
     on conflict (org_id, user_id) do nothing;
+  else
+    -- No explicit invite → if this email is a school's named AD, auto-make them its admin.
+    insert into public.org_members (org_id, user_id, role)
+    select o.id, new.id, 'admin'
+    from public.organizations o
+    where o.ad_email is not null and lower(o.ad_email) = lower(new.email)
+    on conflict (org_id, user_id) do nothing;
   end if;
   return new;
 end;
