@@ -387,23 +387,26 @@ export const joinSchoolAsCoach = async (orgId, userId) => {
 };
 
 // Invite a coach or AD by email (calls the invite-member edge function). Best-effort.
+// Invite by pre-authorizing an email+role — a plain insert (RLS-gated to school admins),
+// no edge function / CORS. The handle_new_user trigger places this person on signup.
 export const inviteMember = async (email, orgId, role) => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session?.access_token}`,
-      },
-      body: JSON.stringify({ email, org_id: orgId, role }),
-    });
-    const out = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: out.error || `Invite failed (${res.status})` };
-    return { data: out };
-  } catch (e) {
-    return { error: e.message };
-  }
+  const { error } = await supabase
+    .from('pending_invites')
+    .upsert({ org_id: orgId, email: (email || '').trim().toLowerCase(), role }, { onConflict: 'org_id,email' });
+  return { error };
+};
+
+export const getPendingInvites = async (orgId) => {
+  const { data, error } = await supabase
+    .from('pending_invites')
+    .select('id, email, role')
+    .eq('org_id', orgId);
+  return { data, error };
+};
+
+export const cancelInvite = async (inviteId) => {
+  const { error } = await supabase.from('pending_invites').delete().eq('id', inviteId);
+  return { error };
 };
 
 // School roster (with profile name/email — requires the v2.1 profiles read policy).
