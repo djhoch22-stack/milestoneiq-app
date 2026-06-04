@@ -467,3 +467,50 @@ update public.org_members set role = 'admin'
   where coalesce(role,'') not in ('coach','admin');
 
 -- Done (v2). Adds program_coaches + schools_directory; role-based per-program RLS.
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.1 — Member management: read fellow members, admin-only role changes,
+--        profiles readable by fellow members (so the admin console shows names).
+-- ════════════════════════════════════════════════════════════════════════════
+
+create or replace function public.user_org_ids()
+returns setof uuid language sql stable security definer set search_path = public as $$
+  select org_id from public.org_members where user_id = auth.uid();
+$$;
+
+create or replace function public.shares_org_with(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.org_members a
+    join public.org_members b on a.org_id = b.org_id
+    where a.user_id = auth.uid() and b.user_id = p_user
+  );
+$$;
+
+-- profiles: read self OR a fellow school member (for the roster); write self only
+drop policy if exists prof_all on public.profiles;
+drop policy if exists prof_sel on public.profiles;
+drop policy if exists prof_ins on public.profiles;
+drop policy if exists prof_upd on public.profiles;
+create policy prof_sel on public.profiles for select
+  using (id = auth.uid() or public.shares_org_with(id));
+create policy prof_ins on public.profiles for insert with check (id = auth.uid());
+create policy prof_upd on public.profiles for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- org_members: any member READS their school's roster; a user may self-join only as
+-- 'coach'; only an ADMIN may change roles or remove others (coaches can't self-promote).
+drop policy if exists om_all on public.org_members;
+drop policy if exists om_sel on public.org_members;
+drop policy if exists om_ins on public.org_members;
+drop policy if exists om_upd on public.org_members;
+drop policy if exists om_del on public.org_members;
+create policy om_sel on public.org_members for select
+  using (org_id in (select public.user_org_ids()));
+create policy om_ins on public.org_members for insert
+  with check ((user_id = auth.uid() and role = 'coach') or public.is_school_admin(org_id));
+create policy om_upd on public.org_members for update
+  using (public.is_school_admin(org_id)) with check (public.is_school_admin(org_id));
+create policy om_del on public.org_members for delete
+  using (user_id = auth.uid() or public.is_school_admin(org_id));
+
+-- Done (v2.1).
