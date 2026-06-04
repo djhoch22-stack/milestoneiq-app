@@ -738,12 +738,20 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →' }) {
 
 export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const isAdmin = role === 'admin';
   const pastDue = status === 'past_due';
+  const showErr = (e) => setErr(typeof e === 'string' ? e : (e?.message || 'Something went wrong'));
   const handleSelect = async (priceId, tier, billing) => {
-    setBusy(true);
-    await onCheckout(priceId, tier, billing);
+    setBusy(true); setErr('');
+    const e = await onCheckout(priceId, tier, billing);
     setBusy(false);
+    if (e) showErr(e);
+  };
+  const handlePortal = async () => {
+    setErr('');
+    const e = await onManageBilling();
+    if (e) showErr(e);
   };
   return (
     <div style={s.wrap}>
@@ -758,10 +766,11 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
         ) : (
           <>
             <p style={s.sub}>{pastDue ? "We couldn't process your last payment. Pick a plan or update billing to continue." : "Choose a plan to keep your school's stats, records, and alerts going — your data is safe and waiting."}</p>
+            {err && <div style={s.err}>{err}</div>}
             <ChoosePlan onSelect={handleSelect} busy={busy} ctaLabel="Subscribe & continue →" />
             {(status === 'canceled' || pastDue) && (
               <div style={{ textAlign: 'center', marginTop: 10 }}>
-                <span style={s.link} onClick={onManageBilling}>Or manage existing billing →</span>
+                <span style={s.link} onClick={handlePortal}>Or manage existing billing →</span>
               </div>
             )}
           </>
