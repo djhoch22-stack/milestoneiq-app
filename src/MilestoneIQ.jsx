@@ -1282,8 +1282,9 @@ function MembersSection({ orgId, role, userId }) {
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
 const AVAILABLE_SPORTS = ["basketball_boys", "basketball_girls"];
 
-function AddSchoolModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name:"", mascot:"", sport:"basketball_boys", primaryColor:"#1a3a6b" });
+function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
+  const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
+  const [form, setForm] = useState(() => ({ name:"", mascot:"", sport: openSports[0] || AVAILABLE_SPORTS[0], primaryColor:"#1a3a6b" }));
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
       <div style={{ background:"#fff",borderRadius:16,padding:28,width:440 }}>
@@ -1305,10 +1306,10 @@ function AddSchoolModal({ onClose, onAdd }) {
             {Object.entries(SPORTS)
               .filter(([k])=>k!=="basketball")
               .sort((a,b)=>{ const av=AVAILABLE_SPORTS.includes(a[0]), bv=AVAILABLE_SPORTS.includes(b[0]); return av===bv?0:av?-1:1; })
-              .map(([k,v])=>{ const ok=AVAILABLE_SPORTS.includes(k); return <option key={k} value={k} disabled={!ok}>{v.icon} {v.label}{ok?"":" — Coming soon"}</option>; })}
+              .map(([k,v])=>{ const taken=existingSports.includes(k); const avail=AVAILABLE_SPORTS.includes(k); const ok=avail&&!taken; return <option key={k} value={k} disabled={!ok}>{v.icon} {v.label}{taken?" — already added":(avail?"":" — Coming soon")}</option>; })}
           </select>
         </div>
-        <button onClick={()=>{ if(form.name){ onAdd({ id:`s${Date.now()}`, ...form, athletes:[], records:[] }); onClose(); }}}
+        <button onClick={()=>{ if(!form.name) return; if(existingSports.includes(form.sport)){ alert("This school already has a "+(SPORTS[form.sport]?.label||"that")+" program."); return; } onAdd({ id:`s${Date.now()}`, ...form, athletes:[], records:[] }); onClose(); }}
           style={{ width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14,cursor:"pointer" }}>
           Add program
         </button>
@@ -3789,7 +3790,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   return (
     <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
       <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
-      {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} onAdd={async (s)=>{
+      {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} existingSports={schools.map(sc=>sc.sport)} onAdd={async (s)=>{
         if (orgId) {
           if (tierLimits && schools.length >= tierLimits.maxPrograms) {
             alert(`Your ${({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"current")} plan includes ${tierLimits.maxPrograms} program${tierLimits.maxPrograms===1?"":"s"}. Upgrade to add more.`);
