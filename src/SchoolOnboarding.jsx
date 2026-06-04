@@ -41,7 +41,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
   const [orgId, setOrgId] = useState(null);
   const [schoolName, setSchoolName] = useState('');
 
-  const [form, setForm] = useState({ name:'', address:'', city:'', state:'', zip:'', website:'', level:'HS', adName:'', adEmail:'' });
+  const [form, setForm] = useState({ name:'', address:'', city:'', state:'', zip:'', level:'HS', adName:'', adEmail:'' });
   const [prog, setProg] = useState({ sport:'basketball_boys', mascot:'', color:'#1a3a6b' });
 
   const sf = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -70,8 +70,9 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
   };
 
   const createSchool = async () => {
-    if (!form.name || !form.state) { setErr('School name and state are required.'); return; }
-    if (!form.adEmail) { setErr("Your Athletic Director's email is required so we can invite them."); return; }
+    const required = [['name','School name'],['city','City'],['state','State'],['zip','ZIP'],['address','Street address'],['adName','AD name'],['adEmail','AD email']];
+    const missing = required.filter(([k]) => !String(form[k] || '').trim()).map(([,label]) => label);
+    if (missing.length) { setErr('Please complete all fields — missing: ' + missing.join(', ') + '.'); return; }
     setBusy(true); setErr('');
     const { data, error } = await createSchoolWithMembership(form, userId);
     if (error) { setBusy(false); setErr(error.message); return; }
@@ -152,7 +153,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
         {step === 2 && (
           <>
             <h1 style={s.h1}>Add your school</h1>
-            <p style={s.sub}>This creates your school's directory entry. Your AD will be invited as the school administrator.</p>
+            <p style={s.sub}>This creates your school's directory entry. All fields are required. Your AD will be invited as the school administrator.</p>
             <div style={s.field}><label style={s.label}>School name</label><input style={s.input} value={form.name} onChange={sf('name')} placeholder="Denver Christian High School" /></div>
             <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:10 }}>
               <div style={s.field}><label style={s.label}>City</label><input style={s.input} value={form.city} onChange={sf('city')} /></div>
@@ -164,11 +165,8 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
               <div style={s.field}><label style={s.label}>ZIP</label><input style={s.input} value={form.zip} onChange={sf('zip')} /></div>
             </div>
             <div style={s.field}><label style={s.label}>Street address</label><input style={s.input} value={form.address} onChange={sf('address')} /></div>
-            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:10 }}>
-              <div style={s.field}><label style={s.label}>Website</label><input style={s.input} value={form.website} onChange={sf('website')} placeholder="https://…" /></div>
-              <div style={s.field}><label style={s.label}>Level</label>
-                <select style={s.input} value={form.level} onChange={sf('level')}><option value="HS">High School</option><option value="MS">Middle School</option></select>
-              </div>
+            <div style={s.field}><label style={s.label}>Level</label>
+              <select style={s.input} value={form.level} onChange={sf('level')}><option value="HS">High School</option><option value="MS">Middle School</option></select>
             </div>
             <div style={{ borderTop:'1px solid #f0eeea', margin:'8px 0 14px', paddingTop:14 }}>
               <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:8 }}>Athletic Director (school admin)</div>
@@ -191,7 +189,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
                 {SPORTS_AVAILABLE.map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
               </select>
             </div>
-            <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} placeholder="Thunder" /></div>
+            <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} /></div>
             <div style={s.field}><label style={s.label}>Team color</label><input type="color" value={prog.color} onChange={e => setProg(p => ({ ...p, color: e.target.value }))} style={{ width:60, height:38, border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff' }} /></div>
             <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open MilestoneIQ →'}</button>
           </>
