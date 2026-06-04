@@ -45,6 +45,15 @@ export const updateProfile = async (userId, updates) => {
   return { data, error };
 };
 
+// Change the signed-in user's password. Verifies the current password by
+// re-authenticating first (Supabase's updateUser doesn't check it otherwise).
+export const changePassword = async (email, currentPassword, newPassword) => {
+  const { error: authErr } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+  if (authErr) return { error: { message: 'Current password is incorrect' } };
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error };
+};
+
 // ── Organization helpers ──────────────────────────────────────────────────────
 export const createOrg = async (name, userId) => {
   const slug = name
