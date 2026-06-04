@@ -3697,27 +3697,13 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
-          <Field label="Alert email recipients" hint="Who receives milestone alert emails">
-            <Input defaultValue="bmcgatlin@denchristian.org, cfuller@denchristian.org" />
-          </Field>
-          <Field label="Alert frequency">
-            <select defaultValue="weekly" style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:14,width:"100%",color:"#111" }}>
-              <option value="instant">Instant — send as soon as an alert fires</option>
-              <option value="daily">Daily digest — once per day</option>
-              <option value="weekly">Weekly digest — every Monday morning</option>
-              <option value="off">Off — don't send alert emails</option>
-            </select>
-          </Field>
-          <Field label="Notify on">
-            <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-              {["Record approaching (85%+)","Record broken","Milestone reached","Milestone approaching"].map(opt => (
-                <label key={opt} style={{ display:"flex",alignItems:"center",gap:8,fontSize:14,color:"#374151",cursor:"pointer" }}>
-                  <input type="checkbox" defaultChecked style={{ width:16,height:16,cursor:"pointer" }} /> {opt}
-                </label>
-              ))}
+          <div style={{ display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:"#f9fafb",border:"1px dashed #d1d5db",borderRadius:10 }}>
+            <span style={{ fontSize:22 }}>🔔</span>
+            <div>
+              <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>Email &amp; text alerts are coming soon</div>
+              <div style={{ fontSize:13,color:"#6b7280" }}>For now, milestone &amp; record alerts appear in-app on the <strong>Alerts</strong> tab. Sending them by email or text is on the way — you'll choose recipients and frequency here when it lands.</div>
             </div>
-          </Field>
-          <SaveBtn label="Save notification settings" />
+          </div>
         </Section>
 
         {/* School settings */}
