@@ -337,3 +337,71 @@ export const seedDCPrograms = async (orgId, seedSchools) => {
   }
   return { success: true };
 };
+
+// ── School directory + role-based access (v2) ─────────────────────────────────
+
+// Search the public school directory (non-sensitive columns) by state + name.
+export const searchSchools = async (state, query) => {
+  let q = supabase.from('schools_directory').select('*').order('name');
+  if (state) q = q.eq('state', state);
+  if (query) q = q.ilike('name', `%${query}%`);
+  const { data, error } = await q.limit(50);
+  return { data, error };
+};
+
+// Create a new school (organization) and add the creating user as a coach.
+export const createSchoolWithMembership = async (school, userId) => {
+  const slug = (school.name || '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  const { data: org, error: orgErr } = await supabase
+    .from('organizations')
+    .insert({
+      name: school.name,
+      slug,
+      city: school.city || null,
+      state: school.state || null,
+      address: school.address || null,
+      zip: school.zip || null,
+      website: school.website || null,
+      level: school.level || null,
+      ad_name: school.adName || null,
+      ad_email: school.adEmail || null,
+      created_by: userId,
+    })
+    .select()
+    .single();
+  if (orgErr) return { error: orgErr };
+  const { error: memErr } = await supabase
+    .from('org_members')
+    .insert({ org_id: org.id, user_id: userId, role: 'coach' });
+  if (memErr) return { error: memErr };
+  return { data: org };
+};
+
+// Join an existing school as a coach.
+export const joinSchoolAsCoach = async (orgId, userId) => {
+  const { error } = await supabase
+    .from('org_members')
+    .insert({ org_id: orgId, user_id: userId, role: 'coach' });
+  return { error };
+};
+
+// Invite a coach or AD by email (calls the invite-member edge function). Best-effort.
+export const inviteMember = async (email, orgId, role) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ email, org_id: orgId, role }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: out.error || `Invite failed (${res.status})` };
+    return { data: out };
+  } catch (e) {
+    return { error: e.message };
+  }
+};
