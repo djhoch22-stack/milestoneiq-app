@@ -3,6 +3,7 @@
 // Flow: (1) find your school by state → (2) join it, OR create a new one + name
 // your AD (who gets invited as admin) → (3) create your own program.
 import { useState } from 'react';
+import raftersLogo from '../raftersiq-logo.png';
 import {
   searchSchools,
   createSchoolWithMembership,
@@ -98,7 +99,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
       <div style={s.card}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width:38, height:38, objectFit:'contain' }} />
+            <img src={raftersLogo} alt="RaftersIQ" style={{ width:38, height:38, objectFit:'contain' }} />
             <span style={{ fontWeight:700, fontSize:18, color:'#111' }}>RaftersIQ</span>
           </div>
           <span style={s.link} onClick={onSignOut}>Sign out</span>
