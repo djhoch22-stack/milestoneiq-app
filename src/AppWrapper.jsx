@@ -400,6 +400,7 @@ export default function AppWrapper() {
         role={role}
         userEmail={session.user.email}
         userName={profile?.full_name || ''}
+        userPhone={profile?.phone || ''}
         userId={session.user.id}
         onSignOut={() => supabase.auth.signOut()}
       />
