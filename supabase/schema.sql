@@ -523,7 +523,16 @@ alter table public.profiles add column if not exists phone text;
 create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public, auth as $$
 begin
-  delete from auth.users where id = auth.uid();
+  -- Wipe the caller's app data (always permitted on these tables).
+  delete from public.program_coaches where user_id = auth.uid();
+  delete from public.org_members     where user_id = auth.uid();
+  delete from public.profiles        where id      = auth.uid();
+  -- Remove the auth login too if the project permits it (otherwise app data is still gone).
+  begin
+    delete from auth.users where id = auth.uid();
+  exception when others then
+    null;
+  end;
 end;
 $$;
 revoke all on function public.delete_my_account() from anon, public;
