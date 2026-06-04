@@ -161,7 +161,7 @@ const s = {
 function Logo() {
   return (
     <div style={s.logo}>
-      <div style={s.logoBox}>🏆</div>
+      <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width: 40, height: 40, objectFit: 'contain' }} />
       <span style={s.logoTxt}>RaftersIQ</span>
     </div>
   );
