@@ -697,28 +697,75 @@ function OnboardingScreen({ userId, onComplete, seedSchools }) {
   );
 }
 
-export function LockedScreen({ orgId, onManageBilling }) {
+// Reusable plan picker (monthly/annual toggle + tier tiles). onSelect(priceId, tier, billing).
+export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →' }) {
+  const [billing, setBilling] = useState('monthly');
+  const [plan, setPlan] = useState('school');
+  const go = () => {
+    const p = PLANS.find((x) => x.id === plan);
+    if (p) onSelect(p[billing === 'annual' ? 'annualId' : 'monthlyId'], p.id, billing);
+  };
+  return (
+    <>
+      <div style={{ display: 'flex', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', marginBottom: 20, width: 'fit-content' }}>
+        {[['monthly', 'Monthly'], ['annual', 'Annual (save ~25%)']].map(([val, label]) => (
+          <button key={val} onClick={() => setBilling(val)} style={{ padding: '8px 20px', fontSize: 13, border: 'none', cursor: 'pointer', fontWeight: billing === val ? 700 : 400, background: billing === val ? '#1a3a6b' : '#fff', color: billing === val ? '#fff' : '#6b7280', fontFamily: 'inherit' }}>{label}</button>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+        {PLANS.map((p) => (
+          <div key={p.id} onClick={() => setPlan(p.id)} style={{ border: `2px solid ${plan === p.id ? '#1a3a6b' : p.popular ? '#93c5fd' : '#e5e7eb'}`, borderRadius: 12, padding: 20, cursor: 'pointer', position: 'relative', background: plan === p.id ? '#eff6ff' : '#fff' }}>
+            {p.popular && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#1a56db', color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+            <div style={{ fontWeight: 700, fontSize: 16, color: '#111', marginBottom: 4 }}>{p.name}</div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>{p.description}</div>
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ fontSize: 26, fontWeight: 800, color: '#111' }}>${billing === 'annual' ? Math.round(p.annualPrice / 12) : p.monthlyPrice}</span>
+              <span style={{ fontSize: 13, color: '#9ca3af' }}>/mo</span>
+              {billing === 'annual' && <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>${p.annualPrice}/yr billed annually</div>}
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+              {p.features.map((f) => (
+                <li key={f} style={{ fontSize: 12, color: '#374151', padding: '3px 0', display: 'flex', gap: 6 }}><span style={{ color: '#166534' }}>✓</span>{f}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <button style={s.btn} onClick={go} disabled={busy}>{busy ? 'Redirecting to checkout…' : ctaLabel}</button>
+    </>
+  );
+}
+
+export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
+  const [busy, setBusy] = useState(false);
+  const isAdmin = role === 'admin';
+  const pastDue = status === 'past_due';
+  const handleSelect = async (priceId, tier, billing) => {
+    setBusy(true);
+    await onCheckout(priceId, tier, billing);
+    setBusy(false);
+  };
   return (
     <div style={s.wrap}>
-      <div style={s.card}>
+      <div style={{ ...s.card, maxWidth: isAdmin ? 820 : 440 }}>
         <Logo />
-        <h1 style={s.h1}>Trial ended</h1>
-        <p style={s.sub}>
-          Your 7-day free trial has expired. Choose a plan to continue.
-        </p>
-        <button style={s.btn} onClick={onManageBilling}>
-          Choose a plan →
-        </button>
-        <p
-          style={{
-            fontSize: 12,
-            color: '#9ca3af',
-            textAlign: 'center',
-            marginTop: 12,
-          }}
-        >
-          Your data is safe — it'll be here when you're ready.
-        </p>
+        <h1 style={s.h1}>{pastDue ? 'Payment needs attention' : "Your school's trial has ended"}</h1>
+        {!isAdmin ? (
+          <>
+            <p style={s.sub}>MilestoneIQ for your school is paused. Ask your athletic director to choose a plan to restore access.</p>
+            <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 12 }}>Your data is safe — it'll be here the moment your AD subscribes.</p>
+          </>
+        ) : (
+          <>
+            <p style={s.sub}>{pastDue ? "We couldn't process your last payment. Pick a plan or update billing to continue." : "Choose a plan to keep your school's stats, records, and alerts going — your data is safe and waiting."}</p>
+            <ChoosePlan onSelect={handleSelect} busy={busy} ctaLabel="Subscribe & continue →" />
+            {(status === 'canceled' || pastDue) && (
+              <div style={{ textAlign: 'center', marginTop: 10 }}>
+                <span style={s.link} onClick={onManageBilling}>Or manage existing billing →</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -730,15 +777,9 @@ export default function Auth({ onAuthenticated, seedSchools }) {
 
   const handleLoginSuccess = () => window.location.reload();
 
-  const handleSignupDone = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.user) {
-      setUserId(session.user.id);
-      setScreen('onboarding');
-    }
-  };
+  // Free trial, no card: after signup just reload — AppWrapper routes the new user
+  // into SchoolOnboarding and their school's 7-day trial starts automatically.
+  const handleSignupDone = () => window.location.reload();
 
   if (screen === 'signup')
     return <SignupScreen onSwitch={setScreen} onSuccess={handleSignupDone} />;
