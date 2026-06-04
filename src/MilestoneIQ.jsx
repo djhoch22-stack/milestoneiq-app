@@ -1138,11 +1138,11 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
 
 // ── Add School Modal ───────────────────────────────────────────────────────────
 // Account section — real name (from registration), saves to the profile.
-function AccountSection({ userId, userName, userEmail, tier, onSignOut }) {
+function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOut }) {
   const parts = (userName || "").trim().split(/\s+/).filter(Boolean);
   const [first, setFirst] = useState(parts[0] || "");
   const [last, setLast] = useState(parts.slice(1).join(" "));
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(userPhone || "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const display = `${first} ${last}`.trim() || userEmail || "Your account";
@@ -1154,9 +1154,11 @@ function AccountSection({ userId, userName, userEmail, tier, onSignOut }) {
   const save = async () => {
     if (!userId) return;
     setSaving(true); setMsg("");
-    const { error } = await updateProfile(userId, { full_name: `${first} ${last}`.trim() });
+    const full_name = `${first} ${last}`.trim();
+    let res = await updateProfile(userId, { full_name, phone });
+    if (res.error) res = await updateProfile(userId, { full_name }); // phone column may not exist yet
     setSaving(false);
-    setMsg(error ? ("Couldn't save: " + (error.message || error)) : "Saved ✓");
+    setMsg(res.error ? ("Couldn't save: " + (res.error.message || res.error)) : "Saved ✓");
   };
 
   return (
@@ -3524,7 +3526,7 @@ function saveSchools(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId } = {}) {
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -3611,7 +3613,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Account */}
         <Section title="👤 Account">
-          <AccountSection userId={userId} userName={userName} userEmail={userEmail} tier={tier} onSignOut={handleSignOut} />
+          <AccountSection userId={userId} userName={userName} userEmail={userEmail} userPhone={userPhone} tier={tier} onSignOut={handleSignOut} />
         </Section>
 
         {/* Password */}
