@@ -98,7 +98,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
       <div style={s.card}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:34, height:34, background:'#1a3a6b', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>🏆</div>
+            <img src="/raftersiq-logo.png" alt="RaftersIQ" style={{ width:38, height:38, objectFit:'contain' }} />
             <span style={{ fontWeight:700, fontSize:18, color:'#111' }}>RaftersIQ</span>
           </div>
           <span style={s.link} onClick={onSignOut}>Sign out</span>
