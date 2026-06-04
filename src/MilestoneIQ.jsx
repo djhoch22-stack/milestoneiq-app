@@ -3728,7 +3728,12 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   const [schools, setSchoolsRaw] = useState(() => authed ? (initialSchools || []) : loadSchools());
   const [activeSchool, setActiveSchool] = useState(null);
   const [showAddSchool, setShowAddSchool] = useState(false);
-  const [homeTab, setHomeTab] = useState("schools");
+  const [homeTab, setHomeTab] = useState(() => {
+    try { return sessionStorage.getItem("mq_tab") || "schools"; } catch (e) { return "schools"; }
+  });
+  // Remember the active tab so any reload (e.g. saving your name) returns you here
+  // instead of bouncing to the home page.
+  useEffect(() => { try { sessionStorage.setItem("mq_tab", homeTab); } catch (e) {} }, [homeTab]);
 
   useEffect(() => {
     if (authed) {
@@ -3747,11 +3752,14 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
   const updateSchool = useCallback((updated) => {
     setSchools(s => s.map(sc => sc.id===updated.id ? updated : sc));
-    setActiveSchool(updated);
+    // Keep the dashboard in sync ONLY if it's already open — never navigate INTO a
+    // school view from elsewhere (e.g. editing a logo on the Settings page).
+    setActiveSchool(prev => (prev && prev.id === updated.id) ? updated : prev);
     if (onUpdateSchool) onUpdateSchool(updated);   // persist this program to Supabase
   }, [setSchools, onUpdateSchool]);
 
   const handleSignOut = useCallback(() => {
+    try { sessionStorage.removeItem("mq_tab"); } catch (e) {}   // fresh start (home) on next login
     if (onSignOut) onSignOut();
     else signOut().then(() => window.location.reload());
   }, [onSignOut]);
