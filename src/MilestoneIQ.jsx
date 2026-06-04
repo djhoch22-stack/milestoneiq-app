@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -3734,7 +3734,14 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                       <div style={{ fontSize:12,color:"#6b7280" }}>{sc.mascot} · {SPORTS[sc.sport]?.label}</div>
                     </div>
                     <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",color:"#374151" }}>Edit</button>
-                    <button style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",color:"#991b1b" }}>Delete</button>
+                    <button onClick={async ()=>{
+                        if(!window.confirm(`⚠️ Permanently delete the ${SPORTS[sc.sport]?.label||""} program "${sc.mascot||sc.name}"?\n\nThis ALSO deletes every athlete, all-time player, record, season, and milestone in it. This CANNOT be undone and the data is lost for good.`)) return;
+                        const { error } = await deleteProgram(sc.id);
+                        if(error){ alert("Could not delete program: "+(error.message||error)); return; }
+                        setSchools(prev => prev.filter(x => x.id !== sc.id));
+                        setActiveSchool(a => a && a.id===sc.id ? null : a);
+                      }}
+                      style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",color:"#991b1b" }}>Delete</button>
                   </div>
                   <div style={{ borderTop:"1px solid #e5e7eb",padding:"10px 16px",display:"flex",alignItems:"center",gap:10,background:"#fff" }}>
                     <span style={{ fontSize:12,color:"#6b7280",fontWeight:600 }}>Logo</span>
