@@ -1,0 +1,202 @@
+// ── SchoolOnboarding ──────────────────────────────────────────────────────────
+// Shown by AppWrapper to a logged-in user who has no school membership yet.
+// Flow: (1) find your school by state → (2) join it, OR create a new one + name
+// your AD (who gets invited as admin) → (3) create your own program.
+import { useState } from 'react';
+import {
+  searchSchools,
+  createSchoolWithMembership,
+  joinSchoolAsCoach,
+  inviteMember,
+  createProgram,
+} from './supabase_client';
+
+const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+const SPORTS_AVAILABLE = [["basketball_boys","🏀 Boys Basketball"],["basketball_girls","🏀 Girls Basketball"]];
+
+const s = {
+  wrap: { minHeight:'100vh', background:'#f8f7f4', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Georgia, serif', padding:20 },
+  card: { background:'#fff', borderRadius:16, padding:'36px 40px', width:'100%', maxWidth:540, boxShadow:'0 4px 24px rgba(0,0,0,0.08)', border:'1px solid #e8e4dd' },
+  h1: { margin:'0 0 4px', fontSize:22, fontWeight:700, color:'#111' },
+  sub: { margin:'0 0 22px', fontSize:14, color:'#6b7280' },
+  label: { display:'block', fontSize:12, fontWeight:600, color:'#374151', marginBottom:4 },
+  input: { width:'100%', border:'1px solid #d1d5db', borderRadius:9, padding:'10px 13px', fontSize:14, boxSizing:'border-box', outline:'none', fontFamily:'inherit', color:'#111' },
+  btn: { background:'#1a3a6b', color:'#fff', border:'none', borderRadius:9, padding:'12px 0', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', width:'100%', marginTop:6 },
+  ghost: { background:'none', border:'1px solid #d1d5db', borderRadius:9, padding:'10px 14px', fontSize:13, cursor:'pointer', color:'#374151', fontFamily:'inherit' },
+  field: { marginBottom:14 },
+  err: { background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, padding:'9px 13px', fontSize:13, color:'#991b1b', marginBottom:14 },
+  link: { color:'#1a3a6b', cursor:'pointer', textDecoration:'underline', fontSize:13 },
+};
+
+export default function SchoolOnboarding({ userId, fullName, onComplete, onSignOut }) {
+  const [step, setStep] = useState(1);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const [selState, setSelState] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+
+  const [orgId, setOrgId] = useState(null);
+  const [schoolName, setSchoolName] = useState('');
+
+  const [form, setForm] = useState({ name:'', address:'', city:'', state:'', zip:'', website:'', level:'HS', adName:'', adEmail:'' });
+  const [prog, setProg] = useState({ sport:'basketball_boys', mascot:'', color:'#1a3a6b' });
+
+  const sf = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const runSearch = async () => {
+    if (!selState) { setErr('Pick your state first.'); return; }
+    setBusy(true); setErr('');
+    const { data, error } = await searchSchools(selState, query.trim());
+    setBusy(false); setSearched(true);
+    if (error) { setErr(error.message); return; }
+    setResults(data || []);
+  };
+
+  const joinExisting = async (school) => {
+    setBusy(true); setErr('');
+    const { error } = await joinSchoolAsCoach(school.id, userId);
+    setBusy(false);
+    if (error && !/duplicate|unique/i.test(error.message || '')) { setErr(error.message); return; }
+    setOrgId(school.id); setSchoolName(school.name); setStep(3);
+  };
+
+  const startNewSchool = () => {
+    setErr('');
+    setForm(f => ({ ...f, name: query.trim(), state: selState }));
+    setStep(2);
+  };
+
+  const createSchool = async () => {
+    if (!form.name || !form.state) { setErr('School name and state are required.'); return; }
+    if (!form.adEmail) { setErr("Your Athletic Director's email is required so we can invite them."); return; }
+    setBusy(true); setErr('');
+    const { data, error } = await createSchoolWithMembership(form, userId);
+    if (error) { setBusy(false); setErr(error.message); return; }
+    await inviteMember(form.adEmail, data.id, 'admin'); // best-effort
+    setBusy(false);
+    setOrgId(data.id); setSchoolName(form.name); setStep(3);
+  };
+
+  const createMyProgram = async () => {
+    if (!prog.mascot) { setErr('Enter your team name / mascot.'); return; }
+    setBusy(true); setErr('');
+    const { error } = await createProgram(orgId, {
+      name: schoolName, mascot: prog.mascot, sport: prog.sport,
+      primary_color: prog.color, created_by: userId,
+    });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onComplete();
+  };
+
+  return (
+    <div style={s.wrap}>
+      <div style={s.card}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:34, height:34, background:'#1a3a6b', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>🏆</div>
+            <span style={{ fontWeight:700, fontSize:18, color:'#111' }}>MilestoneIQ</span>
+          </div>
+          <span style={s.link} onClick={onSignOut}>Sign out</span>
+        </div>
+        <div style={{ fontSize:12, color:'#9ca3af', marginBottom:18 }}>Step {step} of 3{fullName ? ` · Welcome, ${fullName}` : ''}</div>
+
+        {err && <div style={s.err}>{err}</div>}
+
+        {step === 1 && (
+          <>
+            <h1 style={s.h1}>Find your school</h1>
+            <p style={s.sub}>Pick your state and search — if it's not listed yet, you can add it.</p>
+            <div style={s.field}>
+              <label style={s.label}>State</label>
+              <select style={s.input} value={selState} onChange={e => { setSelState(e.target.value); setSearched(false); setResults([]); }}>
+                <option value="">Select a state…</option>
+                {STATES.map(st => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </div>
+            <div style={s.field}>
+              <label style={s.label}>School name</label>
+              <div style={{ display:'flex', gap:8 }}>
+                <input style={s.input} value={query} placeholder="Start typing your school…"
+                  onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} />
+                <button style={{ ...s.ghost, whiteSpace:'nowrap' }} onClick={runSearch} disabled={busy}>{busy ? '…' : 'Search'}</button>
+              </div>
+            </div>
+
+            {searched && (
+              <div style={{ marginBottom:14 }}>
+                {results.length === 0
+                  ? <div style={{ fontSize:13, color:'#6b7280', padding:'8px 0' }}>No matching schools found.</div>
+                  : results.map(r => (
+                      <div key={r.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'9px 12px', border:'1px solid #e5e7eb', borderRadius:8, marginBottom:6 }}>
+                        <div>
+                          <div style={{ fontSize:14, fontWeight:600, color:'#111' }}>{r.name}</div>
+                          <div style={{ fontSize:12, color:'#9ca3af' }}>{[r.city, r.state].filter(Boolean).join(', ')}</div>
+                        </div>
+                        <button style={s.ghost} onClick={() => joinExisting(r)} disabled={busy}>This is mine</button>
+                      </div>
+                    ))
+                }
+                <div style={{ textAlign:'center', marginTop:10, fontSize:13, color:'#6b7280' }}>
+                  Don't see it?{' '}
+                  <span style={s.link} onClick={startNewSchool}>Add your school →</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h1 style={s.h1}>Add your school</h1>
+            <p style={s.sub}>This creates your school's directory entry. Your AD will be invited as the school administrator.</p>
+            <div style={s.field}><label style={s.label}>School name</label><input style={s.input} value={form.name} onChange={sf('name')} placeholder="Denver Christian High School" /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:10 }}>
+              <div style={s.field}><label style={s.label}>City</label><input style={s.input} value={form.city} onChange={sf('city')} /></div>
+              <div style={s.field}><label style={s.label}>State</label>
+                <select style={s.input} value={form.state} onChange={sf('state')}>
+                  <option value="">—</option>{STATES.map(st => <option key={st} value={st}>{st}</option>)}
+                </select>
+              </div>
+              <div style={s.field}><label style={s.label}>ZIP</label><input style={s.input} value={form.zip} onChange={sf('zip')} /></div>
+            </div>
+            <div style={s.field}><label style={s.label}>Street address</label><input style={s.input} value={form.address} onChange={sf('address')} /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:10 }}>
+              <div style={s.field}><label style={s.label}>Website</label><input style={s.input} value={form.website} onChange={sf('website')} placeholder="https://…" /></div>
+              <div style={s.field}><label style={s.label}>Level</label>
+                <select style={s.input} value={form.level} onChange={sf('level')}><option value="HS">High School</option><option value="MS">Middle School</option></select>
+              </div>
+            </div>
+            <div style={{ borderTop:'1px solid #f0eeea', margin:'8px 0 14px', paddingTop:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#374151', marginBottom:8 }}>Athletic Director (school admin)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div style={s.field}><label style={s.label}>AD name</label><input style={s.input} value={form.adName} onChange={sf('adName')} /></div>
+                <div style={s.field}><label style={s.label}>AD email</label><input style={s.input} type="email" value={form.adEmail} onChange={sf('adEmail')} placeholder="ad@school.org" /></div>
+              </div>
+            </div>
+            <button style={s.btn} onClick={createSchool} disabled={busy}>{busy ? 'Creating…' : 'Create school & continue →'}</button>
+            <div style={{ textAlign:'center', marginTop:10 }}><span style={s.link} onClick={() => { setErr(''); setStep(1); }}>← Back to search</span></div>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <h1 style={s.h1}>Create your program</h1>
+            <p style={s.sub}>You'll manage this program at <strong>{schoolName}</strong>. Only you (and your AD) can see it.</p>
+            <div style={s.field}><label style={s.label}>Sport</label>
+              <select style={s.input} value={prog.sport} onChange={e => setProg(p => ({ ...p, sport: e.target.value }))}>
+                {SPORTS_AVAILABLE.map(([k, lbl]) => <option key={k} value={k}>{lbl}</option>)}
+              </select>
+            </div>
+            <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} placeholder="Thunder" /></div>
+            <div style={s.field}><label style={s.label}>Team color</label><input type="color" value={prog.color} onChange={e => setProg(p => ({ ...p, color: e.target.value }))} style={{ width:60, height:38, border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff' }} /></div>
+            <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open MilestoneIQ →'}</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
