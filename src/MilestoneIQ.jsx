@@ -3664,7 +3664,9 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
   const manage = async () => { setErr(""); const e = await onManageBilling?.(); if (e) showErr(e); };
   const errStyle = { background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#991b1b" };
   return (
-    <Section title="💳 Billing & plan">
+    <div style={{ background:"#fff",borderRadius:14,border:"1px solid #e8e4dd",marginBottom:20,overflow:"hidden" }}>
+      <div style={{ padding:"14px 24px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111" }}>💳 Billing &amp; plan</div>
+      <div style={{ padding:"20px 24px" }}>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10 }}>
         <div>
           <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{planLine}</div>
@@ -3688,7 +3690,8 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
           </div>
         </div>
       )}
-    </Section>
+      </div>
+    </div>
   );
 }
 
