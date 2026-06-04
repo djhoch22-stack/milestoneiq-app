@@ -399,6 +399,8 @@ export default function AppWrapper() {
         tierLimits={TIER_LIMITS[tier] || TIER_LIMITS.program}
         role={role}
         userEmail={session.user.email}
+        userName={profile?.full_name || ''}
+        userId={session.user.id}
         onSignOut={() => supabase.auth.signOut()}
       />
     </>
