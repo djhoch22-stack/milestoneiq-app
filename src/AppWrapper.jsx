@@ -21,11 +21,12 @@ import {
 } from './supabase_client';
 import Auth, { LockedScreen } from './Auth';
 import App from './MilestoneIQ';
+import SchoolOnboarding from './SchoolOnboarding';
 
 const TIER_LIMITS = {
-  program: { maxPrograms: 1 },
-  school: { maxPrograms: 8 },
-  school_plus: { maxPrograms: 999 },
+  program: { maxPrograms: 1, maxCoachesPerProgram: 1 },
+  school: { maxPrograms: 8, maxCoachesPerProgram: 3 },
+  school_plus: { maxPrograms: 999, maxCoachesPerProgram: 999 },
 };
 
 function rowToSchool(prog, athletes, allTime, records, milestones, seasons) {
@@ -93,6 +94,8 @@ export default function AppWrapper() {
   const [profile, setProfile] = useState(null);
   const [schools, setSchools] = useState([]);
   const [orgId, setOrgId] = useState(null);
+  const [role, setRole] = useState('coach');
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -126,9 +129,12 @@ export default function AppWrapper() {
       setProfile(prof);
       const { data: orgs } = await getUserOrgs(userId);
       if (!orgs?.length) {
+        setNeedsOnboarding(true);
         setLoading(false);
         return;
       }
+      setNeedsOnboarding(false);
+      setRole(orgs[0].role || 'coach');
       const org = orgs[0].organizations;
       setOrgId(org.id);
       const { data: programs } = await getPrograms(org.id);
@@ -302,6 +308,17 @@ export default function AppWrapper() {
     return <Auth onAuthenticated={() => loadUserData(session?.user?.id)} />;
   }
 
+  if (needsOnboarding) {
+    return (
+      <SchoolOnboarding
+        userId={session.user.id}
+        fullName={profile?.full_name}
+        onComplete={() => loadUserData(session.user.id)}
+        onSignOut={() => supabase.auth.signOut()}
+      />
+    );
+  }
+
   const tier = profile?.subscription_tier || 'program';
   const status = profile?.subscription_status || 'active';
   const trialEnd = profile?.trial_ends_at
@@ -380,6 +397,7 @@ export default function AppWrapper() {
         orgId={orgId}
         tier={tier}
         tierLimits={TIER_LIMITS[tier] || TIER_LIMITS.program}
+        role={role}
         userEmail={session.user.email}
         onSignOut={() => supabase.auth.signOut()}
       />
