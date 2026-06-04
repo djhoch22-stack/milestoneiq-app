@@ -1187,14 +1187,16 @@ function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOu
 }
 
 // School roster + role management (admin only manages; everyone sees the list).
-function MembersSection({ orgId, role, userId }) {
+function MembersSection({ orgId, role, userId, programs = [] }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("coach");
   const [msg, setMsg] = useState("");
   const [pending, setPending] = useState([]);
+  const [inviteProgram, setInviteProgram] = useState("");
   const isAdmin = role === "admin";
+  const progLabel = (id) => { const p = programs.find(x => x.id === id); return p ? (SPORTS[p.sport]?.label || p.mascot || "program") : ""; };
 
   const load = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
@@ -1220,10 +1222,12 @@ function MembersSection({ orgId, role, userId }) {
   };
   const sendInvite = async () => {
     if (!inviteEmail) return;
+    if (inviteRole === "coach" && !inviteProgram) { setMsg("Pick which program this coach will run."); return; }
     setMsg("Inviting…");
-    const { error } = await inviteMember(inviteEmail, orgId, inviteRole);
+    const programId = inviteRole === "coach" ? inviteProgram : null;
+    const { error } = await inviteMember(inviteEmail, orgId, inviteRole, programId);
     if (error) { setMsg("Invite failed: " + (error.message || error)); return; }
-    setMsg(`✓ ${inviteEmail} will join as ${inviteRole} when they sign up.`);
+    setMsg(`✓ ${inviteEmail} will join as ${inviteRole}${programId ? " (" + progLabel(programId) + ")" : ""} when they sign up.`);
     setInviteEmail("");
     load();
   };
@@ -1277,20 +1281,28 @@ function MembersSection({ orgId, role, userId }) {
               {pending.map(pi => (
                 <div key={pi.id} style={{ display:"flex",alignItems:"center",gap:8,padding:"6px 0",fontSize:13,borderBottom:"1px solid #f3f4f6" }}>
                   <span style={{ flex:1,color:"#374151" }}>{pi.email}</span>
-                  <span style={{ fontSize:11,color:"#9ca3af",textTransform:"capitalize" }}>{pi.role} · pending</span>
+                  <span style={{ fontSize:11,color:"#9ca3af" }}>{pi.role}{pi.program_id ? " · " + progLabel(pi.program_id) : ""} · pending</span>
                   <button onClick={()=>cancelOne(pi.id)} style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",color:"#6b7280" }}>Cancel</button>
                 </div>
               ))}
             </div>
           )}
-          <div style={{ display:"flex",gap:8 }}>
+          <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
             <input value={inviteEmail} onChange={e=>setInviteEmail(e.target.value)} placeholder="colleague@school.org" type="email"
-              style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13 }} />
-            <select value={inviteRole} onChange={e=>setInviteRole(e.target.value)} style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151" }}>
-              <option value="coach">Coach</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button onClick={sendInvite} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",whiteSpace:"nowrap" }}>Send invite</button>
+              style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13 }} />
+            <div style={{ display:"flex",gap:8 }}>
+              <select value={inviteRole} onChange={e=>setInviteRole(e.target.value)} style={{ border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151" }}>
+                <option value="coach">Coach</option>
+                <option value="admin">Admin (sees all)</option>
+              </select>
+              {inviteRole === "coach" && (
+                <select value={inviteProgram} onChange={e=>setInviteProgram(e.target.value)} style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#374151" }}>
+                  <option value="">Which program?</option>
+                  {programs.map(p => <option key={p.id} value={p.id}>{SPORTS[p.sport]?.label || p.mascot || p.name}</option>)}
+                </select>
+              )}
+              <button onClick={sendInvite} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",whiteSpace:"nowrap" }}>Send invite</button>
+            </div>
           </div>
           {msg && <div style={{ fontSize:12,color:"#6b7280",marginTop:8 }}>{msg}</div>}
         </>
@@ -3783,7 +3795,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Users & Access */}
         <Section title="👥 Users & access">
-          <MembersSection orgId={orgId} role={role} userId={userId} />
+          <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} />
         </Section>
 
         {/* Notifications */}
