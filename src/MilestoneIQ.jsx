@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 
@@ -1177,7 +1177,10 @@ function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOu
     let res = await updateProfile(userId, { full_name, phone });
     if (res.error) res = await updateProfile(userId, { full_name }); // phone column may not exist yet
     setSaving(false);
-    setMsg(res.error ? ("Couldn't save: " + (res.error.message || res.error)) : "Saved ✓");
+    if (res.error) { setMsg("Couldn't save: " + (res.error.message || res.error)); return; }
+    setMsg("Saved ✓");
+    // Reload so the new name shows everywhere (e.g. the Users & access roster).
+    setTimeout(() => window.location.reload(), 700);
   };
 
   return (
@@ -1200,6 +1203,41 @@ function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOu
         <div><label style={lbl}>Phone number</label><input style={inp} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="(555) 000-0000" type="tel" /></div>
       </div>
       <button onClick={save} disabled={saving} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:600,fontSize:13,cursor:"pointer",marginTop:12 }}>{saving ? "Saving…" : "Save changes"}</button>
+      {msg && <span style={{ marginLeft:12,fontSize:13,color:"#6b7280" }}>{msg}</span>}
+    </>
+  );
+}
+
+// Password change — verifies the current password, then updates via Supabase auth.
+function PasswordSection({ userEmail }) {
+  const [cur, setCur] = useState("");
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const inp = { width:"100%", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box", color:"#111" };
+  const lbl = { display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:4 };
+  const save = async () => {
+    setMsg("");
+    if (!cur || !pw || !confirm) { setMsg("Fill in all three fields."); return; }
+    if (pw.length < 8) { setMsg("New password must be at least 8 characters."); return; }
+    if (pw !== confirm) { setMsg("New passwords don't match."); return; }
+    setSaving(true);
+    const { error } = await changePassword(userEmail, cur, pw);
+    setSaving(false);
+    if (error) { setMsg("Couldn't update: " + (error.message || error)); return; }
+    setCur(""); setPw(""); setConfirm("");
+    setMsg("Password updated ✓");
+  };
+  return (
+    <>
+      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+        <div><label style={lbl}>Current password</label><input style={inp} type="password" value={cur} onChange={e=>setCur(e.target.value)} placeholder="••••••••" /></div>
+        <div />
+        <div><label style={lbl}>New password</label><input style={inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Min. 8 characters" /></div>
+        <div><label style={lbl}>Confirm new password</label><input style={inp} type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="••••••••" /></div>
+      </div>
+      <button onClick={save} disabled={saving} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:600,fontSize:13,cursor:"pointer",marginTop:12 }}>{saving ? "Updating…" : "Update password"}</button>
       {msg && <span style={{ marginLeft:12,fontSize:13,color:"#6b7280" }}>{msg}</span>}
     </>
   );
@@ -3772,13 +3810,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Password */}
         <Section title="🔒 Password">
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
-            <Field label="Current password"><Input placeholder="••••••••" type="password" /></Field>
-            <div />
-            <Field label="New password" hint="Minimum 8 characters"><Input placeholder="••••••••" type="password" /></Field>
-            <Field label="Confirm new password"><Input placeholder="••••••••" type="password" /></Field>
-          </div>
-          <SaveBtn label="Update password" />
+          <PasswordSection userEmail={userEmail} />
         </Section>
 
         {/* Users & Access */}
