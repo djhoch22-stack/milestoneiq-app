@@ -537,3 +537,8 @@ end;
 $$;
 revoke all on function public.delete_my_account() from anon, public;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- Make PostgREST re-read the schema so newly-added functions (like delete_my_account)
+-- and columns are exposed to the API immediately. Run this any time RPC says
+-- "could not find the function ... in the schema cache."
+NOTIFY pgrst, 'reload schema';
