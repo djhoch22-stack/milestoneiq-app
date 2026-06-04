@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -1137,6 +1137,53 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
 }
 
 // ── Add School Modal ───────────────────────────────────────────────────────────
+// Account section — real name (from registration), saves to the profile.
+function AccountSection({ userId, userName, userEmail, tier, onSignOut }) {
+  const parts = (userName || "").trim().split(/\s+/).filter(Boolean);
+  const [first, setFirst] = useState(parts[0] || "");
+  const [last, setLast] = useState(parts.slice(1).join(" "));
+  const [phone, setPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const display = `${first} ${last}`.trim() || userEmail || "Your account";
+  const initial = ((first[0] || userEmail[0] || "?")).toUpperCase();
+  const planLabel = ({ program:"Program", school:"School", school_plus:"School Plus" }[tier] || "Program");
+  const inp = { width:"100%", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box", color:"#111" };
+  const lbl = { display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:4 };
+
+  const save = async () => {
+    if (!userId) return;
+    setSaving(true); setMsg("");
+    const { error } = await updateProfile(userId, { full_name: `${first} ${last}`.trim() });
+    setSaving(false);
+    setMsg(error ? ("Couldn't save: " + (error.message || error)) : "Saved ✓");
+  };
+
+  return (
+    <>
+      <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:24,padding:16,background:"#f9fafb",borderRadius:10 }}>
+        <div style={{ width:56,height:56,borderRadius:"50%",background:"#1a56db",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:20 }}>{initial}</div>
+        <div>
+          <div style={{ fontWeight:700,fontSize:15,color:"#111" }}>{display}</div>
+          <div style={{ fontSize:13,color:"#6b7280" }}>{userEmail || "—"}</div>
+          <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>{planLabel} plan</div>
+        </div>
+        <div style={{ marginLeft:"auto" }}>
+          <button onClick={onSignOut} style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#991b1b",fontWeight:600 }}>Sign out</button>
+        </div>
+      </div>
+      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
+        <div><label style={lbl}>First name</label><input style={inp} value={first} onChange={e=>setFirst(e.target.value)} /></div>
+        <div><label style={lbl}>Last name</label><input style={inp} value={last} onChange={e=>setLast(e.target.value)} /></div>
+        <div><label style={lbl}>Email address</label><input style={{ ...inp, background:"#f3f4f6", color:"#6b7280" }} value={userEmail || ""} disabled /></div>
+        <div><label style={lbl}>Phone number</label><input style={inp} value={phone} onChange={e=>setPhone(e.target.value)} placeholder="(555) 000-0000" type="tel" /></div>
+      </div>
+      <button onClick={save} disabled={saving} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"9px 20px",fontWeight:600,fontSize:13,cursor:"pointer",marginTop:12 }}>{saving ? "Saving…" : "Save changes"}</button>
+      {msg && <span style={{ marginLeft:12,fontSize:13,color:"#6b7280" }}>{msg}</span>}
+    </>
+  );
+}
+
 // School roster + role management (admin only manages; everyone sees the list).
 function MembersSection({ orgId, role }) {
   const [members, setMembers] = useState([]);
@@ -3466,7 +3513,7 @@ function saveSchools(data) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role } = {}) {
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -3553,26 +3600,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Account */}
         <Section title="👤 Account">
-          <div style={{ display:"flex",alignItems:"center",gap:16,marginBottom:24,padding:16,background:"#f9fafb",borderRadius:10 }}>
-            <div style={{ width:56,height:56,borderRadius:"50%",background:"#1a56db",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:20 }}>A</div>
-            <div>
-              <div style={{ fontWeight:700,fontSize:15,color:"#111" }}>Admin User</div>
-              <div style={{ fontSize:13,color:"#6b7280" }}>{userEmail || "—"}</div>
-              <div style={{ display:"inline-block",background:"#dbeafe",color:"#1e40af",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,marginTop:4 }}>{({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"Program")} plan</div>
-            </div>
-            <div style={{ marginLeft:"auto",display:"flex",gap:8 }}>
-              <button style={{ background:"none",border:"1px solid #e5e7eb",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#374151" }}>Change photo</button>
-              <button onClick={handleSignOut}
-                style={{ background:"none",border:"1px solid #fca5a5",borderRadius:8,padding:"6px 14px",fontSize:13,cursor:"pointer",color:"#991b1b",fontWeight:600 }}>Sign out</button>
-            </div>
-          </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:16 }}>
-            <Field label="First name"><Input defaultValue="Admin" /></Field>
-            <Field label="Last name"><Input defaultValue="User" /></Field>
-            <Field label="Email address"><Input defaultValue="admin@denchristian.org" type="email" /></Field>
-            <Field label="Phone number"><Input placeholder="(555) 000-0000" type="tel" /></Field>
-          </div>
-          <SaveBtn />
+          <AccountSection userId={userId} userName={userName} userEmail={userEmail} tier={tier} onSignOut={handleSignOut} />
         </Section>
 
         {/* Password */}
