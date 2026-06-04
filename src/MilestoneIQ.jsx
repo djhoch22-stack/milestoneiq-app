@@ -1075,7 +1075,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
         </div>
         <div style={{ border:"1px solid #e5e7eb",borderRadius:12,overflow:"hidden",marginBottom:16 }}>
           <div style={{ background:"#1a56db",padding:"16px 20px",color:"#fff" }}>
-            <div style={{ fontSize:11,opacity:0.8,marginBottom:2 }}>FROM: alerts@milestoneiq.com</div>
+            <div style={{ fontSize:11,opacity:0.8,marginBottom:2 }}>FROM: alerts@raftersiq.com</div>
             <div style={{ fontSize:11,opacity:0.8,marginBottom:8 }}>TO: coaching staff & athletic director</div>
             <div style={{ fontSize:16,fontWeight:700 }}>🏆 {school.name} milestone alert — {new Date().toLocaleDateString()}</div>
           </div>
@@ -1095,7 +1095,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
                 ))}
               </div>
             ))}
-            <p style={{ fontSize:13,color:"#6b7280",marginTop:8 }}>Generated automatically by MilestoneIQ.</p>
+            <p style={{ fontSize:13,color:"#6b7280",marginTop:8 }}>Generated automatically by RaftersIQ.</p>
           </div>
         </div>
         {status==="done" && (result?.sent > 0
@@ -2330,7 +2330,7 @@ function hofTier(score) {
 
 // ── Coach HOF Engine ──────────────────────────────────────────────────────────
 
-// Wins/record a coach earned at a PREVIOUS school, folded into their MilestoneIQ
+// Wins/record a coach earned at a PREVIOUS school, folded into their RaftersIQ
 // profile here ("for now" — there's no per-coach DB field yet). Matched by exact name.
 const COACH_PRIOR_STATS = {
   "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
@@ -3946,7 +3946,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
         <div style={{ display:"flex",alignItems:"center",gap:16,height:56 }}>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <div style={{ width:32,height:32,background:"#1a56db",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16 }}>🏆</div>
-            <span style={{ color:"#fff",fontWeight:700,fontSize:18,fontFamily:"Crimson Pro,serif" }}>MilestoneIQ</span>
+            <span style={{ color:"#fff",fontWeight:700,fontSize:18,fontFamily:"Crimson Pro,serif" }}>RaftersIQ</span>
           </div>
           <div style={{ display:"flex",gap:0,marginLeft:16,border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,overflow:"hidden" }}>
             {[["schools","Programs"],["settings","Settings"]].map(([tab,label]) => (
