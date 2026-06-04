@@ -551,3 +551,21 @@ grant execute on function public.delete_my_account() to authenticated;
 -- and columns are exposed to the API immediately. Run this any time RPC says
 -- "could not find the function ... in the schema cache."
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.4 — Remove LEGACY org-level policies from the original setup (e.g. "Org members
+-- can view/edit programs" using is_org_member). RLS OR's SELECT policies together, so
+-- these permissive org-wide rules defeat the strict program-level ones and let any
+-- coach see every program in their school. Drop them across all tables.
+-- ════════════════════════════════════════════════════════════════════════════
+do $$
+declare r record;
+begin
+  for r in
+    select tablename, policyname from pg_policies
+    where schemaname = 'public' and qual like '%is_org_member%'
+  loop
+    execute format('drop policy if exists %I on public.%I', r.policyname, r.tablename);
+  end loop;
+end $$;
+NOTIFY pgrst, 'reload schema';
