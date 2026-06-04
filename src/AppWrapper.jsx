@@ -315,7 +315,7 @@ export default function AppWrapper() {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🏆</div>
           <div style={{ fontSize: 16, color: '#6b7280' }}>
-            Loading MilestoneIQ…
+            Loading RaftersIQ…
           </div>
         </div>
       </div>
@@ -381,7 +381,7 @@ export default function AppWrapper() {
             justifyContent: 'space-between',
           }}
         >
-          🎉 Welcome to MilestoneIQ! Your 7-day trial has started.
+          🎉 Welcome to RaftersIQ! Your 7-day trial has started.
           <span
             style={{ cursor: 'pointer' }}
             onClick={() =>
