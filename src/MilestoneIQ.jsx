@@ -3386,25 +3386,30 @@ function saveSchools(data) {
 
 export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut } = {}) {
   const supabaseMode = !!orgId;
-  const [schools, setSchoolsRaw] = useState(() => supabaseMode ? (initialSchools || []) : loadSchools());
+  // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
+  // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
+  // fall back to SEED_SCHOOLS / localStorage, or a brand-new account with no org would be
+  // shown Denver Christian's seed data. AppWrapper always passes userEmail + onUpdateSchool.
+  const authed = !!(orgId || userEmail || onUpdateSchool);
+  const [schools, setSchoolsRaw] = useState(() => authed ? (initialSchools || []) : loadSchools());
   const [activeSchool, setActiveSchool] = useState(null);
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [homeTab, setHomeTab] = useState("schools");
 
-  // In Supabase mode the database (delivered via AppWrapper's initialSchools) is the
-  // source of truth. We never fall back to SEED_SCHOOLS for a logged-in org, so one
-  // customer can never see another customer's (or Denver Christian's) data.
   useEffect(() => {
-    if (supabaseMode) setSchoolsRaw(initialSchools || []);
-  }, [supabaseMode, initialSchools]);
+    if (authed) {
+      setSchoolsRaw(initialSchools || []);
+      try { localStorage.removeItem(LS_KEY); } catch(e) {}   // purge any stale demo cache in this browser
+    }
+  }, [authed, initialSchools]);
 
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      if (!orgId) saveSchools(next);   // localStorage is a cache for standalone/demo only
+      if (!authed) saveSchools(next);   // localStorage cache only in true standalone/demo
       return next;
     });
-  }, [orgId]);
+  }, [authed]);
 
   const updateSchool = useCallback((updated) => {
     setSchools(s => s.map(sc => sc.id===updated.id ? updated : sc));
