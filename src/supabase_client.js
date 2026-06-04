@@ -405,3 +405,46 @@ export const inviteMember = async (email, orgId, role) => {
     return { error: e.message };
   }
 };
+
+// School roster (with profile name/email — requires the v2.1 profiles read policy).
+export const getMembers = async (orgId) => {
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('id, role, user_id, profiles ( full_name, email )')
+    .eq('org_id', orgId);
+  return { data, error };
+};
+
+export const updateMemberRole = async (orgId, userId, role) => {
+  const { error } = await supabase
+    .from('org_members')
+    .update({ role })
+    .eq('org_id', orgId)
+    .eq('user_id', userId);
+  return { error };
+};
+
+export const removeMember = async (orgId, userId) => {
+  const { error } = await supabase
+    .from('org_members')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('user_id', userId);
+  return { error };
+};
+
+// Permanently delete the signed-in user's account (calls the delete-account edge function).
+export const deleteMyAccount = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) return { error: out.error || `Delete failed (${res.status})` };
+    return { data: out };
+  } catch (e) {
+    return { error: e.message };
+  }
+};
