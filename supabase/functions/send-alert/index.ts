@@ -79,28 +79,43 @@ Deno.serve(async (req) => {
       .from("org_members").select("role").eq("org_id", prog.org_id).eq("user_id", user.id).maybeSingle();
     if (!membership) return json({ error: "not a member of this school" }, 403);
 
-    // Dedup: drop alerts already emailed for this program (kind is part of the key,
-    // so "broke record" still sends after an earlier "approaching record").
-    const { data: seenRows } = await admin
-      .from("sent_alerts").select("athlete_id, stat_name, kind, target").eq("program_id", programId);
-    const seen = new Set(
-      (seenRows || []).map((r: any) => `${r.athlete_id}|${r.stat_name}|${r.kind}|${Number(r.target)}`)
-    );
-    const fresh: Alert[] = (alerts as Alert[]).filter(
-      (a) => !seen.has(`${a.athlete_id}|${a.stat_name}|${a.kind}|${Number(a.target)}`)
-    );
-    if (fresh.length === 0) return json({ sent: 0, reason: "all alerts already sent" });
+    // TEST MODE: if RESEND_TEST_TO is set, send ONLY to that address (your own inbox) and
+    // skip dedup/recording. Lets you verify delivery in Resend's sandbox before a domain is
+    // verified. Remove this secret (and set RESEND_FROM to a verified domain) to go live.
+    const testTo = (Deno.env.get("RESEND_TEST_TO") || "").trim();
+    const isTest = !!testTo;
 
-    // Recipients: this program's coaches + the school's admins (AD), by email.
-    const { data: coaches } = await admin
-      .from("program_coaches").select("user_id").eq("program_id", programId);
-    const { data: admins } = await admin
-      .from("org_members").select("user_id").eq("org_id", prog.org_id).eq("role", "admin");
-    const ids = [...new Set([...(coaches || []), ...(admins || [])].map((r: any) => r.user_id))];
-    if (ids.length === 0) return json({ sent: 0, reason: "no recipients yet" });
-    const { data: profs } = await admin.from("profiles").select("email").in("id", ids);
-    const emails = [...new Set((profs || []).map((p: any) => p.email).filter(Boolean))];
-    if (emails.length === 0) return json({ sent: 0, reason: "no recipient emails" });
+    // Dedup: drop alerts already emailed for this program (kind is part of the key, so
+    // "broke record" still sends after an earlier "approaching record"). Skipped in test
+    // mode so you can re-send to yourself freely.
+    let fresh: Alert[] = alerts as Alert[];
+    if (!isTest) {
+      const { data: seenRows } = await admin
+        .from("sent_alerts").select("athlete_id, stat_name, kind, target").eq("program_id", programId);
+      const seen = new Set(
+        (seenRows || []).map((r: any) => `${r.athlete_id}|${r.stat_name}|${r.kind}|${Number(r.target)}`)
+      );
+      fresh = (alerts as Alert[]).filter(
+        (a) => !seen.has(`${a.athlete_id}|${a.stat_name}|${a.kind}|${Number(a.target)}`)
+      );
+      if (fresh.length === 0) return json({ sent: 0, reason: "all alerts already sent" });
+    }
+
+    // Recipients: test mode → only your own address; production → program coaches + admins (AD).
+    let emails: string[];
+    if (isTest) {
+      emails = [testTo];
+    } else {
+      const { data: coaches } = await admin
+        .from("program_coaches").select("user_id").eq("program_id", programId);
+      const { data: admins } = await admin
+        .from("org_members").select("user_id").eq("org_id", prog.org_id).eq("role", "admin");
+      const ids = [...new Set([...(coaches || []), ...(admins || [])].map((r: any) => r.user_id))];
+      if (ids.length === 0) return json({ sent: 0, reason: "no recipients yet" });
+      const { data: profs } = await admin.from("profiles").select("email").in("id", ids);
+      emails = [...new Set((profs || []).map((p: any) => p.email).filter(Boolean))];
+      if (emails.length === 0) return json({ sent: 0, reason: "no recipient emails" });
+    }
 
     // Compose one digest email for all the new crossings.
     const anyBig = fresh.some((a) => a.kind === "record_broken" || a.kind === "milestone_hit");
@@ -123,16 +138,19 @@ Deno.serve(async (req) => {
       return json({ error: "Resend send failed", detail }, 502);
     }
 
-    // Record what we sent so it never re-emails (only after a successful send).
-    const rows = fresh.map((a) => ({
-      program_id: programId, athlete_id: String(a.athlete_id),
-      stat_name: a.stat_name, kind: a.kind, target: a.target,
-    }));
-    await admin.from("sent_alerts").upsert(rows, {
-      onConflict: "program_id,athlete_id,stat_name,kind,target", ignoreDuplicates: true,
-    });
+    // Record what we sent so it never re-emails (only after a successful real send; skipped
+    // in test mode so going live later still emails the real recipients).
+    if (!isTest) {
+      const rows = fresh.map((a) => ({
+        program_id: programId, athlete_id: String(a.athlete_id),
+        stat_name: a.stat_name, kind: a.kind, target: a.target,
+      }));
+      await admin.from("sent_alerts").upsert(rows, {
+        onConflict: "program_id,athlete_id,stat_name,kind,target", ignoreDuplicates: true,
+      });
+    }
 
-    return json({ sent: fresh.length, recipients: emails.length });
+    return json({ sent: fresh.length, recipients: emails.length, test: isTest || undefined });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
