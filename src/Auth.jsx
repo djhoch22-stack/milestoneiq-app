@@ -162,7 +162,7 @@ function Logo() {
   return (
     <div style={s.logo}>
       <div style={s.logoBox}>🏆</div>
-      <span style={s.logoTxt}>MilestoneIQ</span>
+      <span style={s.logoTxt}>RaftersIQ</span>
     </div>
   );
 }
@@ -760,7 +760,7 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
         <h1 style={s.h1}>{pastDue ? 'Payment needs attention' : "Your school's trial has ended"}</h1>
         {!isAdmin ? (
           <>
-            <p style={s.sub}>MilestoneIQ for your school is paused. Ask your athletic director to choose a plan to restore access.</p>
+            <p style={s.sub}>RaftersIQ for your school is paused. Ask your athletic director to choose a plan to restore access.</p>
             <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 12 }}>Your data is safe — it'll be here the moment your AD subscribes.</p>
           </>
         ) : (
