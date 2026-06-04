@@ -514,3 +514,6 @@ create policy om_del on public.org_members for delete
   using (user_id = auth.uid() or public.is_school_admin(org_id));
 
 -- Done (v2.1).
+
+-- v2.2 — store an optional phone number on the profile.
+alter table public.profiles add column if not exists phone text;
