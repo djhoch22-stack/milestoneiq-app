@@ -607,3 +607,29 @@ create policy pi_all on public.pending_invites for all
   with check (public.is_school_admin(org_id));
 grant all on public.pending_invites to anon, authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.6 — Instant email alerts. `sent_alerts` is a dedup ledger so each record /
+-- milestone crossing emails exactly once. The send-alert edge function (service
+-- role) inserts here right after emailing; "broke record" still fires after
+-- "approaching" because `kind` is part of the unique key. athlete_id is text
+-- (no FK) since app athlete ids may still be seed strings like "bb026".
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.sent_alerts (
+  id         uuid primary key default gen_random_uuid(),
+  program_id uuid references public.programs(id) on delete cascade,
+  athlete_id text,
+  stat_name  text,
+  kind       text,
+  target     numeric,
+  created_at timestamptz default now(),
+  unique (program_id, athlete_id, stat_name, kind, target)
+);
+alter table public.sent_alerts enable row level security;
+drop policy if exists sa_sel on public.sent_alerts;
+create policy sa_sel on public.sent_alerts for select
+  using (program_id in (select public.visible_program_ids()));
+-- Writes happen via the edge function's service-role key (bypasses RLS).
+grant select on public.sent_alerts to authenticated;
+grant all on public.sent_alerts to service_role;
+NOTIFY pgrst, 'reload schema';
