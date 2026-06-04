@@ -1043,9 +1043,24 @@ Rules: numeric stats only, exact stat names from document, unknown grad year = $
 
 // ── Email Preview Modal ────────────────────────────────────────────────────────
 function EmailPreviewModal({ allAlerts, school, onClose }) {
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState("idle"); // idle | sending | done | error
+  const [result, setResult] = useState(null);
   const sport = SPORTS[school.sport] || SPORTS.football;
   const totalAlerts = allAlerts.reduce((a, x) => a + x.alerts.length, 0);
+
+  const doSend = async () => {
+    setStatus("sending"); setResult(null);
+    const payload = [];
+    allAlerts.forEach(({ athlete, alerts }) => (alerts || []).forEach(al => payload.push({
+      athlete_id: String(athlete.id), athlete_name: athlete.name,
+      stat_name: al.statName, kind: al.type,
+      current: al.current, target: al.target, holder_name: al.holderName || null,
+    })));
+    if (!payload.length) { setResult({ sent: 0 }); setStatus("done"); return; }
+    const { data, error } = await sendAlerts(school.id, payload);
+    if (error) { setResult({ error }); setStatus("error"); }
+    else { setResult(data || { sent: 0 }); setStatus("done"); }
+  };
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
@@ -1082,10 +1097,13 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
             <p style={{ fontSize:13,color:"#6b7280",marginTop:8 }}>Generated automatically by MilestoneIQ.</p>
           </div>
         </div>
-        {sent
-          ? <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:12,textAlign:"center",color:"#14532d",fontWeight:600 }}>✓ Alert sent to coaching staff</div>
-          : <button onClick={()=>setSent(true)} style={{ width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14,cursor:"pointer" }}>Send alert now</button>
-        }
+        {status==="done" && (result?.sent > 0
+          ? <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:12,textAlign:"center",color:"#14532d",fontWeight:600 }}>✓ Sent {result.sent} alert{result.sent!==1?"s":""} to your coaches &amp; AD{result.recipients?` (${result.recipients} recipient${result.recipients!==1?"s":""})`:""}</div>
+          : <div style={{ background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,padding:12,textAlign:"center",color:"#374151",fontWeight:600 }}>✓ Nothing new to send — these alerts were already emailed.</div>
+        )}
+        {status==="error" && <div style={{ background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:12,textAlign:"center",color:"#991b1b",fontSize:13,fontWeight:600 }}>⚠ Couldn't send: {result?.error}. Check the send-alert function is deployed (Verify JWT off) and RESEND_API_KEY is set.</div>}
+        {(status==="idle" || status==="error") && <button onClick={doSend} style={{ width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14,cursor:"pointer",marginTop:status==="error"?8:0 }}>{status==="error"?"Try again":"Send alert now"}</button>}
+        {status==="sending" && <button disabled style={{ width:"100%",background:"#93b4f0",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14 }}>Sending…</button>}
       </div>
     </div>
   );
@@ -3658,25 +3676,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     setSchools(s => s.map(sc => sc.id===updated.id ? updated : sc));
     setActiveSchool(updated);
     if (onUpdateSchool) onUpdateSchool(updated);   // persist this program to Supabase
-    // Instant email alerts: if this save pushed an active athlete across a threshold,
-    // email the program's coaches + AD. The edge function dedups, so re-saves are safe.
-    if (onUpdateSchool && orgId && updated?.id) {
-      try {
-        const fired = [];
-        (updated.athletes || []).forEach(a => {
-          if (a.isActive === false) return;
-          getMilestoneAlerts(a, updated.records || [], updated.milestones || []).forEach(al => {
-            fired.push({
-              athlete_id: String(a.id), athlete_name: a.name,
-              stat_name: al.statName, kind: al.type,
-              current: al.current, target: al.target, holder_name: al.holderName || null,
-            });
-          });
-        });
-        if (fired.length) sendAlerts(updated.id, fired);
-      } catch (_) { /* alerts are best-effort; never block a save */ }
-    }
-  }, [setSchools, onUpdateSchool, orgId]);
+  }, [setSchools, onUpdateSchool]);
 
   const handleSignOut = useCallback(() => {
     if (onSignOut) onSignOut();
@@ -3822,7 +3822,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
             <span style={{ fontSize:22 }}>✅</span>
             <div>
               <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>Email alerts are on</div>
-              <div style={{ fontSize:13,color:"#6b7280" }}>When an active athlete approaches or breaks a record — or reaches a milestone — this program's coaches and your AD are emailed automatically. Each alert is sent once. Alerts also appear in-app on the <strong>Alerts</strong> tab. Text (SMS) alerts are coming later.</div>
+              <div style={{ fontSize:13,color:"#6b7280" }}>Open any program and click <strong>📧 Send alerts</strong> to email this program's coaches and your AD about every active athlete approaching or breaking a record, or reaching a milestone. You'll see a preview first, and each alert is only sent once (we won't re-send the same one). Text (SMS) alerts are coming later.</div>
             </div>
           </div>
         </Section>
