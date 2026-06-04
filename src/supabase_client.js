@@ -409,6 +409,31 @@ export const cancelInvite = async (inviteId) => {
   return { error };
 };
 
+// Which coaches are assigned to a program (returns ids; names come from the school roster).
+export const getProgramCoaches = async (programId) => {
+  const { data, error } = await supabase
+    .from('program_coaches')
+    .select('id, user_id')
+    .eq('program_id', programId);
+  return { data, error };
+};
+
+export const addProgramCoach = async (programId, userId) => {
+  const { error } = await supabase
+    .from('program_coaches')
+    .upsert({ program_id: programId, user_id: userId }, { onConflict: 'program_id,user_id' });
+  return { error };
+};
+
+export const removeProgramCoach = async (programId, userId) => {
+  const { error } = await supabase
+    .from('program_coaches')
+    .delete()
+    .eq('program_id', programId)
+    .eq('user_id', userId);
+  return { error };
+};
+
 // School roster (with profile name/email — requires the v2.1 profiles read policy).
 export const getMembers = async (orgId) => {
   const { data, error } = await supabase
