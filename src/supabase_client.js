@@ -473,3 +473,27 @@ export const deleteProgram = async (programId) => {
   const { error } = await supabase.from('programs').delete().eq('id', programId);
   return { error };
 };
+
+// ── Instant email alerts ──────────────────────────────────────────────────────
+// Fire-and-forget: post a program's current alerts to the send-alert edge function,
+// which dedups and emails the program's coaches + AD via Resend. Best-effort — never
+// blocks or breaks a save. Safe to call on every save (the function won't re-email).
+export const sendAlerts = async (programId, alerts) => {
+  try {
+    if (!programId || !alerts?.length) return { data: { sent: 0 } };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-alert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ programId, alerts }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'send failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
