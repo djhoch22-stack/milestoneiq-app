@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -3658,7 +3658,25 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     setSchools(s => s.map(sc => sc.id===updated.id ? updated : sc));
     setActiveSchool(updated);
     if (onUpdateSchool) onUpdateSchool(updated);   // persist this program to Supabase
-  }, [setSchools, onUpdateSchool]);
+    // Instant email alerts: if this save pushed an active athlete across a threshold,
+    // email the program's coaches + AD. The edge function dedups, so re-saves are safe.
+    if (onUpdateSchool && orgId && updated?.id) {
+      try {
+        const fired = [];
+        (updated.athletes || []).forEach(a => {
+          if (a.isActive === false) return;
+          getMilestoneAlerts(a, updated.records || [], updated.milestones || []).forEach(al => {
+            fired.push({
+              athlete_id: String(a.id), athlete_name: a.name,
+              stat_name: al.statName, kind: al.type,
+              current: al.current, target: al.target, holder_name: al.holderName || null,
+            });
+          });
+        });
+        if (fired.length) sendAlerts(updated.id, fired);
+      } catch (_) { /* alerts are best-effort; never block a save */ }
+    }
+  }, [setSchools, onUpdateSchool, orgId]);
 
   const handleSignOut = useCallback(() => {
     if (onSignOut) onSignOut();
@@ -3800,11 +3818,11 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
-          <div style={{ display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:"#f9fafb",border:"1px dashed #d1d5db",borderRadius:10 }}>
-            <span style={{ fontSize:22 }}>🔔</span>
+          <div style={{ display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10 }}>
+            <span style={{ fontSize:22 }}>✅</span>
             <div>
-              <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>Email &amp; text alerts are coming soon</div>
-              <div style={{ fontSize:13,color:"#6b7280" }}>For now, milestone &amp; record alerts appear in-app on the <strong>Alerts</strong> tab. Sending them by email or text is on the way — you'll choose recipients and frequency here when it lands.</div>
+              <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>Email alerts are on</div>
+              <div style={{ fontSize:13,color:"#6b7280" }}>When an active athlete approaches or breaks a record — or reaches a milestone — this program's coaches and your AD are emailed automatically. Each alert is sent once. Alerts also appear in-app on the <strong>Alerts</strong> tab. Text (SMS) alerts are coming later.</div>
             </div>
           </div>
         </Section>
