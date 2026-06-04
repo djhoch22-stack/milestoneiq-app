@@ -1101,7 +1101,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
           ? <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:12,textAlign:"center",color:"#14532d",fontWeight:600 }}>✓ Sent {result.sent} alert{result.sent!==1?"s":""} to your coaches &amp; AD{result.recipients?` (${result.recipients} recipient${result.recipients!==1?"s":""})`:""}</div>
           : <div style={{ background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,padding:12,textAlign:"center",color:"#374151",fontWeight:600 }}>✓ Nothing new to send — these alerts were already emailed.</div>
         )}
-        {status==="error" && <div style={{ background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:12,textAlign:"center",color:"#991b1b",fontSize:13,fontWeight:600 }}>⚠ Couldn't send: {result?.error}. Check the send-alert function is deployed (Verify JWT off) and RESEND_API_KEY is set.</div>}
+        {status==="error" && <div style={{ background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:12,color:"#991b1b",fontSize:13,fontWeight:600,lineHeight:1.5 }}>⚠ Couldn't send: {result?.error}{result?.detail ? ` — ${typeof result.detail === "string" ? result.detail : JSON.stringify(result.detail)}` : ""}</div>}
         {(status==="idle" || status==="error") && <button onClick={doSend} style={{ width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14,cursor:"pointer",marginTop:status==="error"?8:0 }}>{status==="error"?"Try again":"Send alert now"}</button>}
         {status==="sending" && <button disabled style={{ width:"100%",background:"#93b4f0",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14 }}>Sending…</button>}
       </div>
