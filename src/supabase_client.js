@@ -497,3 +497,39 @@ export const sendAlerts = async (programId, alerts) => {
     return { error: String(e?.message || e) };
   }
 };
+
+// ── Billing (Stripe) ──────────────────────────────────────────────────────────
+// Start a Stripe Checkout session for a school (org). Returns { data:{ url }, error };
+// the caller redirects the browser to data.url.
+export const createCheckout = async (orgId, priceId, tier, billing) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ orgId, priceId, tier, billing }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'checkout failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
+
+// Open the Stripe billing portal for a school (org) to manage/cancel a subscription.
+export const openBillingPortal = async (orgId) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-portal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ orgId }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'portal failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
