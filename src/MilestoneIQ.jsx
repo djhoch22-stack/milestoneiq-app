@@ -1185,7 +1185,7 @@ function AccountSection({ userId, userName, userEmail, tier, onSignOut }) {
 }
 
 // School roster + role management (admin only manages; everyone sees the list).
-function MembersSection({ orgId, role }) {
+function MembersSection({ orgId, role, userId }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -1202,8 +1202,17 @@ function MembersSection({ orgId, role }) {
   }, [orgId]);
   useEffect(() => { load(); }, [load]);
 
-  const changeRole = async (uid, newRole) => { await updateMemberRole(orgId, uid, newRole); load(); };
-  const removeOne = async (uid) => { if (!window.confirm("Remove this member from the school?")) return; await removeMember(orgId, uid); load(); };
+  const changeRole = async (uid, newRole) => {
+    const { error } = await updateMemberRole(orgId, uid, newRole);
+    if (error) alert("Couldn't update role: " + (error.message || error));
+    load();
+  };
+  const removeOne = async (uid) => {
+    if (!window.confirm("Remove this member from the school?")) return;
+    const { error } = await removeMember(orgId, uid);
+    if (error) { alert("Couldn't remove member: " + (error.message || error)); return; }
+    load();
+  };
   const sendInvite = async () => {
     if (!inviteEmail) return;
     setMsg("Sending invite…");
@@ -1229,7 +1238,9 @@ function MembersSection({ orgId, role }) {
                     <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{nm}</div>
                     <div style={{ fontSize:12,color:"#6b7280" }}>{em}</div>
                   </div>
-                  {isAdmin ? (
+                  {mb.user_id === userId ? (
+                    <span style={{ fontSize:12,fontWeight:600,color:"#1a56db",whiteSpace:"nowrap" }}>You · {mb.role}</span>
+                  ) : isAdmin ? (
                     <>
                       <select value={mb.role} onChange={e=>changeRole(mb.user_id, e.target.value)}
                         style={{ border:"1px solid #e5e7eb",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#374151" }}>
@@ -3681,7 +3692,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Users & Access */}
         <Section title="👥 Users & access">
-          <MembersSection orgId={orgId} role={role} />
+          <MembersSection orgId={orgId} role={role} userId={userId} />
         </Section>
 
         {/* Notifications */}
