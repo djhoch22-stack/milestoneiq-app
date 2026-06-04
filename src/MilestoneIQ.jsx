@@ -3776,7 +3776,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 <div style={{ fontSize:14,fontWeight:600,color:"#991b1b" }}>Delete account</div>
                 <div style={{ fontSize:12,color:"#6b7280" }}>Permanently delete your account and all data. This cannot be undone.</div>
               </div>
-              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+error); return; } handleSignOut(); }}
+              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+(error.message || error.hint || error.code || JSON.stringify(error))); return; } handleSignOut(); }}
                 style={{ background:"#991b1b",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Delete account</button>
             </div>
           </div>
