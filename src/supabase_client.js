@@ -389,17 +389,17 @@ export const joinSchoolAsCoach = async (orgId, userId) => {
 // Invite a coach or AD by email (calls the invite-member edge function). Best-effort.
 // Invite by pre-authorizing an email+role — a plain insert (RLS-gated to school admins),
 // no edge function / CORS. The handle_new_user trigger places this person on signup.
-export const inviteMember = async (email, orgId, role) => {
+export const inviteMember = async (email, orgId, role, programId = null) => {
   const { error } = await supabase
     .from('pending_invites')
-    .upsert({ org_id: orgId, email: (email || '').trim().toLowerCase(), role }, { onConflict: 'org_id,email' });
+    .upsert({ org_id: orgId, email: (email || '').trim().toLowerCase(), role, program_id: programId }, { onConflict: 'org_id,email' });
   return { error };
 };
 
 export const getPendingInvites = async (orgId) => {
   const { data, error } = await supabase
     .from('pending_invites')
-    .select('id, email, role')
+    .select('id, email, role, program_id')
     .eq('org_id', orgId);
   return { data, error };
 };
