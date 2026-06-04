@@ -11,7 +11,7 @@
 //   RESEND_API_KEY  (required)
 //   RESEND_FROM     (optional; defaults to Resend's shared onboarding sender, which
 //                    only delivers to your own Resend account email until you verify
-//                    a sending domain). Example once verified: "MilestoneIQ <alerts@yourdomain.com>"
+//                    a sending domain). Example once verified: "RaftersIQ <alerts@yourdomain.com>"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    const from = Deno.env.get("RESEND_FROM") || "MilestoneIQ <onboarding@resend.dev>";
+    const from = Deno.env.get("RESEND_FROM") || "RaftersIQ <onboarding@resend.dev>";
     if (!resendKey) return json({ error: "RESEND_API_KEY is not set" }, 500);
 
     // Identify the caller from their JWT (sent by the app even with Verify JWT off).
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       <h2 style="margin:0 0 4px">${anyBig ? "🏆 Milestone reached!" : "📈 Heads up — a record is within reach"}</h2>
       <p style="margin:0 0 14px;color:#6b7280;font-size:14px">${prog.name}</p>
       <ul style="padding-left:18px;margin:0">${items}</ul>
-      <p style="margin:18px 0 0;color:#9ca3af;font-size:12px">You're receiving this as a coach or athletic director on MilestoneIQ. Alerts also appear in-app on the Alerts tab.</p>
+      <p style="margin:18px 0 0;color:#9ca3af;font-size:12px">You're receiving this as a coach or athletic director on RaftersIQ. Alerts also appear in-app on the Alerts tab.</p>
     </div>`;
 
     const resp = await fetch("https://api.resend.com/emails", {
