@@ -225,7 +225,7 @@ const SPORTS = {
     ]
   },
   soccer: {
-    label: "Soccer", icon: "⚽",
+    label: "Boys Soccer", icon: "⚽",
     statCategories: [
       { name: "Goals", variants: ["Career total","Single season","Single game"] },
       { name: "Assists", variants: ["Career total","Single season","Single game"] },
@@ -1137,8 +1137,11 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
 }
 
 // ── Add School Modal ───────────────────────────────────────────────────────────
+// Sports a NEW program can currently be created for; everything else shows "Coming soon".
+const AVAILABLE_SPORTS = ["basketball_boys", "basketball_girls"];
+
 function AddSchoolModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name:"", mascot:"", sport:"football", primaryColor:"#1a3a6b" });
+  const [form, setForm] = useState({ name:"", mascot:"", sport:"basketball_boys", primaryColor:"#1a3a6b" });
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
       <div style={{ background:"#fff",borderRadius:16,padding:28,width:440 }}>
@@ -1157,7 +1160,10 @@ function AddSchoolModal({ onClose, onAdd }) {
           <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#374151",marginBottom:4 }}>Primary sport</label>
           <select value={form.sport} onChange={e=>setForm(f=>({...f,sport:e.target.value}))}
             style={{ width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:14 }}>
-            {Object.entries(SPORTS).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+            {Object.entries(SPORTS)
+              .filter(([k])=>k!=="basketball")
+              .sort((a,b)=>{ const av=AVAILABLE_SPORTS.includes(a[0]), bv=AVAILABLE_SPORTS.includes(b[0]); return av===bv?0:av?-1:1; })
+              .map(([k,v])=>{ const ok=AVAILABLE_SPORTS.includes(k); return <option key={k} value={k} disabled={!ok}>{v.icon} {v.label}{ok?"":" — Coming soon"}</option>; })}
           </select>
         </div>
         <button onClick={()=>{ if(form.name){ onAdd({ id:`s${Date.now()}`, ...form, athletes:[], records:[] }); onClose(); }}}
