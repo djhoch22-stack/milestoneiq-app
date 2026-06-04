@@ -471,6 +471,12 @@ begin
   from public.pending_invites pi
   where lower(pi.email) = lower(new.email)
   on conflict (org_id, user_id) do nothing;
+  -- If the invite named a program, attach the coach to it.
+  insert into public.program_coaches (program_id, user_id)
+  select pi.program_id, new.id
+  from public.pending_invites pi
+  where lower(pi.email) = lower(new.email) and pi.program_id is not null
+  on conflict (program_id, user_id) do nothing;
   delete from public.pending_invites where lower(email) = lower(new.email);
 
   return new;
@@ -589,9 +595,11 @@ create table if not exists public.pending_invites (
   org_id     uuid references public.organizations(id) on delete cascade,
   email      text not null,
   role       text not null default 'coach',
+  program_id uuid references public.programs(id) on delete cascade,
   created_at timestamptz default now(),
   unique (org_id, email)
 );
+alter table public.pending_invites add column if not exists program_id uuid references public.programs(id) on delete cascade;
 alter table public.pending_invites enable row level security;
 drop policy if exists pi_all on public.pending_invites;
 create policy pi_all on public.pending_invites for all
