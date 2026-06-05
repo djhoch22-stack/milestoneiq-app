@@ -3933,7 +3933,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 <div style={{ fontSize:14,fontWeight:600,color:"#991b1b" }}>Delete account</div>
                 <div style={{ fontSize:12,color:"#6b7280" }}>Permanently delete your account and all data. This cannot be undone.</div>
               </div>
-              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+(error.message || error.hint || error.code || JSON.stringify(error))); return; } handleSignOut(); }}
+              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+(error.message || error.hint || error.code || JSON.stringify(error))); return; } try { sessionStorage.removeItem("mq_tab"); } catch(e){} await signOut(); window.location.href = "/"; }}
                 style={{ background:"#991b1b",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Delete account</button>
             </div>
           </div>
@@ -3996,7 +3996,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 {schools.length} program{schools.length!==1?"s":""} · {schools.reduce((a,s)=>a+s.athletes.filter(a=>a.isActive!==false).length,0)} athletes · {totalAlerts} active alerts
               </p>
             </div>
-            <button onClick={()=>setShowAddSchool(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer" }}>+ Add program</button>
+            {role === "admin" && <button onClick={()=>setShowAddSchool(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer" }}>+ Add program</button>}
           </div>
 
           {supabaseMode && schools.length===0 && new URLSearchParams(window.location.search).get("seed")==="dc" && (
@@ -4074,6 +4074,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 </div>
               );
             })}
+            {role === "admin" && (
             <div onClick={()=>setShowAddSchool(true)}
               style={{ borderRadius:14,border:"2px dashed #d1d5db",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,cursor:"pointer",color:"#9ca3af",minHeight:160,transition:"all 0.15s" }}
               onMouseEnter={e=>{ e.currentTarget.style.borderColor="#1a56db"; e.currentTarget.style.color="#1a56db"; }}
@@ -4081,6 +4082,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
               <div style={{ fontSize:32,marginBottom:8 }}>+</div>
               <div style={{ fontWeight:600,fontSize:14 }}>Add program</div>
             </div>
+            )}
           </div>
         </div>
       )}
