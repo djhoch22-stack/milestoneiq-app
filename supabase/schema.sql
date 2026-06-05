@@ -680,3 +680,36 @@ end $$;
 revoke all on function public.claim_my_invites() from anon, public;
 grant execute on function public.claim_my_invites() to authenticated;
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.9 — Trial-abuse guard. A persistent ledger of every email that has started a
+-- free trial. It survives account + org deletion, so re-signing-up with the same
+-- email does NOT grant a second free trial — that new school starts expired and
+-- must subscribe. Brand-new emails get their one trial as normal.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.trial_ledger (
+  email          text primary key,
+  first_trial_at timestamptz default now()
+);
+grant all on public.trial_ledger to service_role;
+
+create or replace function public.gate_org_trial()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare em text;
+begin
+  if new.created_by is null then return new; end if;
+  select lower(email) into em from auth.users where id = new.created_by;
+  if em is null then return new; end if;
+  if exists (select 1 from public.trial_ledger where email = em) then
+    -- this email already used its free trial → no fresh trial; school starts locked
+    new.trial_ends_at := now() - interval '1 second';
+  else
+    insert into public.trial_ledger (email) values (em) on conflict (email) do nothing;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists gate_org_trial_trg on public.organizations;
+create trigger gate_org_trial_trg before insert on public.organizations
+  for each row execute function public.gate_org_trial();
+NOTIFY pgrst, 'reload schema';
