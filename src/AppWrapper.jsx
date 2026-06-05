@@ -26,11 +26,12 @@ import Auth, { LockedScreen } from './Auth';
 import App from './MilestoneIQ';
 import SchoolOnboarding from './SchoolOnboarding';
 
+// maxUsers = total members per school INCLUDING the AD (enforced at invite time).
 const TIER_LIMITS = {
-  program: { maxPrograms: 1, maxCoachesPerProgram: 1 },
-  program_plus: { maxPrograms: 1, maxCoachesPerProgram: 5 },
-  school: { maxPrograms: 5, maxCoachesPerProgram: 3 },
-  school_plus: { maxPrograms: 999, maxCoachesPerProgram: 999 },
+  program: { maxPrograms: 1, maxUsers: 2, maxCoachesPerProgram: 1 },
+  program_plus: { maxPrograms: 1, maxUsers: 6, maxCoachesPerProgram: 5 },
+  school: { maxPrograms: 5, maxUsers: 6, maxCoachesPerProgram: 6 },
+  school_plus: { maxPrograms: 999, maxUsers: 999, maxCoachesPerProgram: 999 },
 };
 
 function rowToSchool(prog, athletes, allTime, records, milestones, seasons) {
