@@ -239,9 +239,9 @@ function LoginScreen({ onSwitch, onSuccess }) {
   );
 }
 
-function SignupScreen({ onSwitch, onSuccess }) {
+function SignupScreen({ onSwitch, onSuccess, initialEmail = '' }) {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -262,8 +262,8 @@ function SignupScreen({ onSwitch, onSuccess }) {
     <div style={s.wrap}>
       <div style={s.card}>
         <Logo />
-        <h1 style={s.h1}>Start your free trial</h1>
-        <p style={s.sub}>7 days free — no charge until trial ends</p>
+        <h1 style={s.h1}>{initialEmail ? 'Set up your account' : 'Start your free trial'}</h1>
+        <p style={s.sub}>{initialEmail ? 'Create a password to finish joining your team on RaftersIQ.' : '7 days free — no charge until trial ends'}</p>
         {err && <div style={s.err}>{err}</div>}
         <div style={s.field}>
           <label style={s.label}>Full name</label>
@@ -782,7 +782,9 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
 }
 
 export default function Auth({ onAuthenticated, seedSchools }) {
-  const [screen, setScreen] = useState('login');
+  const params = new URLSearchParams(window.location.search);
+  const invitedEmail = params.get('invite') || '';
+  const [screen, setScreen] = useState(invitedEmail ? 'signup' : 'login');
   const [userId, setUserId] = useState(null);
 
   const handleLoginSuccess = () => window.location.reload();
@@ -792,7 +794,7 @@ export default function Auth({ onAuthenticated, seedSchools }) {
   const handleSignupDone = () => window.location.reload();
 
   if (screen === 'signup')
-    return <SignupScreen onSwitch={setScreen} onSuccess={handleSignupDone} />;
+    return <SignupScreen onSwitch={setScreen} onSuccess={handleSignupDone} initialEmail={invitedEmail} />;
   if (screen === 'forgot') return <ForgotScreen onSwitch={setScreen} />;
   if (screen === 'onboarding')
     return (
