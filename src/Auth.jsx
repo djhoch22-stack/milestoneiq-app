@@ -13,56 +13,77 @@ const STRIPE_KEY =
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
   'pk_test_51Tdck5BzAEImpxa646mEihqfdsTof7jBXRkClADOv3QKvXJZvjgonrdSbFxyCLdEyqhzddAMiL2k7IE4ZyAShrhM00F1IvcmHw';
 
+// NOTE: monthlyId/annualId below are PLACEHOLDERS — replace with the real Stripe
+// price_… ids (and mirror them in the stripe-webhook PRICE_TIER map) before launch.
 const PLANS = [
   {
     id: 'program',
     name: 'Program',
-    monthlyPrice: 12,
-    annualPrice: 99,
-    monthlyId: 'price_1TdcrABzAEImpxa62G24Ul20',
-    annualId: 'price_1TdczrBzAEImpxa6dKJ8R8gp',
+    monthlyPrice: 15,
+    annualPrice: 149,
+    monthlyId: 'PRICE_program_monthly',
+    annualId: 'PRICE_program_annual',
     programs: 1,
-    description: 'One sport program, full access',
+    description: 'Solo coach, one program',
     features: [
       '1 program',
-      'Unlimited athletes',
-      'Full all-time roster',
-      'Hall of Fame tab',
-      'Milestone alerts',
-      'Season history',
-      'Records tracking',
+      '1 coach + AD',
+      'Unlimited athletes & seasons',
+      'Records & milestone alerts',
+      'All-time roster',
+      'CSV / PDF import',
+    ],
+  },
+  {
+    id: 'program_plus',
+    name: 'Program+',
+    monthlyPrice: 39,
+    annualPrice: 389,
+    monthlyId: 'PRICE_programplus_monthly',
+    annualId: 'PRICE_programplus_annual',
+    programs: 1,
+    description: 'One program, full staff',
+    features: [
+      'Everything in Program',
+      'Up to 5 coaches + AD',
+      'Email alert digests',
+      'Shared staff editing',
+      'Hall of Fame ratings',
+      'Role-based access',
     ],
   },
   {
     id: 'school',
     name: 'School',
-    monthlyPrice: 79,
-    annualPrice: 699,
-    monthlyId: 'price_1TdcrXBzAEImpxa6WMZtfSY0',
-    annualId: 'price_1Tdd0bBzAEImpxa6voXKjkUm',
-    programs: 8,
-    description: 'Up to 8 programs for your school',
+    monthlyPrice: 149,
+    annualPrice: 1490,
+    monthlyId: 'PRICE_school_monthly',
+    annualId: 'PRICE_school_annual',
+    programs: 5,
+    description: 'Multi-sport school',
     features: [
-      'Up to 8 programs',
-      'Everything in Program',
-      'Multi-coach access',
-      'Cross-sport HOF ratings',
-      'Email digest alerts',
+      'Everything in Program+',
+      'Up to 5 programs',
+      'Athletic Director dashboard',
+      'School-wide alert digest',
+      'Cross-program season history',
     ],
     popular: true,
   },
   {
     id: 'school_plus',
-    name: 'School Plus',
-    monthlyPrice: 149,
-    annualPrice: 1299,
-    monthlyId: 'price_1Tdd1XBzAEImpxa6dlaquzPO',
-    annualId: 'price_1Tdd1rBzAEImpxa6NjhJBxV6',
+    name: 'School+',
+    monthlyPrice: 299,
+    annualPrice: 2990,
+    monthlyId: 'PRICE_schoolplus_monthly',
+    annualId: 'PRICE_schoolplus_annual',
     programs: 999,
-    description: 'Unlimited programs for large schools',
+    description: 'Full school, unlimited',
     features: [
-      'Unlimited programs',
       'Everything in School',
+      'Unlimited programs & coaches',
+      'Full HOF + induction management',
+      'Cross-sport profiles & ratings',
       'Priority support',
       'Early access to new features',
     ],
@@ -713,7 +734,7 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial
           <button key={val} onClick={() => setBilling(val)} style={{ padding: '8px 20px', fontSize: 13, border: 'none', cursor: 'pointer', fontWeight: billing === val ? 700 : 400, background: billing === val ? '#1a3a6b' : '#fff', color: billing === val ? '#fff' : '#6b7280', fontFamily: 'inherit' }}>{label}</button>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 20 }}>
         {PLANS.map((p) => (
           <div key={p.id} onClick={() => setPlan(p.id)} style={{ border: `2px solid ${plan === p.id ? '#1a3a6b' : p.popular ? '#93c5fd' : '#e5e7eb'}`, borderRadius: 12, padding: 20, cursor: 'pointer', position: 'relative', background: plan === p.id ? '#eff6ff' : '#fff' }}>
             {p.popular && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#1a56db', color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
