@@ -760,9 +760,12 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial
   );
 }
 
-export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
+export function LockedScreen({ role, status, onCheckout, onManageBilling, onRedeemCode }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [code, setCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState('');
   const isAdmin = role === 'admin';
   const pastDue = status === 'past_due';
   const showErr = (e) => setErr(typeof e === 'string' ? e : (e?.message || 'Something went wrong'));
@@ -776,6 +779,13 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
     setErr('');
     const e = await onManageBilling();
     if (e) showErr(e);
+  };
+  const handleRedeem = async () => {
+    if (!code.trim() || !onRedeemCode) return;
+    setRedeeming(true); setErr(''); setRedeemMsg('');
+    const { error, message } = await onRedeemCode(code.trim());
+    setRedeeming(false);
+    if (error) showErr(error); else setRedeemMsg(message || 'Applied!');
   };
   return (
     <div style={s.wrap}>
@@ -797,6 +807,21 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling }) {
                 <span style={s.link} onClick={handlePortal}>Or manage existing billing →</span>
               </div>
             )}
+            <div style={{ borderTop: '1px solid #eef0f3', marginTop: 18, paddingTop: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Have a beta or promo code?</div>
+              {redeemMsg ? (
+                <div style={{ ...s.err, background: '#f0fdf4', color: '#166534', border: '1px solid #86efac' }}>{redeemMsg}</div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. BETA90"
+                    style={{ flex: 1, border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 12px', fontSize: 14, textTransform: 'uppercase' }} />
+                  <button onClick={handleRedeem} disabled={redeeming || !code.trim()}
+                    style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 14, fontWeight: 600, cursor: redeeming || !code.trim() ? 'default' : 'pointer', opacity: redeeming || !code.trim() ? 0.6 : 1 }}>
+                    {redeeming ? 'Applying…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
