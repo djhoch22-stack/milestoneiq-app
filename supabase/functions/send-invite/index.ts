@@ -25,17 +25,16 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const resendKey = Deno.env.get("RESEND_API_KEY");
     const from = Deno.env.get("RESEND_FROM") || "RaftersIQ <onboarding@resend.dev>";
     if (!resendKey) return json({ error: "RESEND_API_KEY is not set" }, 500);
 
-    // Identify + authorize: only a school admin can send invites.
-    const authHeader = req.headers.get("Authorization") || "";
-    const caller = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: uErr } = await caller.auth.getUser();
-    if (uErr || !user) return json({ error: "not authenticated" }, 401);
     const admin = createClient(url, serviceKey);
+    // Identify the caller from their JWT — the service-role client validates the
+    // token directly, so this doesn't depend on the (deprecated) anon key.
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const { data: { user }, error: uErr } = await admin.auth.getUser(token);
+    if (uErr || !user) return json({ error: "not authenticated", detail: uErr?.message || "no user from token" }, 401);
     const { data: mem } = await admin
       .from("org_members").select("role").eq("org_id", orgId).eq("user_id", user.id).maybeSingle();
     if (mem?.role !== "admin") return json({ error: "only a school admin can invite" }, 403);
