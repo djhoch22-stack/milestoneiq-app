@@ -13,14 +13,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Fallback price → tier map (primary source is checkout/subscription metadata.tier).
 const PRICE_TIER: Record<string, string> = {
-  "PRICE_program_monthly": "program",
-  "PRICE_program_annual": "program",
-  "PRICE_programplus_monthly": "program_plus",
-  "PRICE_programplus_annual": "program_plus",
-  "PRICE_school_monthly": "school",
-  "PRICE_school_annual": "school",
-  "PRICE_schoolplus_monthly": "school_plus",
-  "PRICE_schoolplus_annual": "school_plus",
+  "price_1TdcrABzAEImpxa62G24Ul20": "program",
+  "price_1TdczrBzAEImpxa6dKJ8R8gp": "program",
+  "price_1Tf5V2BzAEImpxa6NOVNecDO": "program_plus",
+  "price_1Tf5VTBzAEImpxa6PSUFDI3o": "program_plus",
+  "price_1Tf5aUBzAEImpxa64FdUtiZY": "school",
+  "price_1Tdd0bBzAEImpxa6voXKjkUm": "school",
+  "price_1Tdd1XBzAEImpxa6dlaquzPO": "school_plus",
+  "price_1Tdd1XBzAEImpxa6dlaquzPO": "school_plus",
 };
 
 Deno.serve(async (req) => {
