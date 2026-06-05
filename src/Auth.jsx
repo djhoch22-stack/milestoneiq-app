@@ -720,7 +720,7 @@ function OnboardingScreen({ userId, onComplete, seedSchools }) {
 }
 
 // Reusable plan picker (monthly/annual toggle + tier tiles). onSelect(priceId, tier, billing).
-export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial }) {
+export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial, currentTier }) {
   const [billing, setBilling] = useState('monthly');
   const [plan, setPlan] = useState(PLANS.some((p) => p.id === initial) ? initial : 'school');
   const go = () => {
@@ -737,7 +737,9 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: 20 }}>
         {PLANS.map((p) => (
           <div key={p.id} onClick={() => setPlan(p.id)} style={{ border: `2px solid ${plan === p.id ? '#1a3a6b' : p.popular ? '#93c5fd' : '#e5e7eb'}`, borderRadius: 12, padding: 20, cursor: 'pointer', position: 'relative', background: plan === p.id ? '#eff6ff' : '#fff' }}>
-            {p.popular && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#1a56db', color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+            {p.id === currentTier
+              ? <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#166534', color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>CURRENT PLAN</div>
+              : p.popular && <div style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#1a56db', color: '#fff', borderRadius: 10, padding: '2px 10px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
             <div style={{ fontWeight: 700, fontSize: 16, color: '#111', marginBottom: 4 }}>{p.name}</div>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>{p.description}</div>
             <div style={{ marginBottom: 12 }}>
@@ -753,7 +755,7 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial
           </div>
         ))}
       </div>
-      <button style={s.btn} onClick={go} disabled={busy}>{busy ? 'Redirecting to checkout…' : ctaLabel}</button>
+      <button style={{ ...s.btn, ...(plan === currentTier ? { background: '#9ca3af', cursor: 'default' } : {}) }} onClick={go} disabled={busy || plan === currentTier}>{plan === currentTier ? '✓ Your current plan' : (busy ? 'Redirecting to checkout…' : ctaLabel)}</button>
     </>
   );
 }
