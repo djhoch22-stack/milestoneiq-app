@@ -28,7 +28,8 @@ import SchoolOnboarding from './SchoolOnboarding';
 
 const TIER_LIMITS = {
   program: { maxPrograms: 1, maxCoachesPerProgram: 1 },
-  school: { maxPrograms: 8, maxCoachesPerProgram: 3 },
+  program_plus: { maxPrograms: 1, maxCoachesPerProgram: 5 },
+  school: { maxPrograms: 5, maxCoachesPerProgram: 3 },
   school_plus: { maxPrograms: 999, maxCoachesPerProgram: 999 },
 };
 
