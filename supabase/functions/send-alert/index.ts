@@ -58,18 +58,15 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const resendKey = Deno.env.get("RESEND_API_KEY");
     const from = Deno.env.get("RESEND_FROM") || "RaftersIQ <onboarding@resend.dev>";
     if (!resendKey) return json({ error: "RESEND_API_KEY is not set" }, 500);
 
-    // Identify the caller from their JWT (sent by the app even with Verify JWT off).
-    const authHeader = req.headers.get("Authorization") || "";
-    const caller = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: userErr } = await caller.auth.getUser();
-    if (userErr || !user) return json({ error: "not authenticated" }, 401);
-
+    // Identify the caller from their JWT — service-role validates it (no anon key needed).
     const admin = createClient(url, serviceKey);
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const { data: { user }, error: userErr } = await admin.auth.getUser(token);
+    if (userErr || !user) return json({ error: "not authenticated", detail: userErr?.message || "no user from token" }, 401);
 
     // Resolve the program + its school, and authorize: caller must belong to that school.
     const { data: prog } = await admin
