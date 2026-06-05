@@ -157,11 +157,18 @@ export default function AppWrapper() {
         return;
       }
       setNeedsOnboarding(false);
-      setRole(orgs[0].role || 'coach');
-      const org = orgs[0].organizations;
+      // Pick the org with the most programs so we never land on an empty/stray org
+      // (e.g. a leftover school from a botched onboarding).
+      let chosen = orgs[0];
+      let programs = [];
+      for (const m of orgs) {
+        const { data: progs } = await getPrograms(m.organizations.id);
+        if ((progs?.length || 0) > programs.length) { chosen = m; programs = progs || []; }
+      }
+      setRole(chosen.role || 'coach');
+      const org = chosen.organizations;
       setOrgId(org.id);
       setOrg(org);
-      const { data: programs } = await getPrograms(org.id);
       if (!programs?.length) {
         setLoading(false);
         return;
