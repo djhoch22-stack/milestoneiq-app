@@ -21,6 +21,7 @@ import {
   getSeasons,
   createCheckout,
   openBillingPortal,
+  redeemPromoCode,
 } from './supabase_client';
 import Auth, { LockedScreen } from './Auth';
 import App from './MilestoneIQ';
@@ -368,6 +369,13 @@ export default function AppWrapper() {
     if (data?.url) { window.location.href = data.url; return null; }
     return error || 'Could not open billing portal';
   };
+  // Redeem a beta/promo code against this school, then refresh the gate (unlock/extend).
+  const goRedeem = async (code) => {
+    const { data, error } = await redeemPromoCode((code || '').trim(), orgId);
+    if (error) return { error: error.message || String(error) };
+    await loadUserData(session.user.id);
+    return { message: data || 'Applied!' };
+  };
 
   if (!unlocked) {
     return (
@@ -376,6 +384,7 @@ export default function AppWrapper() {
         status={status}
         onCheckout={goCheckout}
         onManageBilling={goPortal}
+        onRedeemCode={goRedeem}
       />
     );
   }
@@ -434,6 +443,8 @@ export default function AppWrapper() {
         trialEndsAt={org?.trial_ends_at || null}
         onCheckout={goCheckout}
         onManageBilling={goPortal}
+        onRedeemCode={goRedeem}
+        isPlatformOwner={!!profile?.is_platform_owner}
         onSignOut={() => supabase.auth.signOut()}
       />
     </>
