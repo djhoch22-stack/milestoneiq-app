@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -3752,7 +3752,7 @@ function saveSchools(data) {
 
 // Settings → Billing card (admins only). Shows trial/plan status and opens the
 // shared ChoosePlan picker (→ Stripe checkout) or the Stripe billing portal.
-function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling }) {
+function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
@@ -3765,6 +3765,16 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
   const showErr = (e) => setErr(typeof e === "string" ? e : (e?.message || "Something went wrong"));
   const select = async (priceId, t, b) => { setBusy(true); setErr(""); const e = await onCheckout?.(priceId, t, b); setBusy(false); if (e) showErr(e); };
   const manage = async () => { setErr(""); const e = await onManageBilling?.(); if (e) showErr(e); };
+  const [code, setCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemMsg, setRedeemMsg] = useState("");
+  const redeem = async () => {
+    if (!code.trim() || !onRedeemCode) return;
+    setRedeeming(true); setErr(""); setRedeemMsg("");
+    const { error, message } = await onRedeemCode(code.trim());
+    setRedeeming(false);
+    if (error) showErr(error); else { setRedeemMsg(message || "Applied!"); setCode(""); }
+  };
   const errStyle = { background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#991b1b" };
   return (
     <div style={{ background:"#fff",borderRadius:14,border:"1px solid #e8e4dd",marginBottom:20,overflow:"hidden" }}>
@@ -3779,12 +3789,96 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
         </div>
         {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
         <ChoosePlan onSelect={select} busy={busy} initial={tier} currentTier={status === "active" ? tier : undefined} ctaLabel={status === "active" ? "Switch to selected plan →" : "Subscribe & continue →"} />
+        <div style={{ borderTop:"1px solid #f3f0ea",marginTop:18,paddingTop:16 }}>
+          <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:6 }}>Have a beta or promo code?</div>
+          {redeemMsg && <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#166534",marginBottom:8 }}>{redeemMsg}</div>}
+          <div style={{ display:"flex",gap:8,maxWidth:420 }}>
+            <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="e.g. BETA90"
+              style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:14,textTransform:"uppercase" }} />
+            <button onClick={redeem} disabled={redeeming || !code.trim()}
+              style={{ background:"#111827",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:14,fontWeight:600,cursor:redeeming||!code.trim()?"default":"pointer",opacity:redeeming||!code.trim()?0.6:1 }}>
+              {redeeming ? "Applying…" : "Apply"}
+            </button>
+          </div>
+        </div>
+        {isPlatformOwner && <PromoAdmin />}
       </div>
     </div>
   );
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling } = {}) {
+const pInp = (w) => ({ width: w, border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 13 });
+function PField({ label, children }) {
+  return <label style={{ display:"flex",flexDirection:"column",gap:3,fontSize:11,color:"#6b7280",fontWeight:600 }}>{label}{children}</label>;
+}
+function PromoAdmin() {
+  const [codes, setCodes] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ code:"", kind:"trial_days", trialDays:90, grantTier:"", max:"", note:"" });
+  const [msg, setMsg] = useState("");
+  const load = async () => { const { data } = await listPromoCodes(); setCodes(data || []); };
+  useEffect(() => { load(); }, []);
+  const create = async () => {
+    if (!form.code.trim()) { setMsg("Enter a code."); return; }
+    const { error } = await createPromoCode({
+      code: form.code.trim(), kind: form.kind, trialDays: Number(form.trialDays) || 90,
+      grantTier: form.grantTier || null, max: form.max ? Number(form.max) : null, note: form.note || null,
+    });
+    if (error) { setMsg(error.message || String(error)); return; }
+    setMsg("✓ Saved"); setForm({ code:"", kind:"trial_days", trialDays:90, grantTier:"", max:"", note:"" }); load();
+  };
+  const toggle = async (c) => { await setPromoActive(c.code, !c.active); load(); };
+  return (
+    <div style={{ borderTop:"1px solid #f3f0ea",marginTop:18,paddingTop:16 }}>
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer" }} onClick={()=>setOpen(o=>!o)}>
+        <div style={{ fontSize:13,fontWeight:700,color:"#7c3aed" }}>🎟️ Promo codes (owner)</div>
+        <span style={{ fontSize:12,color:"#9ca3af" }}>{open ? "Hide ▲" : "Manage ▼"}</span>
+      </div>
+      {open && (
+        <div style={{ marginTop:12 }}>
+          <div style={{ display:"flex",flexWrap:"wrap",gap:8,alignItems:"flex-end",marginBottom:12 }}>
+            <PField label="Code"><input value={form.code} onChange={e=>setForm(f=>({...f,code:e.target.value.toUpperCase()}))} placeholder="BETA90" style={pInp(120)} /></PField>
+            <PField label="Type">
+              <select value={form.kind} onChange={e=>setForm(f=>({...f,kind:e.target.value}))} style={pInp(130)}>
+                <option value="trial_days">Free days</option>
+                <option value="comp">Comp (full)</option>
+              </select>
+            </PField>
+            {form.kind === "trial_days" && <PField label="Days"><input type="number" value={form.trialDays} onChange={e=>setForm(f=>({...f,trialDays:e.target.value}))} style={pInp(70)} /></PField>}
+            <PField label="Tier (opt)">
+              <select value={form.grantTier} onChange={e=>setForm(f=>({...f,grantTier:e.target.value}))} style={pInp(120)}>
+                <option value="">— keep —</option>
+                <option value="program">Program</option>
+                <option value="program_plus">Program+</option>
+                <option value="school">School</option>
+                <option value="school_plus">School+</option>
+              </select>
+            </PField>
+            <PField label="Max uses"><input type="number" value={form.max} onChange={e=>setForm(f=>({...f,max:e.target.value}))} placeholder="∞" style={pInp(70)} /></PField>
+            <PField label="Note"><input value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} placeholder="Launch beta" style={pInp(140)} /></PField>
+            <button onClick={create} style={{ background:"#7c3aed",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer" }}>Save code</button>
+          </div>
+          {msg && <div style={{ fontSize:12,color:"#6b7280",marginBottom:8 }}>{msg}</div>}
+          {codes.length === 0 ? <div style={{ fontSize:13,color:"#9ca3af" }}>No codes yet.</div> : (
+            <div style={{ border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden" }}>
+              {codes.map((c,i) => (
+                <div key={c.code} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 12px",fontSize:13,borderBottom:i<codes.length-1?"1px solid #f3f4f6":"none",background:c.active?"#fff":"#f9fafb" }}>
+                  <span style={{ fontWeight:700,fontFamily:"monospace",color:"#111" }}>{c.code}</span>
+                  <span style={{ color:"#6b7280" }}>{c.kind === "comp" ? "Comp" : `${c.trial_days}d`}{c.grant_tier ? ` · ${c.grant_tier}` : ""}</span>
+                  <span style={{ color:"#9ca3af",fontSize:12 }}>{c.redemptions}{c.max_redemptions ? `/${c.max_redemptions}` : ""} used</span>
+                  {c.note && <span style={{ color:"#9ca3af",fontSize:12 }}>{c.note}</span>}
+                  <button onClick={()=>toggle(c)} style={{ marginLeft:"auto",background:"none",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 10px",fontSize:11,cursor:"pointer",color:c.active?"#991b1b":"#166534" }}>{c.active ? "Disable" : "Enable"}</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -3892,7 +3986,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
           <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} tierLimits={tierLimits} />
         </Section>
 
-        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} />}
+        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
