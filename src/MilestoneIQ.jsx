@@ -1253,6 +1253,7 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
   const [msg, setMsg] = useState("");
   const [pending, setPending] = useState([]);
   const [inviteProgram, setInviteProgram] = useState("");
+  const [roleEdits, setRoleEdits] = useState({});
   const isAdmin = role === "admin";
   const progLabel = (id) => { const p = programs.find(x => x.id === id); return p ? (SPORTS[p.sport]?.label || p.mascot || "program") : ""; };
 
@@ -1267,9 +1268,15 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
   }, [orgId]);
   useEffect(() => { load(); }, [load]);
 
-  const changeRole = async (uid, newRole) => {
-    const { error } = await updateMemberRole(orgId, uid, newRole);
-    if (error) alert("Couldn't update role: " + (error.message || error));
+  const stageRole = (uid, newRole) => setRoleEdits(r => ({ ...r, [uid]: newRole }));
+  const dirtyRoles = members.filter(m => roleEdits[m.user_id] != null && roleEdits[m.user_id] !== m.role);
+  const saveRoles = async () => {
+    if (!dirtyRoles.length) return;
+    for (const m of dirtyRoles) {
+      const { error } = await updateMemberRole(orgId, m.user_id, roleEdits[m.user_id]);
+      if (error) { alert("Couldn't save role change: " + (error.message || error)); return; }
+    }
+    setRoleEdits({});
     load();
   };
   const removeOne = async (uid) => {
@@ -1319,8 +1326,8 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
                     <span style={{ fontSize:12,fontWeight:600,color:"#1a56db",whiteSpace:"nowrap" }}>You · {mb.role}</span>
                   ) : isAdmin ? (
                     <>
-                      <select value={mb.role} onChange={e=>changeRole(mb.user_id, e.target.value)}
-                        style={{ border:"1px solid #e5e7eb",borderRadius:6,padding:"4px 8px",fontSize:12,color:"#374151" }}>
+                      <select value={roleEdits[mb.user_id] ?? mb.role} onChange={e=>stageRole(mb.user_id, e.target.value)}
+                        style={{ border:`1px solid ${roleEdits[mb.user_id] != null && roleEdits[mb.user_id] !== mb.role ? "#f59e0b" : "#e5e7eb"}`,borderRadius:6,padding:"4px 8px",fontSize:12,color:"#374151" }}>
                         <option value="admin">Admin (sees all)</option>
                         <option value="coach">Coach</option>
                       </select>
@@ -1336,6 +1343,13 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
       </div>
       {isAdmin ? (
         <>
+          <div style={{ display:"flex",alignItems:"center",gap:12,marginBottom:14 }}>
+            <button onClick={saveRoles} disabled={!dirtyRoles.length}
+              style={{ background: dirtyRoles.length ? "#1a56db" : "#cbd5e1",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,cursor: dirtyRoles.length ? "pointer" : "default" }}>
+              Save role changes
+            </button>
+            {dirtyRoles.length > 0 && <span style={{ fontSize:12,color:"#b45309",fontWeight:600 }}>{dirtyRoles.length} unsaved</span>}
+          </div>
           {pending.length > 0 && (
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12,fontWeight:600,color:"#6b7280",marginBottom:6 }}>Pending invites</div>
