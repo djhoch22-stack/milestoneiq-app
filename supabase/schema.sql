@@ -713,3 +713,125 @@ drop trigger if exists gate_org_trial_trg on public.organizations;
 create trigger gate_org_trial_trg before insert on public.organizations
   for each row execute function public.gate_org_trial();
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.0 — Beta / promo codes. Platform-owner-issued codes that grant free or
+-- extended access. A 'trial_days' code pushes trial_ends_at out N days; a 'comp'
+-- code flips the org to 'active' (optionally bumping its tier). One redemption per
+-- school. Redeeming OVERRIDES the trial-abuse guard (a real code legitimately
+-- unlocks even a repeat email). All writes go through SECURITY DEFINER RPCs so a
+-- school can't self-grant — validation (active/expiry/limit/already-used) is
+-- enforced server-side.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.promo_codes (
+  code            text primary key,                    -- stored UPPERCASE
+  kind            text not null default 'trial_days',  -- 'trial_days' | 'comp'
+  trial_days      int  default 90,                     -- used when kind='trial_days'
+  grant_tier      text,                                -- optional: also set this tier on redeem
+  note            text,                                -- internal label (e.g. 'Launch beta')
+  max_redemptions int,                                 -- null = unlimited
+  redemptions     int  not null default 0,
+  active          boolean not null default true,
+  expires_at      timestamptz,                         -- code stops working after this
+  created_at      timestamptz default now()
+);
+
+alter table public.organizations add column if not exists promo_code text;          -- which code this school redeemed (one per org)
+alter table public.profiles      add column if not exists is_platform_owner boolean not null default false;
+
+-- Only platform owners can SEE the code list (for the generator panel). All writes
+-- happen via the SECURITY DEFINER RPCs below — no insert/update/delete policy.
+grant select on public.promo_codes to anon, authenticated, service_role;
+alter table public.promo_codes enable row level security;
+drop policy if exists promo_sel on public.promo_codes;
+create policy promo_sel on public.promo_codes for select
+  using (exists (select 1 from public.profiles where id = auth.uid() and is_platform_owner));
+
+-- Redeem: a school admin applies a code to their org. Raises on any invalid case.
+create or replace function public.redeem_promo_code(p_code text, p_org_id uuid)
+returns text language plpgsql security definer set search_path = public as $$
+declare c public.promo_codes; msg text;
+begin
+  if not public.is_school_admin(p_org_id) then raise exception 'Only a school admin can apply a code.'; end if;
+  select * into c from public.promo_codes where code = upper(trim(p_code));
+  if not found or not c.active then raise exception 'That code isn''t valid.'; end if;
+  if c.expires_at is not null and c.expires_at < now() then raise exception 'That code has expired.'; end if;
+  if c.max_redemptions is not null and c.redemptions >= c.max_redemptions then raise exception 'That code has reached its redemption limit.'; end if;
+  if exists (select 1 from public.organizations where id = p_org_id and promo_code is not null) then
+    raise exception 'Your school has already applied a code.';
+  end if;
+  if c.kind = 'comp' then
+    update public.organizations
+       set subscription_status = 'active',
+           subscription_tier   = coalesce(c.grant_tier, subscription_tier),
+           promo_code          = c.code
+     where id = p_org_id;
+    msg := 'Applied! Full access unlocked.';
+  else
+    update public.organizations
+       set subscription_status = 'trialing',
+           trial_ends_at       = now() + make_interval(days => coalesce(c.trial_days, 90)),
+           subscription_tier   = coalesce(c.grant_tier, subscription_tier),
+           promo_code          = c.code
+     where id = p_org_id;
+    msg := 'Applied! ' || coalesce(c.trial_days, 90) || ' days of free access.';
+  end if;
+  update public.promo_codes set redemptions = redemptions + 1 where code = c.code;
+  return msg;
+end $$;
+
+-- Generate / upsert a code (platform owner only).
+create or replace function public.create_promo_code(
+  p_code text, p_kind text default 'trial_days', p_trial_days int default 90,
+  p_note text default null, p_max int default null, p_expires timestamptz default null,
+  p_grant_tier text default null
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_platform_owner) then
+    raise exception 'Not authorized.';
+  end if;
+  insert into public.promo_codes (code, kind, trial_days, note, max_redemptions, expires_at, grant_tier)
+  values (upper(trim(p_code)), coalesce(p_kind,'trial_days'), p_trial_days, p_note, p_max, p_expires, nullif(trim(coalesce(p_grant_tier,'')),''))
+  on conflict (code) do update set
+    kind = excluded.kind, trial_days = excluded.trial_days, note = excluded.note,
+    max_redemptions = excluded.max_redemptions, expires_at = excluded.expires_at,
+    grant_tier = excluded.grant_tier, active = true;
+end $$;
+
+-- Activate / deactivate a code (platform owner only).
+create or replace function public.set_promo_active(p_code text, p_active boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_platform_owner) then
+    raise exception 'Not authorized.';
+  end if;
+  update public.promo_codes set active = p_active where code = upper(trim(p_code));
+end $$;
+
+-- List codes for the generator panel (returns rows only to platform owners).
+create or replace function public.list_promo_codes()
+returns setof public.promo_codes language sql stable security definer set search_path = public as $$
+  select * from public.promo_codes
+  where exists (select 1 from public.profiles where id = auth.uid() and is_platform_owner)
+  order by created_at desc;
+$$;
+
+revoke all on function public.redeem_promo_code(text,uuid) from anon, public;
+revoke all on function public.create_promo_code(text,text,int,text,int,timestamptz,text) from anon, public;
+revoke all on function public.set_promo_active(text,boolean) from anon, public;
+revoke all on function public.list_promo_codes() from anon, public;
+grant execute on function public.redeem_promo_code(text,uuid) to authenticated;
+grant execute on function public.create_promo_code(text,text,int,text,int,timestamptz,text) to authenticated;
+grant execute on function public.set_promo_active(text,boolean) to authenticated;
+grant execute on function public.list_promo_codes() to authenticated;
+
+-- Make yourself the platform owner (edit emails as needed):
+update public.profiles set is_platform_owner = true
+where lower(email) in ('djhoch22@gmail.com', 'dhoch@denverchristian.org');
+
+-- A starter launch code (or create codes from the in-app panel):
+insert into public.promo_codes (code, kind, trial_days, note)
+values ('BETA90', 'trial_days', 90, 'Launch beta — 90 days free')
+on conflict (code) do nothing;
+
+NOTIFY pgrst, 'reload schema';
