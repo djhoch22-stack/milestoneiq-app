@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       <h2 style="margin:0 0 8px">🏆 You've been invited to RaftersIQ</h2>
       <p style="font-size:14px;line-height:1.6">You've been added as <b>${roleLabel}</b> for <b>${school}</b> on RaftersIQ — the home for your program's stats, records, and Hall of Fame.</p>
       <p style="font-size:14px;line-height:1.6">Get started by creating your account with <b>this email</b> (${email}):</p>
-      <p style="margin:18px 0"><a href="${APP_URL}" style="background:#1a3a6b;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:14px">Set up your account →</a></p>
+      <p style="margin:18px 0"><a href="${APP_URL}/?invite=${encodeURIComponent(email)}" style="background:#1a3a6b;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:14px">Set up your account →</a></p>
       <p style="font-size:12px;color:#9ca3af">Or visit ${APP_URL} and sign up. Already have an account? Just log in — you'll be added automatically.</p>
     </div>`;
 
