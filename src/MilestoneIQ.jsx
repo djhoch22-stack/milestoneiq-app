@@ -1293,6 +1293,22 @@ function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} })
     if (error) { alert("Couldn't remove member: " + (error.message || error)); return; }
     load();
   };
+  const assignTeam = async (uid, programId) => {
+    if (!programId) return;
+    const max = tierLimits?.maxCoachesPerProgram || 999;
+    const already = (assignments[uid] || []).includes(programId);
+    const onProg = Object.values(assignments).filter(arr => arr.includes(programId)).length;
+    if (!already && onProg >= max) { setMsg(`That team is at its ${max}-coach limit for your plan. Upgrade to add more.`); return; }
+    const { error } = await addProgramCoach(programId, uid);
+    if (error) { setMsg("Couldn't assign team: " + (error.message || error)); return; }
+    setMsg(`✓ Assigned to ${progLabel(programId)}`);
+    load();
+  };
+  const unassignTeam = async (uid, programId) => {
+    const { error } = await removeProgramCoach(programId, uid);
+    if (error) { setMsg("Couldn't remove from team: " + (error.message || error)); return; }
+    load();
+  };
   const sendInvite = async () => {
     if (!inviteEmail) return;
     if (inviteRole === "coach" && !inviteProgram) { setMsg("Pick which program this coach will run."); return; }
@@ -1334,9 +1350,25 @@ function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} })
                   <div style={{ flex:1,minWidth:0 }}>
                     <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{nm}</div>
                     <div style={{ fontSize:12,color:"#6b7280" }}>{em}</div>
-                    {assignments[mb.user_id]?.length > 0 && (
+                    {isAdmin && (roleEdits[mb.user_id] ?? mb.role) === "coach" ? (
+                      <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginTop:4,alignItems:"center" }}>
+                        {(assignments[mb.user_id] || []).map(pid => (
+                          <span key={pid} style={{ display:"inline-flex",alignItems:"center",gap:3,background:"#eff6ff",color:"#1a56db",border:"1px solid #bfdbfe",borderRadius:10,padding:"1px 4px 1px 8px",fontSize:11,fontWeight:600 }}>
+                            {progLabel(pid)}
+                            <button onClick={()=>unassignTeam(mb.user_id, pid)} title="Remove from team" style={{ background:"none",border:"none",cursor:"pointer",color:"#1a56db",fontSize:13,lineHeight:1,padding:"0 2px" }}>×</button>
+                          </span>
+                        ))}
+                        <select value="" onChange={e=>{ const v=e.target.value; e.target.value=""; assignTeam(mb.user_id, v); }}
+                          style={{ border:"1px dashed #93c5fd",borderRadius:10,padding:"2px 6px",fontSize:11,color:"#1a56db",background:"#fff",cursor:"pointer" }}>
+                          <option value="">+ assign team…</option>
+                          {programs.filter(p => !(assignments[mb.user_id] || []).includes(p.id)).map(p => (
+                            <option key={p.id} value={p.id}>{progLabel(p.id)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : assignments[mb.user_id]?.length > 0 ? (
                       <div style={{ fontSize:11,color:"#1a56db",marginTop:2,fontWeight:600 }}>📋 {assignments[mb.user_id].map(progLabel).join(", ")}</div>
-                    )}
+                    ) : null}
                   </div>
                   {mb.user_id === userId ? (
                     <span style={{ fontSize:12,fontWeight:600,color:"#1a56db",whiteSpace:"nowrap" }}>You · {mb.role}</span>
