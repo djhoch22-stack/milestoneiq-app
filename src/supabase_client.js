@@ -382,7 +382,7 @@ export const createSchoolWithMembership = async (school, userId) => {
   if (orgErr) return { error: orgErr };
   const { error: memErr } = await supabase
     .from('org_members')
-    .insert({ org_id: org.id, user_id: userId, role: 'coach' });
+    .insert({ org_id: org.id, user_id: userId, role: 'admin' });
   if (memErr) return { error: memErr };
   return { data: org };
 };
