@@ -1245,7 +1245,7 @@ function PasswordSection({ userEmail }) {
 }
 
 // School roster + role management (admin only manages; everyone sees the list).
-function MembersSection({ orgId, role, userId, programs = [] }) {
+function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -1288,6 +1288,11 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
   const sendInvite = async () => {
     if (!inviteEmail) return;
     if (inviteRole === "coach" && !inviteProgram) { setMsg("Pick which program this coach will run."); return; }
+    const maxUsers = tierLimits?.maxUsers || 999;
+    if (members.length + pending.length >= maxUsers) {
+      setMsg(`Your plan allows up to ${maxUsers} users (including the AD). Upgrade to add more seats.`);
+      return;
+    }
     setMsg("Inviting…");
     const programId = inviteRole === "coach" ? inviteProgram : null;
     const { error } = await inviteMember(inviteEmail, orgId, inviteRole, programId);
@@ -3841,7 +3846,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
 
         {/* Users & Access */}
         <Section title="👥 Users & access">
-          <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} />
+          <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} tierLimits={tierLimits} />
         </Section>
 
         {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} />}
