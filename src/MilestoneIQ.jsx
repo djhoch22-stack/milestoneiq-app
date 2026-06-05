@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1285,7 +1285,10 @@ function MembersSection({ orgId, role, userId, programs = [] }) {
     const programId = inviteRole === "coach" ? inviteProgram : null;
     const { error } = await inviteMember(inviteEmail, orgId, inviteRole, programId);
     if (error) { setMsg("Invite failed: " + (error.message || error)); return; }
-    setMsg(`✓ ${inviteEmail} will join as ${inviteRole}${programId ? " (" + progLabel(programId) + ")" : ""} when they sign up.`);
+    const { error: emailErr } = await sendInviteEmail(inviteEmail, orgId, inviteRole);
+    setMsg(emailErr
+      ? `✓ ${inviteEmail} is set as ${inviteRole}${programId ? " (" + progLabel(programId) + ")" : ""} — but the email didn't send (${emailErr}). Tell them to sign up at raftersiq.com.`
+      : `✓ Invited ${inviteEmail} as ${inviteRole}${programId ? " (" + progLabel(programId) + ")" : ""} — we emailed them a sign-up link. 📨`);
     setInviteEmail("");
     load();
   };
