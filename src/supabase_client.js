@@ -543,6 +543,30 @@ export const openBillingPortal = async (orgId) => {
   }
 };
 
+// ── Promo / beta codes ─────────────────────────────────────────────────────────
+// Redeem a code against a school (validation + apply happen server-side in the RPC).
+// On success `data` is a friendly message; on any invalid case `error` is the reason.
+export const redeemPromoCode = async (code, orgId) => {
+  const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code, p_org_id: orgId });
+  return { data, error };
+};
+// Platform-owner only (RPC enforces it). List / create / toggle codes for the panel.
+export const listPromoCodes = async () => {
+  const { data, error } = await supabase.rpc('list_promo_codes');
+  return { data: data || [], error };
+};
+export const createPromoCode = async ({ code, kind = 'trial_days', trialDays = 90, note = null, max = null, expires = null, grantTier = null }) => {
+  const { error } = await supabase.rpc('create_promo_code', {
+    p_code: code, p_kind: kind, p_trial_days: trialDays, p_note: note,
+    p_max: max, p_expires: expires, p_grant_tier: grantTier,
+  });
+  return { error };
+};
+export const setPromoActive = async (code, active) => {
+  const { error } = await supabase.rpc('set_promo_active', { p_code: code, p_active: active });
+  return { error };
+};
+
 // ── Invite email ──────────────────────────────────────────────────────────────
 // Email an invited coach/AD a sign-up link (best-effort). The pending_invite row
 // (from inviteMember) is what actually authorizes them; this just notifies them.
