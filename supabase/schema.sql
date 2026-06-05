@@ -652,3 +652,31 @@ update public.organizations set subscription_status = 'active'
 create unique index if not exists subscriptions_stripe_sub_uidx
   on public.subscriptions (stripe_subscription_id);
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v2.8 — Claim pending invites on LOGIN, not just signup. The signup trigger only
+-- fires for brand-new accounts; if you invite someone who already has an account
+-- (or who signed up before the invite landed), this RPC — called by the app on
+-- every load — applies their pending invite and upgrades their role if needed
+-- (e.g. a coach who's now invited as admin). Fixes "invited as admin but landed
+-- as a coach."
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.claim_my_invites()
+returns void language plpgsql security definer set search_path = public, auth as $$
+declare em text;
+begin
+  select lower(email) into em from auth.users where id = auth.uid();
+  if em is null then return; end if;
+  insert into public.org_members (org_id, user_id, role)
+  select pi.org_id, auth.uid(), pi.role from public.pending_invites pi
+  where lower(pi.email) = em
+  on conflict (org_id, user_id) do update set role = excluded.role;
+  insert into public.program_coaches (program_id, user_id)
+  select pi.program_id, auth.uid() from public.pending_invites pi
+  where lower(pi.email) = em and pi.program_id is not null
+  on conflict (program_id, user_id) do nothing;
+  delete from public.pending_invites where lower(email) = em;
+end $$;
+revoke all on function public.claim_my_invites() from anon, public;
+grant execute on function public.claim_my_invites() to authenticated;
+NOTIFY pgrst, 'reload schema';
