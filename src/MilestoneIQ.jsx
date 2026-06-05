@@ -1252,6 +1252,7 @@ function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} })
   const [inviteRole, setInviteRole] = useState("coach");
   const [msg, setMsg] = useState("");
   const [pending, setPending] = useState([]);
+  const [assignments, setAssignments] = useState({});
   const [inviteProgram, setInviteProgram] = useState("");
   const [roleEdits, setRoleEdits] = useState({});
   const isAdmin = role === "admin";
@@ -1264,8 +1265,15 @@ function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} })
     setMembers(data || []);
     const { data: inv } = await getPendingInvites(orgId);
     setPending(inv || []);
+    // Which program(s) each coach is assigned to → user_id: [programId,…]
+    const map = {};
+    for (const p of programs) {
+      const { data: pcs } = await getProgramCoaches(p.id);
+      (pcs || []).forEach((pc) => { (map[pc.user_id] = map[pc.user_id] || []).push(p.id); });
+    }
+    setAssignments(map);
     setLoading(false);
-  }, [orgId]);
+  }, [orgId, programs]);
   useEffect(() => { load(); }, [load]);
 
   const stageRole = (uid, newRole) => setRoleEdits(r => ({ ...r, [uid]: newRole }));
@@ -1326,6 +1334,9 @@ function MembersSection({ orgId, role, userId, programs = [], tierLimits = {} })
                   <div style={{ flex:1,minWidth:0 }}>
                     <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{nm}</div>
                     <div style={{ fontSize:12,color:"#6b7280" }}>{em}</div>
+                    {assignments[mb.user_id]?.length > 0 && (
+                      <div style={{ fontSize:11,color:"#1a56db",marginTop:2,fontWeight:600 }}>📋 {assignments[mb.user_id].map(progLabel).join(", ")}</div>
+                    )}
                   </div>
                   {mb.user_id === userId ? (
                     <span style={{ fontSize:12,fontWeight:600,color:"#1a56db",whiteSpace:"nowrap" }}>You · {mb.role}</span>
@@ -3735,7 +3746,7 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
           {status === "active" && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Manage billing</button>}
         </div>
         {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
-        <ChoosePlan onSelect={select} busy={busy} initial={tier} ctaLabel={status === "active" ? "Switch to selected plan →" : "Subscribe & continue →"} />
+        <ChoosePlan onSelect={select} busy={busy} initial={tier} currentTier={status === "active" ? tier : undefined} ctaLabel={status === "active" ? "Switch to selected plan →" : "Subscribe & continue →"} />
       </div>
     </div>
   );
