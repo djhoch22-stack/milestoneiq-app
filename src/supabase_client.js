@@ -542,3 +542,22 @@ export const openBillingPortal = async (orgId) => {
     return { error: String(e?.message || e) };
   }
 };
+
+// ── Invite email ──────────────────────────────────────────────────────────────
+// Email an invited coach/AD a sign-up link (best-effort). The pending_invite row
+// (from inviteMember) is what actually authorizes them; this just notifies them.
+export const sendInviteEmail = async (email, orgId, role) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ email, orgId, role }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'invite email failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
