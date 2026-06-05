@@ -835,3 +835,35 @@ values ('BETA90', 'trial_days', 90, 'Launch beta — 90 days free')
 on conflict (code) do nothing;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.1 — Fix onboarding "Create your program" (RLS denial) + make the school's
+-- creator its admin. Two root causes:
+--   1) prog_ins checked org_members via a RAW subquery (subject to org_members'
+--      own RLS), so a brand-new creator's just-inserted membership wasn't reliably
+--      visible during the INSERT check → "new row violates row-level security
+--      policy for table programs". It now uses the SECURITY DEFINER user_org_ids()
+--      (like the original prog_all did) plus an org-creator bootstrap.
+--   2) The creator was added as 'coach' (om_ins only allowed self-insert as coach),
+--      so the AD who set up the school landed with no admin powers. om_ins now lets
+--      the org's CREATOR add their own membership at ANY role; the client inserts
+--      them as 'admin'.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.is_org_creator(p_org uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.organizations o where o.id = p_org and o.created_by = auth.uid());
+$$;
+grant execute on function public.is_org_creator(uuid) to authenticated;
+
+drop policy if exists prog_ins on public.programs;
+create policy prog_ins on public.programs for insert
+  with check (org_id in (select public.user_org_ids()) or public.is_org_creator(org_id));
+
+drop policy if exists om_ins on public.org_members;
+create policy om_ins on public.org_members for insert
+  with check (
+    (user_id = auth.uid() and (role = 'coach' or public.is_org_creator(org_id)))
+    or public.is_school_admin(org_id)
+  );
+
+NOTIFY pgrst, 'reload schema';
