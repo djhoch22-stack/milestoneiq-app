@@ -147,6 +147,9 @@ export default function AppWrapper() {
     try {
       const { data: prof } = await getProfile(userId);
       setProfile(prof);
+      // Apply any pending invite for this user's email (e.g. an admin invite) — works
+      // even if they already had an account, and upgrades their role if needed.
+      try { await supabase.rpc('claim_my_invites'); } catch (e) { /* best-effort */ }
       const { data: orgs } = await getUserOrgs(userId);
       if (!orgs?.length) {
         setNeedsOnboarding(true);
