@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1848,6 +1848,17 @@ function parseSeasonsWorkbook(XLSX, buf) {
   }
   return Object.values(byPS);
 }
+function seasonFromFilename(name) {
+  const m = String(name || "").match(/(\d{4})\D+(\d{2,4})/);
+  if (!m) return null;
+  let b = m[2]; if (b.length === 2) b = m[1].slice(0, 2) + b;
+  return `${m[1]}-${b}`;
+}
+function remapSeasonStats(stats) {
+  const out = {};
+  for (const k in (stats || {})) out[SEASON_STAT_MAP[String(k).trim()] || k] = stats[k];
+  return out;
+}
 function mergeSeasonRows(all) {
   const byPS = {};
   for (const r of all) {
@@ -1865,11 +1876,63 @@ function ImportSeasons({ school, roster = [] }) {
     e.target.value = "";
     if (!files.length) return;
     if (!school || !school.id) { setMsg("Open a saved program first."); return; }
-    setBusy(true); setMsg(`Reading ${files.length} file${files.length > 1 ? "s" : ""}…`);
+    const xlsxFiles = files.filter((f) => /\.(xlsx|xls)$/i.test(f.name));
+    const pdfFiles = files.filter((f) => /\.pdf$/i.test(f.name));
+    setBusy(true);
     try {
+      // PDFs: each file is ONE season's roster → AI-extract, then replace just that season
+      // (other seasons untouched). Season comes from the filename, else we ask.
+      if (pdfFiles.length) {
+        let shared = null;
+        const bySeason = {};
+        const errs = [];
+        for (let i = 0; i < pdfFiles.length; i++) {
+          const f = pdfFiles[i];
+          let season = seasonFromFilename(f.name);
+          if (!season) {
+            if (!shared) shared = (window.prompt("What season are these PDF stats for? (e.g. 2011-2012)") || "").trim();
+            season = shared;
+          }
+          if (!season) { errs.push(`${f.name}: no season given`); continue; }
+          setMsg(`Reading ${i + 1} of ${pdfFiles.length}: ${f.name}…`);
+          const base64 = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result.split(",")[1]);
+            r.onerror = () => rej(new Error("read failed"));
+            r.readAsDataURL(f);
+          });
+          const { data, error } = await extractPdfStats(base64);
+          if (error) { errs.push(`${f.name}: ${error}`); continue; }
+          const bucket = (bySeason[season] = bySeason[season] || {});
+          for (const a of (data.athletes || [])) {
+            const key = String(a.name || "").toLowerCase().trim();
+            if (!key) continue;
+            const stats = remapSeasonStats(a.stats || {});
+            if (!bucket[key]) bucket[key] = { player_name: a.name, stats };
+            else Object.assign(bucket[key].stats, stats);
+          }
+        }
+        const seasons = Object.keys(bySeason);
+        if (!seasons.length) { setBusy(false); setMsg("No season stats found in those PDFs." + (errs.length ? " " + errs[0] : "")); return; }
+        const summary = seasons.map((s) => `${Object.keys(bySeason[s]).length} players for ${s}`).join(", ");
+        if (!window.confirm(`Import ${summary}?\n\nThis replaces those season(s) for ${school.name || "this program"} — every other season is left alone.`)) {
+          setBusy(false); setMsg(""); return;
+        }
+        let total = 0;
+        for (const s of seasons) {
+          const { data, error } = await replacePlayerSeasonRowsForSeason(school.id, s, Object.values(bySeason[s]));
+          if (error) { setBusy(false); setMsg("Import failed: " + (error.message || error)); return; }
+          total += (data && data.inserted) || 0;
+        }
+        setBusy(false);
+        setMsg(`✓ Imported ${total} player-season rows${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — open a player to see them.`);
+        return;
+      }
+      // Spreadsheet matrix (one workbook = the WHOLE history) → replace all season data.
+      setMsg(`Reading ${xlsxFiles.length} file${xlsxFiles.length > 1 ? "s" : ""}…`);
       const XLSX = await loadSheetJS();
       let all = [];
-      for (const f of files) {
+      for (const f of xlsxFiles) {
         const buf = await f.arrayBuffer();
         all = all.concat(parseSeasonsWorkbook(XLSX, new Uint8Array(buf)));
       }
@@ -1877,7 +1940,7 @@ function ImportSeasons({ school, roster = [] }) {
       if (!rows.length) { setBusy(false); setMsg("No season rows found in those files."); return; }
       const players = new Set(rows.map((r) => r.player_name)).size;
       const seasons = new Set(rows.map((r) => r.season)).size;
-      if (!window.confirm(`Import ${rows.length} player-season rows (${players} players, ${seasons} seasons) from ${files.length} file${files.length > 1 ? "s" : ""}?\n\nThis REPLACES all existing season-by-season stats for ${school.name || "this program"}.`)) {
+      if (!window.confirm(`Import ${rows.length} player-season rows (${players} players, ${seasons} seasons)?\n\nThis REPLACES all existing season-by-season stats for ${school.name || "this program"}.`)) {
         setBusy(false); setMsg(""); return;
       }
       setMsg("Importing…");
@@ -1908,8 +1971,8 @@ function ImportSeasons({ school, roster = [] }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
-        {busy ? "Working…" : "📥 Import season stats"}
-        <input type="file" accept=".xlsx,.xls" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
+        {busy ? "Working…" : "📥 Import season stats (.xlsx or PDF)"}
+        <input type="file" accept=".xlsx,.xls,.pdf" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
       <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
       {msg && <span style={{ fontSize: 12, color: msg.indexOf("✓") === 0 ? "#166534" : ((msg.indexOf("fail") >= 0 || msg.indexOf("error") >= 0) ? "#991b1b" : "#6b7280") }}>{msg}</span>}
