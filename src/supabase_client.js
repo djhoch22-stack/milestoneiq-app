@@ -251,6 +251,24 @@ export const replacePlayerSeasons = async (programId, rows) => {
   return { data: { inserted } };
 };
 
+// Replace just ONE season's rows for a program (PDF season imports — additive, leaves
+// every other season untouched).
+export const replacePlayerSeasonRowsForSeason = async (programId, season, rows) => {
+  const del = await supabase.from('player_seasons').delete().eq('program_id', programId).eq('season', season);
+  if (del.error) return { error: del.error };
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500).map((r) => ({
+      program_id: programId, player_name: r.player_name, season, stats: r.stats || {},
+    }));
+    if (!chunk.length) continue;
+    const { error } = await supabase.from('player_seasons').insert(chunk);
+    if (error) return { error };
+    inserted += chunk.length;
+  }
+  return { data: { inserted } };
+};
+
 // AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
 // which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
 export const extractPdfStats = async (pdf) => {
