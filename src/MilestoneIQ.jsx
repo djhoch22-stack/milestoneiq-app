@@ -3372,7 +3372,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
     const gradCol = parsed.headers.find(h => /grad.?year|class.?of/i.test(h));
     // Non-stat columns to exclude
     const metaCols = new Set([nameCol, posCol, gradCol].filter(Boolean));
-    const newAthletes = parsed.rows.map((row, i) => {
+    const imported = parsed.rows.map((row, i) => {
       const name = nameCol ? String(row[nameCol]).trim() : `Athlete ${i+1}`;
       if (!name || name === "undefined") return null;
       const stats = {};
@@ -3381,28 +3381,30 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
         const val = row[h];
         if (typeof val === "number" && val > 0) stats[h] = val;
       });
-      return {
-        id: `imported_${Date.now()}_${i}`,
-        isActive: true,
-        name,
-        position: posCol ? String(row[posCol]) : "—",
-        gradYear: gradCol ? Number(row[gradCol]) : new Date().getFullYear() + 2,
-        stats
-      };
+      return { name, gradYear: gradCol ? (Number(row[gradCol]) || null) : null, stats };
     }).filter(Boolean);
-    // Merge: update existing athletes by name, append new ones
-    const existingNames = new Map(school.athletes.map(a => [a.name.toLowerCase(), a]));
-    const updated = [...school.athletes];
-    newAthletes.forEach(imp => {
-      const key = imp.name.toLowerCase();
-      if (existingNames.has(key)) {
-        const idx = updated.findIndex(a => a.name.toLowerCase() === key);
-        updated[idx] = { ...updated[idx], stats: { ...updated[idx].stats, ...imp.stats } };
+    // Career/stat imports belong in the ALL-TIME roster — that's what the All-Time tab
+    // shows and where existing players live. Merge by name so we never duplicate a player
+    // who's already there; brand-new players come in as alumni, NOT active (mark current
+    // players active from their profile). Fixes: duplicates, missing-from-all-time, all-active.
+    const roster = [...(school.allTimeRoster || [])];
+    const idxByName = new Map(roster.map((p, i) => [p.name.toLowerCase().trim(), i]));
+    imported.forEach(imp => {
+      const key = imp.name.toLowerCase().trim();
+      if (idxByName.has(key)) {
+        const idx = idxByName.get(key);
+        roster[idx] = { ...roster[idx], stats: { ...roster[idx].stats, ...imp.stats } };
       } else {
-        updated.push(imp);
+        roster.push({
+          id: `imported_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          name: imp.name, gradYear: imp.gradYear, firstYear: null, lastYear: null,
+          isCurrent: false, isActive: false, schoolHallOfFame: false, stateHallOfFame: false,
+          stats: imp.stats,
+        });
+        idxByName.set(key, roster.length - 1);
       }
     });
-    onUpdate({ ...school, athletes: updated });
+    onUpdate({ ...school, allTimeRoster: roster });
   };
 
   const tabs = ["overview","athletes","milestones","alerts","records","all-time",
