@@ -2270,13 +2270,24 @@ function ImportSeasons({ school, roster = [] }) {
       const wb = XLSX.utils.book_new();
       const seasonHeaders = [...new Set((school.seasons || []).map((s) => s.season).filter(Boolean))];
       const cols = seasonHeaders.length ? seasonHeaders : ["2023-2024", "2024-2025"];
-      const names = [...new Set((roster || []).map((p) => p.name).filter(Boolean))].sort();
+      const ROWS = 40;                 // blank player rows for the coach to fill (no pre-filled names)
+      const lastSeasonC = cols.length; // 0-based col of the last season (A=0 player, seasons 1..cols.length)
+      const totalC = cols.length + 1;  // 0-based col of "Total Career"
       for (const sheet of Object.keys(SEASON_STAT_MAP)) {
-        const aoa = [["", ...cols, "Total Career"], ...names.map((n) => [n])];
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheet);
+        const aoa = [["Player", ...cols, "Total Career"]];
+        for (let i = 0; i < ROWS; i++) aoa.push([]);          // empty rows — no names
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        for (let i = 0; i < ROWS; i++) {                        // auto-sum the season columns → Total Career
+          const r = i + 1;
+          const first = XLSX.utils.encode_cell({ r, c: 1 });
+          const last = XLSX.utils.encode_cell({ r, c: lastSeasonC });
+          ws[XLSX.utils.encode_cell({ r, c: totalC })] = { t: "n", f: `SUM(${first}:${last})` };
+        }
+        ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: ROWS, c: totalC } });
+        XLSX.utils.book_append_sheet(wb, ws, sheet);
       }
       XLSX.writeFile(wb, `${String(school.name || "program").replace(/[^a-z0-9]+/gi, "_")}_season_stats_template.xlsx`);
-      setBusy(false); setMsg("✓ Template downloaded — fill in the numbers and re-upload.");
+      setBusy(false); setMsg("✓ Template downloaded — type each player's name + season numbers; Total Career auto-sums.");
     } catch (err) { setBusy(false); setMsg("Template error: " + (err && err.message ? err.message : String(err))); }
   };
   return (
@@ -3877,17 +3888,37 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                     </div>
                   )}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
-                    {rows.map(({ stat, val, rank, total }) => (
-                      <div key={stat} style={{ background:"#f9fafb", borderRadius:8, padding:"8px 12px", border: rank<=3 ? "1px solid #fcd34d" : "1px solid #f0eeea" }}>
-                        <div style={{ fontSize:10, color:"#9ca3af", fontWeight:600 }}>{stat.toUpperCase()}</div>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:2 }}>
-                          <div style={{ fontSize:17, fontWeight:700, color:"#111" }}>{val.toLocaleString()}</div>
-                          <div style={{ fontSize:11, fontWeight:700, color: rank===1?"#b45309":rank<=3?"#1d4ed8":"#6b7280" }}>
-                            {rank===1?"🥇 #1":rank===2?"🥈 #2":rank===3?"🥉 #3":`#${rank}`} of {total}
+                    {rows.flatMap(row => {
+                      // After each stat show its per-game avg; after each "…Attempted" its shooting %.
+                      const out = [row];
+                      const pg = PERGAME_DEFS.find(p => p.stat === row.stat);
+                      if (pg) { const v = perGame(pl.stats, pg.stat); if (v != null) out.push({ derived:true, label:pg.name, value:String(v), note:"per game" }); }
+                      const d = PCT_DEFS.find(p => p.att === row.stat);
+                      if (d) { const v = shootingPct(pl.stats, d.made, d.att); if (v != null) out.push({ derived:true, label:d.name, value:v+"%", note:`${(pl.stats[d.made]||0).toLocaleString()}/${(pl.stats[d.att]||0).toLocaleString()}` }); }
+                      return out;
+                    }).map(entry => {
+                      if (entry.derived) return (
+                        <div key={entry.label} style={{ background:"#f9fafb", borderRadius:8, padding:"8px 12px", border:"1px solid #f0eeea" }}>
+                          <div style={{ fontSize:10, color:"#9ca3af", fontWeight:600 }}>{entry.label.toUpperCase()}</div>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:2 }}>
+                            <div style={{ fontSize:17, fontWeight:700, color:"#111" }}>{entry.value}</div>
+                            <div style={{ fontSize:11, fontWeight:600, color:"#9ca3af" }}>{entry.note}</div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                      const { stat, val, rank, total } = entry;
+                      return (
+                        <div key={stat} style={{ background:"#f9fafb", borderRadius:8, padding:"8px 12px", border: rank<=3 ? "1px solid #fcd34d" : "1px solid #f0eeea" }}>
+                          <div style={{ fontSize:10, color:"#9ca3af", fontWeight:600 }}>{stat.toUpperCase()}</div>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:2 }}>
+                            <div style={{ fontSize:17, fontWeight:700, color:"#111" }}>{val.toLocaleString()}</div>
+                            <div style={{ fontSize:11, fontWeight:700, color: rank===1?"#b45309":rank<=3?"#1d4ed8":"#6b7280" }}>
+                              {rank===1?"🥇 #1":rank===2?"🥈 #2":rank===3?"🥉 #3":`#${rank}`} of {total}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
