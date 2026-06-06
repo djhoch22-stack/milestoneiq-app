@@ -20,7 +20,7 @@ const PRICE_TIER: Record<string, string> = {
   "price_1Tf5aUBzAEImpxa64FdUtiZY": "school",
   "price_1Tdd0bBzAEImpxa6voXKjkUm": "school",
   "price_1Tdd1XBzAEImpxa6dlaquzPO": "school_plus",
-  "price_1Tdd1XBzAEImpxa6dlaquzPO": "school_plus",
+  "price_1Tdd1rBzAEImpxa6NjhJBxV6": "school_plus",
 };
 
 Deno.serve(async (req) => {
