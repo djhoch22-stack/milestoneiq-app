@@ -206,6 +206,35 @@ export const upsertMilestones = async (programId, milestones) => {
 };
 
 // ── Seasons helpers ───────────────────────────────────────────────────────────
+// ── Per-season player stats (Athlete all-years view) ───────────────────────────
+export const getPlayerSeasons = async (programId, playerName) => {
+  const { data, error } = await supabase
+    .from('player_seasons')
+    .select('*')
+    .eq('program_id', programId)
+    .ilike('player_name', playerName)
+    .order('season');
+  return { data: data || [], error };
+};
+export const savePlayerSeason = async (row) => {
+  if (row.id) {
+    const { data, error } = await supabase
+      .from('player_seasons')
+      .update({ season: row.season, grade: row.grade, stats: row.stats })
+      .eq('id', row.id).select().single();
+    return { data, error };
+  }
+  const { data, error } = await supabase
+    .from('player_seasons')
+    .insert({ program_id: row.program_id, player_name: row.player_name, season: row.season, grade: row.grade, stats: row.stats })
+    .select().single();
+  return { data, error };
+};
+export const deletePlayerSeason = async (id) => {
+  const { error } = await supabase.from('player_seasons').delete().eq('id', id);
+  return { error };
+};
+
 export const getSeasons = async (programId) => {
   const { data, error } = await supabase
     .from('seasons')
