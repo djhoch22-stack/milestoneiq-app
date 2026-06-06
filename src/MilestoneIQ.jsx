@@ -879,14 +879,30 @@ function ImportModal({ school, onClose, onImport }) {
     return { headers, rows };
   };
 
-  const handleCSVFile = (file) => {
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try { setPreview(parseCSV(e.target.result)); }
-      catch (err) { setError(err.message); }
-    };
-    reader.readAsText(file);
+  // Accepts CSV *or* Excel (.xlsx/.xls) and normalizes both to { headers, rows }.
+  const handleCSVFile = async (file) => {
+    setError(null); setPreview(null);
+    const name = (file.name || "").toLowerCase();
+    try {
+      if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const XLSX = await loadSheetJS();
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+        if (aoa.length < 2) throw new Error("The spreadsheet needs a header row and at least one player row");
+        const headers = (aoa[0] || []).map(h => String(h).trim()).filter(Boolean);
+        const rows = aoa.slice(1).filter(r => r && r.some(c => c !== "" && c != null)).map(r => {
+          const obj = {};
+          headers.forEach((h, i) => { const v = r[i]; obj[h] = (v === "" || v == null) ? "" : (isNaN(v) ? v : Number(v)); });
+          return obj;
+        });
+        if (!rows.length) throw new Error("No player rows found in the spreadsheet");
+        setPreview({ headers, rows });
+      } else {
+        setPreview(parseCSV(await file.text()));
+      }
+    } catch (err) { setError(err.message || String(err)); }
   };
 
   const handlePDFFiles = async (fileList) => {
@@ -930,10 +946,10 @@ function ImportModal({ school, onClose, onImport }) {
     const dropped = Array.from(e.dataTransfer.files || []);
     if (!dropped.length) return;
     const pdfs = dropped.filter(f => f.name.toLowerCase().endsWith(".pdf"));
-    const csv = dropped.find(f => f.name.toLowerCase().endsWith(".csv"));
+    const sheet = dropped.find(f => /\.(csv|xlsx|xls)$/i.test(f.name));
     if (pdfs.length) { setActiveTab("pdf"); handlePDFFiles(pdfs); }
-    else if (csv) { setActiveTab("csv"); handleCSVFile(csv); }
-    else setError("Please drop .csv or .pdf file(s)");
+    else if (sheet) { setActiveTab("csv"); handleCSVFile(sheet); }
+    else setError("Please drop a .csv, .xlsx, or .pdf file");
   };
 
   const handlePDFImport = () => {
@@ -978,29 +994,41 @@ function ImportModal({ school, onClose, onImport }) {
   const tpl = SPORT_TEMPLATES[school.sport] || SPORT_TEMPLATES.football;
   const sampleCSV = tpl.headers + "\n" + tpl.example;
 
-  const downloadTemplate = () => {
-    const blob = new Blob([tpl.headers + "\n"], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${school.name.replace(/\s+/g,"_")}_${school.sport}_template.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadTemplate = async () => {
+    setError(null);
+    try {
+      const XLSX = await loadSheetJS();
+      const aoa = [
+        tpl.headers.split(","),
+        tpl.example.split(",").map(v => (v === "" || isNaN(v)) ? v : Number(v)),
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Career stats");
+      XLSX.writeFile(wb, `${school.name.replace(/\s+/g,"_")}_${school.sport}_career_template.xlsx`);
+    } catch (err) { setError("Template error: " + (err.message || err)); }
   };
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
       <div style={{ background:"#fff",borderRadius:16,padding:28,width:600,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
-            <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import stats — {school.name}</h2>
-            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Upload a CSV or let AI extract stats from any PDF</p>
+            <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import career stats — {school.name}</h2>
+            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Upload a CSV or Excel file, or let AI extract stats from any PDF</p>
           </div>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#666" }}>✕</button>
         </div>
 
+        <div style={{ background:"#fffbeb", border:"1px solid #fde68a", borderRadius:10, padding:"12px 14px", marginBottom:18, fontSize:13, color:"#92400e", display:"flex", gap:10, alignItems:"flex-start" }}>
+          <span style={{ fontSize:16, lineHeight:1.2 }}>⚠️</span>
+          <div>
+            <div style={{ fontWeight:700, marginBottom:2 }}>This imports CAREER totals — one row per player (their all-time numbers).</div>
+            For <strong>season-by-season</strong> stats (a separate row per player per season), close this and use <strong>“📥 Import season stats”</strong> on the All-Time tab instead.
+          </div>
+        </div>
+
         <div style={{ display:"flex",gap:0,marginBottom:20,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden" }}>
-          {[["csv","📄 CSV file"],["pdf","🤖 AI PDF import"]].map(([tab,label]) => (
+          {[["csv","📄 CSV / Excel"],["pdf","🤖 AI PDF import"]].map(([tab,label]) => (
             <button key={tab} onClick={() => { setActiveTab(tab); setError(null); setPreview(null); setPdfResult(null); }}
               style={{ flex:1,padding:"10px",fontSize:13,fontWeight:activeTab===tab?700:400,cursor:"pointer",border:"none",
                 background:activeTab===tab?"#1a56db":"#f9fafb", color:activeTab===tab?"#fff":"#6b7280" }}>
@@ -1014,10 +1042,10 @@ function ImportModal({ school, onClose, onImport }) {
             <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
               style={{ border:`2px dashed ${dragOver?"#1a56db":"#ddd"}`,borderRadius:12,padding:32,textAlign:"center",background:dragOver?"#eff6ff":"#fafafa",marginBottom:16,transition:"all 0.2s" }}>
               <div style={{ fontSize:32,marginBottom:8 }}>📁</div>
-              <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your CSV here</div>
+              <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your CSV or Excel file here</div>
               <div style={{ fontSize:13,color:"#888",marginBottom:12 }}>or click to browse</div>
-              <input type="file" accept=".csv" onChange={e=>e.target.files[0]&&handleCSVFile(e.target.files[0])} style={{ display:"none" }} id="csv-input" />
-              <label htmlFor="csv-input" style={{ background:"#1a56db",color:"#fff",padding:"8px 20px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600 }}>Choose CSV</label>
+              <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>e.target.files[0]&&handleCSVFile(e.target.files[0])} style={{ display:"none" }} id="csv-input" />
+              <label htmlFor="csv-input" style={{ background:"#1a56db",color:"#fff",padding:"8px 20px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600 }}>Choose file</label>
             </div>
             {preview && (
               <div style={{ marginBottom:16 }}>
@@ -1046,7 +1074,7 @@ function ImportModal({ school, onClose, onImport }) {
             <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
               <button onClick={downloadTemplate}
                 style={{ background:"#f0fdf4",color:"#166534",border:"1px solid #bbf7d0",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
-                ⬇ Download template CSV
+                ⬇ Download Excel template
               </button>
               <details style={{ flex:1 }}>
                 <summary style={{ fontSize:13,color:"#6b7280",cursor:"pointer",userSelect:"none" }}>View expected format</summary>
