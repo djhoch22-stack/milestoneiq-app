@@ -3028,7 +3028,8 @@ const COACH_PRIOR_STATS = {
   "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
 };
 
-function buildCoachStats(seasons) {
+function buildCoachStats(seasons, opts = {}) {
+  const { includePrior = true } = opts;
   const coaches = {};
   (seasons || []).forEach(s => {
     const name = (s.coach || s["coach"] || "").trim();
@@ -3036,9 +3037,10 @@ function buildCoachStats(seasons) {
     if (!coaches[name]) {
       coaches[name] = { name, wins:0, losses:0, leagueWins:0, leagueLosses:0, seasons:0,
         stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0,
-        playoffs:0, leagueChamps:0 };
+        playoffs:0, leagueChamps:0, teams: new Set() };
     }
     const co = coaches[name];
+    if (s._team) co.teams.add(s._team);   // track which program(s)/sport(s) the coach led
     co.seasons    += 1;
     co.wins       += (s.wins || s["wins"] || 0);
     co.losses     += (s.losses || s["losses"] || 0);
@@ -3053,10 +3055,9 @@ function buildCoachStats(seasons) {
     if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
     if (/league champ/.test(notes))                      co.leagueChamps   += 1;
   });
-  // Fold in any wins/record a coach brought from a previous school — but ONLY into programs
-  // where they actually coached (already appear in this program's seasons). Without this guard a
-  // hard-coded prior-stats coach (e.g. a basketball coach) wrongly shows up on every sport's list.
-  Object.entries(COACH_PRIOR_STATS).forEach(([name, prior]) => {
+  // Fold in wins/record a coach brought from a PREVIOUS school — only when enabled (toggle), and
+  // only into programs where they actually coached (so a basketball coach doesn't appear on football).
+  if (includePrior) Object.entries(COACH_PRIOR_STATS).forEach(([name, prior]) => {
     if (!coaches[name]) return;
     const co = coaches[name];
     Object.keys(prior).forEach(k => { if (typeof co[k] === "number") co[k] += prior[k]; });
@@ -3156,11 +3157,24 @@ function awardLabel(a) {
   return PLAYER_AWARD_LABELS[a.kind] || a.kind;
 }
 
-function CoachHofSection({ school, awards = [], onUpdate }) {
+function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
   const [selectedCoach, setSelectedCoach] = useState(null);
-  const seasons = school.seasons || [];
-  const coaches = useMemo(() => buildCoachStats(seasons), [school.id, seasons.length]); // eslint-disable-line
+  const [includePrior, setIncludePrior] = useState(true);   // count prior-school wins toward HOF?
+  const [crossProgram, setCrossProgram] = useState(true);   // combine a coach's record across the teams they led?
   const confirmedHof = school.coachHof || {};
+  const multiProgram = (allSchools || []).length > 1;
+
+  // Seasons to score over: every program at the school (so a coach who led multiple teams gets one
+  // aggregated record) or just this program. Each season tagged with its team for the breakdown.
+  const programs = (crossProgram && multiProgram) ? allSchools : [school];
+  const combinedSeasons = programs.flatMap(p => (p.seasons || []).map(s => ({ ...s, _team: SPORTS[p.sport]?.label || p.name || "Team" })));
+  const allCoaches = useMemo(
+    () => buildCoachStats(combinedSeasons, { includePrior }),
+    [school.id, crossProgram, includePrior, (allSchools||[]).length, combinedSeasons.length] // eslint-disable-line
+  );
+  // Only LIST coaches who actually coached THIS program (their record may still span other teams).
+  const currentSet = new Set((school.seasons || []).map(s => normName(s.coach)).filter(Boolean));
+  const coaches = allCoaches.filter(c => currentSet.has(normName(c.name)));
 
   if (!coaches.length) return (
     <div style={{ padding:"20px 0", textAlign:"center", color:"#9ca3af", fontSize:13 }}>
@@ -3186,6 +3200,18 @@ function CoachHofSection({ school, awards = [], onUpdate }) {
     <div>
       <div style={{ fontSize:14, fontWeight:700, color:"#374151", marginBottom:12, paddingTop:8, borderTop:"2px solid #f0eeea" }}>
         🎓 Coaching staff rankings
+      </div>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+        {multiProgram && (
+          <button onClick={()=>setCrossProgram(v=>!v)} title="Combine a coach's record across every team they led at this school"
+            style={{ background:crossProgram?"#1a3a6b":"#fff", color:crossProgram?"#fff":"#6b7280", border:`1px solid ${crossProgram?"#1a3a6b":"#e5e7eb"}`, borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            {crossProgram?"✓ ":""}🔗 Combine all teams
+          </button>
+        )}
+        <button onClick={()=>setIncludePrior(v=>!v)} title="Count wins a coach earned at a previous school toward their HOF score"
+          style={{ background:includePrior?"#1a3a6b":"#fff", color:includePrior?"#fff":"#6b7280", border:`1px solid ${includePrior?"#1a3a6b":"#e5e7eb"}`, borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+          {includePrior?"✓ ":""}Include prior-school wins
+        </button>
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
         {scored.map((coach, i) => {
@@ -3219,6 +3245,7 @@ function CoachHofSection({ school, awards = [], onUpdate }) {
                     {coach.stateChamps > 0 && <span style={{ color:"#b45309", fontWeight:600 }}>🏆 {coach.stateChamps} state</span>}
                     {coach.leagueChamps > 0 && <span style={{ color:"#1d4ed8", fontWeight:600 }}>🎖 {coach.leagueChamps} league</span>}
                     {coach.coyCount > 0 && <span style={{ color:"#6b21a8", fontWeight:600 }}>🏅 {coach.coyCount} Coach of the Year</span>}
+                    {coach.teams && coach.teams.size > 1 && <span style={{ color:"#0e7490", fontWeight:600 }}>🔗 {coach.teams.size} teams</span>}
                   </div>
                 </div>
                 {/* Bar */}
@@ -3317,6 +3344,12 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onCl
               );
             })}
           </div>
+
+          {coach.teams && coach.teams.size > 1 && (
+            <div style={{ fontSize:12, color:"#0e7490", fontWeight:600, background:"#ecfeff", border:"1px solid #a5f3fc", borderRadius:8, padding:"8px 12px", marginBottom:16 }}>
+              🔗 Combined record across {coach.teams.size} teams: {[...coach.teams].join(", ")}
+            </div>
+          )}
 
           {/* Coach of the Year honors */}
           {(() => {
@@ -3718,7 +3751,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
 
       {/* Coaches view */}
       {view === "coaches" && (
-        <CoachHofSection school={school} awards={awards} onUpdate={onUpdate} />
+        <CoachHofSection school={school} allSchools={allSchools} awards={awards} onUpdate={onUpdate} />
       )}
 
       {showAwards && <AwardsModal school={school} awards={awards} onClose={()=>setShowAwards(false)} onChanged={loadAwards} />}
