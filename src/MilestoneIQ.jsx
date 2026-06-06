@@ -1846,23 +1846,36 @@ function parseSeasonsWorkbook(XLSX, buf) {
   }
   return Object.values(byPS);
 }
-function ImportSeasons({ school }) {
+function mergeSeasonRows(all) {
+  const byPS = {};
+  for (const r of all) {
+    const k = r.player_name + "|||" + r.season;
+    if (!byPS[k]) byPS[k] = { player_name: r.player_name, season: r.season, stats: {} };
+    Object.assign(byPS[k].stats, r.stats);
+  }
+  return Object.values(byPS);
+}
+function ImportSeasons({ school, roster = [] }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
-  const onFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
+  const onFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     if (!school || !school.id) { setMsg("Open a saved program first."); return; }
-    setBusy(true); setMsg("Reading spreadsheet…");
+    setBusy(true); setMsg(`Reading ${files.length} file${files.length > 1 ? "s" : ""}…`);
     try {
       const XLSX = await loadSheetJS();
-      const buf = await file.arrayBuffer();
-      const rows = parseSeasonsWorkbook(XLSX, new Uint8Array(buf));
-      if (!rows.length) { setBusy(false); setMsg("No season rows found in that file."); return; }
+      let all = [];
+      for (const f of files) {
+        const buf = await f.arrayBuffer();
+        all = all.concat(parseSeasonsWorkbook(XLSX, new Uint8Array(buf)));
+      }
+      const rows = mergeSeasonRows(all);
+      if (!rows.length) { setBusy(false); setMsg("No season rows found in those files."); return; }
       const players = new Set(rows.map((r) => r.player_name)).size;
       const seasons = new Set(rows.map((r) => r.season)).size;
-      if (!window.confirm(`Import ${rows.length} player-season rows (${players} players, ${seasons} seasons)?\n\nThis REPLACES all existing season-by-season stats for ${school.name || "this program"}.`)) {
+      if (!window.confirm(`Import ${rows.length} player-season rows (${players} players, ${seasons} seasons) from ${files.length} file${files.length > 1 ? "s" : ""}?\n\nThis REPLACES all existing season-by-season stats for ${school.name || "this program"}.`)) {
         setBusy(false); setMsg(""); return;
       }
       setMsg("Importing…");
@@ -1874,12 +1887,29 @@ function ImportSeasons({ school }) {
       setBusy(false); setMsg("Import error: " + (err && err.message ? err.message : String(err)));
     }
   };
+  const downloadTemplate = async () => {
+    setBusy(true); setMsg("Building template…");
+    try {
+      const XLSX = await loadSheetJS();
+      const wb = XLSX.utils.book_new();
+      const seasonHeaders = [...new Set((school.seasons || []).map((s) => s.season).filter(Boolean))];
+      const cols = seasonHeaders.length ? seasonHeaders : ["2023-2024", "2024-2025"];
+      const names = [...new Set((roster || []).map((p) => p.name).filter(Boolean))].sort();
+      for (const sheet of Object.keys(SEASON_STAT_MAP)) {
+        const aoa = [["", ...cols, "Total Career"], ...names.map((n) => [n])];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheet);
+      }
+      XLSX.writeFile(wb, `${String(school.name || "program").replace(/[^a-z0-9]+/gi, "_")}_season_stats_template.xlsx`);
+      setBusy(false); setMsg("✓ Template downloaded — fill in the numbers and re-upload.");
+    } catch (err) { setBusy(false); setMsg("Template error: " + (err && err.message ? err.message : String(err))); }
+  };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
-        {busy ? "Working…" : "📥 Import season stats (.xlsx)"}
-        <input type="file" accept=".xlsx,.xls" onChange={onFile} disabled={busy} style={{ display: "none" }} />
+        {busy ? "Working…" : "📥 Import season stats"}
+        <input type="file" accept=".xlsx,.xls" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
+      <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
       {msg && <span style={{ fontSize: 12, color: msg.indexOf("✓") === 0 ? "#166534" : ((msg.indexOf("fail") >= 0 || msg.indexOf("error") >= 0) ? "#991b1b" : "#6b7280") }}>{msg}</span>}
     </div>
   );
@@ -1987,7 +2017,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,flex:1,minWidth:160}} />
         <span style={{fontSize:13,color:"#9ca3af",whiteSpace:"nowrap"}}>{filtered.length} players</span>
       </div>
-      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} /></div>}
+      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} roster={roster} /></div>}
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
