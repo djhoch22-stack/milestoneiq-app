@@ -3163,15 +3163,6 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [hofPage, setHofPage] = useState(1);
 
-  // Every season row for this program — feeds the single-season shooting-% record holders.
-  const [allSeasonRows, setAllSeasonRows] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    if (!school?.id) { setAllSeasonRows([]); return; }
-    getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows(data || []); });
-    return () => { alive = false; };
-  }, [school.id]);
-
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
 
@@ -3570,6 +3561,14 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
   const [showMilestoneSettings, setShowMilestoneSettings] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState(null);
+  // Every season row for this program — feeds the single-season shooting-% record holders.
+  const [allSeasonRows, setAllSeasonRows] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    if (!school?.id) { setAllSeasonRows([]); return; }
+    getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows(data || []); });
+    return () => { alive = false; };
+  }, [school.id]);
   const dismissedSet = new Set(school.dismissedAlerts || []);
 
   const dismissAlert = (athleteId, statName, target) => {
