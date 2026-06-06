@@ -3855,12 +3855,26 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                       </div>
                     ) : (
                       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
-                        {Object.entries(athlete.stats).filter(([k]) => k !== "Games Played" || Object.keys(athlete.stats).length === 1).map(([k,v])=>(
-                          <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                            <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
-                            <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{typeof v==="number"?v.toLocaleString():v}</div>
-                          </div>
-                        ))}
+                        {Object.entries(athlete.stats)
+                          .filter(([k]) => k !== "Games Played" || Object.keys(athlete.stats).length === 1)
+                          .flatMap(([k,v])=>{
+                            const tile = (
+                              <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
+                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
+                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{typeof v==="number"?v.toLocaleString():v}</div>
+                              </div>
+                            );
+                            // After an "…Attempted" tile, also show its derived % (made ÷ attempted).
+                            const d = PCT_DEFS.find(p => p.att === k);
+                            const pctVal = d ? shootingPct(athlete.stats, d.made, d.att) : null;
+                            if (d && pctVal != null) return [tile, (
+                              <div key={d.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
+                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{d.name}</div>
+                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{pctVal}%</div>
+                              </div>
+                            )];
+                            return [tile];
+                          })}
                       </div>
                     )}
 
