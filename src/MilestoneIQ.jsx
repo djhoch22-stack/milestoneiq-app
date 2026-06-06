@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1961,7 +1961,22 @@ function ImportSeasons({ school, roster = [] }) {
         }
         let total = 0;
         for (const s of seasons) {
-          const { data, error } = await replacePlayerSeasonRowsForSeason(school.id, s, Object.values(bySeason[s]));
+          // Merge with what's already stored for this season so a roster pass + a stat-sheet
+          // pass (imported separately) accumulate instead of overwriting each other.
+          const { data: existing } = await getPlayerSeasonsForSeason(school.id, s);
+          const merged = {};
+          for (const r of (existing || [])) {
+            merged[seasonNameKey(r.player_name)] = { player_name: r.player_name, stats: { ...(r.stats || {}) } };
+          }
+          for (const r of Object.values(bySeason[s])) {
+            const k = seasonNameKey(r.player_name);
+            if (!merged[k]) merged[k] = { player_name: r.player_name, stats: { ...r.stats } };
+            else {
+              Object.assign(merged[k].stats, r.stats);
+              if (fullerSeasonName(r.player_name, merged[k].player_name)) merged[k].player_name = r.player_name;
+            }
+          }
+          const { data, error } = await replacePlayerSeasonRowsForSeason(school.id, s, Object.values(merged));
           if (error) { setBusy(false); setMsg("Import failed: " + (error.message || error)); return; }
           total += (data && data.inserted) || 0;
         }
