@@ -3408,20 +3408,27 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
 
 function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, school, allSchools, onClose, onToggle }) {
   const tier = hofTier(finalScore);
-  const roster = school.allTimeRoster || [];
-
-  // Build stat breakdown — rank + contribution for each stat
-  const statBreakdown = Object.entries(player.stats || {})
+  // Per-sport breakdown: multi-sport mode shows every sport the athlete played; otherwise just
+  // this program. Each context carries that sport's program (school) + its roster entry (player).
+  const sportContexts = (crossSport && allScores && allScores.length > 1)
+    ? allScores.map(a => ({ school: a.school, player: a.player }))
+    : [{ school, player }];
+  const buildStatBreakdown = (pl, rost) => Object.entries(pl.stats || {})
     .filter(([stat]) => HOF_STAT_WEIGHTS[stat] > 0)
     .map(([stat, val]) => {
-      const weight = HOF_STAT_WEIGHTS[stat] || 1;
-      const sorted = roster.filter(p => (p.stats[stat]||0) > 0).sort((a,b)=>(b.stats[stat]||0)-(a.stats[stat]||0));
-      const rank = sorted.findIndex(p => p.id === player.id) + 1;
-      const total = sorted.length;
-      return { stat, val, rank, total, weight };
+      const sorted = rost.filter(p => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
+      const rank = sorted.findIndex(p => p.id === pl.id) + 1;
+      return { stat, val, rank, total: sorted.length };
     })
     .filter(r => r.rank > 0)
     .sort((a, b) => a.rank - b.rank);
+  const playerHeldRecords = (sch, pl) => {
+    const nameLower = (pl.name || "").toLowerCase().trim();
+    return (sch.records || []).filter(r => {
+      const h = (r.holderName || "").toLowerCase().trim();
+      return h && h !== "multiple players" && h === nameLower;
+    });
+  };
 
   // Team success during player's career
   const seasons = school.seasons || [];
@@ -3503,47 +3510,68 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
             </div>
           )}
 
-          {/* Stat rankings */}
+          {/* Stat rankings — per sport when multi-sport */}
           <div style={{ marginBottom:20 }}>
             <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>Statistical rank</div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
-              {statBreakdown.map(({ stat, val, rank, total }) => (
-                <div key={stat} style={{ background:"#f9fafb", borderRadius:8, padding:"8px 12px", border: rank<=3 ? "1px solid #fcd34d" : "1px solid #f0eeea" }}>
-                  <div style={{ fontSize:10, color:"#9ca3af", fontWeight:600 }}>{stat.toUpperCase()}</div>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:2 }}>
-                    <div style={{ fontSize:17, fontWeight:700, color:"#111" }}>{val.toLocaleString()}</div>
-                    <div style={{ fontSize:11, fontWeight:700, color: rank===1?"#b45309":rank<=3?"#1d4ed8":"#6b7280" }}>
-                      {rank===1?"🥇 #1":rank===2?"🥈 #2":rank===3?"🥉 #3":`#${rank}`} of {total}
+            {sportContexts.map(({ school: s, player: pl }) => {
+              const rows = buildStatBreakdown(pl, s.allTimeRoster || []);
+              if (!rows.length) return null;
+              return (
+                <div key={s.id} style={{ marginBottom: sportContexts.length > 1 ? 12 : 0 }}>
+                  {sportContexts.length > 1 && (
+                    <div style={{ fontSize:12, fontWeight:700, color:"#6b7280", margin:"0 0 6px", display:"flex", alignItems:"center", gap:6 }}>
+                      <span style={{ fontSize:14 }}>{SPORTS[s.sport]?.icon}</span> {SPORTS[s.sport]?.label || s.sport}
                     </div>
+                  )}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+                    {rows.map(({ stat, val, rank, total }) => (
+                      <div key={stat} style={{ background:"#f9fafb", borderRadius:8, padding:"8px 12px", border: rank<=3 ? "1px solid #fcd34d" : "1px solid #f0eeea" }}>
+                        <div style={{ fontSize:10, color:"#9ca3af", fontWeight:600 }}>{stat.toUpperCase()}</div>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:2 }}>
+                          <div style={{ fontSize:17, fontWeight:700, color:"#111" }}>{val.toLocaleString()}</div>
+                          <div style={{ fontSize:11, fontWeight:700, color: rank===1?"#b45309":rank<=3?"#1d4ed8":"#6b7280" }}>
+                            {rank===1?"🥇 #1":rank===2?"🥈 #2":rank===3?"🥉 #3":`#${rank}`} of {total}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Records held */}
+          {/* Records held — per sport when multi-sport */}
           {(() => {
-            const playerNameLower = (player.name||"").toLowerCase().trim();
-            const heldRecords = (school.records||[]).filter(r => {
-              const h = (r.holderName||"").toLowerCase().trim();
-              return h && h !== "multiple players" && h === playerNameLower;
-            });
-            if (!heldRecords.length) return null;
-            const bonus = Math.min(heldRecords.reduce((a,r)=>(r.variant||"").toLowerCase().includes("career")?a+5:a+3,0),20);
+            const blocks = sportContexts
+              .map(({ school: s, player: pl }) => ({ s, recs: playerHeldRecords(s, pl) }))
+              .filter(b => b.recs.length);
+            if (!blocks.length) return null;
+            const allRecs = blocks.flatMap(b => b.recs);
+            const bonus = Math.min(allRecs.reduce((a,r)=>(r.variant||"").toLowerCase().includes("career")?a+5:a+3,0),20);
             return (
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>
                   Records held <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:4, padding:"1px 7px", fontSize:11, fontWeight:700, marginLeft:6 }}>+{bonus} pts</span>
                 </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                  {heldRecords.map(r => (
-                    <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
-                      <span style={{ fontWeight:600, color:"#111" }}>{r.statName}</span>
-                      <span style={{ color:"#6b7280" }}>{r.variant}</span>
-                      <span style={{ fontWeight:700, color:"#b45309" }}>{(r.value||0).toLocaleString()} 🏆</span>
+                {blocks.map(({ s, recs }) => (
+                  <div key={s.id} style={{ marginBottom: blocks.length > 1 ? 10 : 0 }}>
+                    {blocks.length > 1 && (
+                      <div style={{ fontSize:12, fontWeight:700, color:"#6b7280", margin:"0 0 6px", display:"flex", alignItems:"center", gap:6 }}>
+                        <span style={{ fontSize:14 }}>{SPORTS[s.sport]?.icon}</span> {SPORTS[s.sport]?.label || s.sport}
+                      </div>
+                    )}
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      {recs.map(r => (
+                        <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
+                          <span style={{ fontWeight:600, color:"#111" }}>{r.statName}</span>
+                          <span style={{ color:"#6b7280" }}>{r.variant}</span>
+                          <span style={{ fontWeight:700, color:"#b45309" }}>{(r.value||0).toLocaleString()} 🏆</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             );
           })()}
