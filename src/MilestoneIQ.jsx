@@ -319,6 +319,16 @@ const STAT_ORDER = [
   "Coach Wins",
 ];
 
+// Sort stat names into the canonical STAT_ORDER (unknown stats last, alphabetically). Shared so the
+// all-time grid, the player profile, AND the athletes-tab cards all display stats in identical order.
+function byStatOrder(a, b) {
+  const ai = STAT_ORDER.indexOf(a), bi = STAT_ORDER.indexOf(b);
+  if (ai !== -1 && bi !== -1) return ai - bi;
+  if (ai !== -1) return -1;
+  if (bi !== -1) return 1;
+  return a.localeCompare(b);
+}
+
 // Default milestone thresholds for football — all stat categories in canonical order
 const DEFAULT_MILESTONES = [
   { id:"dm1",  statName:"Games Played",       values:[25,50,75,100],          alertPct:90 },
@@ -2147,13 +2157,7 @@ function ImportSeasons({ school, roster = [] }) {
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const ALL_STATS = [...new Set(roster.flatMap(p => Object.keys(p.stats)))]
     .filter(s => roster.some(p => (p.stats[s]||0) > 0))
-    .sort((a,b) => {
-      const ai = STAT_ORDER.indexOf(a); const bi = STAT_ORDER.indexOf(b);
-      if (ai !== -1 && bi !== -1) return ai - bi;
-      if (ai !== -1) return -1;
-      if (bi !== -1) return 1;
-      return a.localeCompare(b);
-    });
+    .sort(byStatOrder);
 
   const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
@@ -3869,6 +3873,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
                         {Object.entries(athlete.stats)
                           .filter(([k]) => k !== "Games Played" || Object.keys(athlete.stats).length === 1)
+                          .sort(([a],[b]) => byStatOrder(a, b))
                           .flatMap(([k,v])=>{
                             const tile = (
                               <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
