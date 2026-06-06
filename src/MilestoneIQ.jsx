@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
+import useIsMobile from './useIsMobile';
 import raftersLogo from '../raftersiq-logo.png';
 
 const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
@@ -4062,6 +4063,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
 }
 
 function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(() => { try { return sessionStorage.getItem("mq_dash_tab") || "overview"; } catch (e) { return "overview"; } });
   useEffect(() => { try { sessionStorage.setItem("mq_dash_tab", activeTab); } catch (e) {} }, [activeTab]);
   const [showImport, setShowImport] = useState(false);
@@ -4163,8 +4165,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
       {showMilestoneSettings && <MilestoneSettingsModal school={school} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
       {showEmailPreview && <EmailPreviewModal allAlerts={allAlerts} school={school} onClose={()=>setShowEmailPreview(false)} />}
 
-      <div style={{ background:"#fff", borderBottom:"1px solid #e8e4dd", padding:"0 24px" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:16, padding:"16px 0 0" }}>
+      <div style={{ background:"#fff", borderBottom:"1px solid #e8e4dd", padding: isMobile ? "0 14px" : "0 24px" }}>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 10 : 16, padding:"16px 0 0" }}>
           <button onClick={onBack} style={{ background:"none",border:"none",cursor:"pointer",color:"#6b7280",fontSize:13 }}>← All programs</button>
           <div style={{ flex:1, display:"flex", alignItems:"center", gap:12 }}>
             {school.logo
@@ -4172,8 +4174,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               : <div style={{ width:44,height:44,borderRadius:10,background:school.primaryColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22 }}>{sport.icon}</div>
             }
             <div>
-              <h1 style={{ margin:0,fontSize:20,fontWeight:700,color:"#111" }}>{school.name}</h1>
-              <div style={{ fontSize:13,color:"#6b7280" }}>{school.mascot} · {sport.label} · {school.athletes.filter(a=>a.isActive!==false).length} athletes · {(school.records||[]).length} records on file</div>
+              <h1 style={{ margin:0,fontSize: isMobile ? 17 : 20,fontWeight:700,color:"#111" }}>{school.name}</h1>
+              <div style={{ fontSize: isMobile ? 11 : 13,color:"#6b7280" }}>{school.mascot} · {sport.label} · {school.athletes.filter(a=>a.isActive!==false).length} athletes · {(school.records||[]).length} records on file</div>
             </div>
           </div>
           <div style={{ display:"flex",gap:8 }}>
@@ -4184,11 +4186,11 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             )}
           </div>
         </div>
-        <div style={{ display:"flex",gap:0,marginTop:16 }}>
+        <div style={{ display:"flex",gap:0,marginTop:16, overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
           {tabs.map(tab=>(
             <button key={tab} onClick={()=>setActiveTab(tab)}
               style={{ background:"none",border:"none",borderBottom:activeTab===tab?"2px solid #1a56db":"2px solid transparent",
-                padding:"10px 16px",fontSize:13,fontWeight:activeTab===tab?700:400,
+                padding:"10px 16px",fontSize:13,fontWeight:activeTab===tab?700:400,whiteSpace:"nowrap",flexShrink:0,
                 color:activeTab===tab?"#1a56db":"#6b7280",cursor:"pointer",textTransform:"capitalize" }}>
               {{"overview":"Overview","athletes":"Athletes","records":"Records","milestones":"Milestones","alerts":"Alerts","all-time":"All-Time","seasons":"Seasons","hof":"🏛️ HOF","export":"Export"}[tab]||tab}{tab==="alerts"&&totalAlertCount>0?` (${totalAlertCount})`:""}
             </button>
@@ -4196,7 +4198,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         </div>
       </div>
 
-      <div style={{ padding:24 }}>
+      <div style={{ padding: isMobile ? 14 : 24 }}>
 
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
@@ -4210,7 +4212,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 {allAlerts.length>3&&<div style={{ fontSize:13,color:"#6b7280",marginTop:8,cursor:"pointer" }} onClick={()=>setActiveTab("alerts")}>View all {totalAlertCount} alerts →</div>}
               </div>
             )}
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20 }}>
+            <div style={{ display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",gap:12,marginBottom:20 }}>
               {[["Athletes",school.athletes.filter(a=>a.isActive!==false).length,"👤"],["Active alerts",totalAlertCount,"🎯"],["Records on file",(school.records||[]).length,"📋"],["Sport",sport.label.split(" ")[0],sport.icon]].map(([label,val,icon])=>(
                 <div key={label} style={{ background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #e8e4dd" }}>
                   <div style={{ fontSize:22,marginBottom:4 }}>{icon}</div>
@@ -4301,7 +4303,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 <button onClick={()=>setShowAddAthlete(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add athlete</button>
               </div>
             </div>
-            <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(320px,1fr))",gap:12 }}>
+            <div style={{ display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px,1fr))",gap:12 }}>
               {school.athletes
                 .filter(a => {
                   const f = school._rosterFilter || "active";
