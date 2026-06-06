@@ -574,7 +574,7 @@ function OnboardingScreen({ userId, onComplete, seedSchools }) {
             >
               {[
                 ['monthly', 'Monthly'],
-                ['annual', 'Annual (save ~25%)'],
+                ['annual', 'Annual (save ~17%)'],
               ].map(([val, label]) => (
                 <button
                   key={val}
@@ -730,7 +730,7 @@ export function ChoosePlan({ onSelect, busy, ctaLabel = 'Subscribe →', initial
   return (
     <>
       <div style={{ display: 'flex', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', marginBottom: 20, width: 'fit-content' }}>
-        {[['monthly', 'Monthly'], ['annual', 'Annual (save ~25%)']].map(([val, label]) => (
+        {[['monthly', 'Monthly'], ['annual', 'Annual (save ~17%)']].map(([val, label]) => (
           <button key={val} onClick={() => setBilling(val)} style={{ padding: '8px 20px', fontSize: 13, border: 'none', cursor: 'pointer', fontWeight: billing === val ? 700 : 400, background: billing === val ? '#1a3a6b' : '#fff', color: billing === val ? '#fff' : '#6b7280', fontFamily: 'inherit' }}>{label}</button>
         ))}
       </div>
