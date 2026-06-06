@@ -1872,13 +1872,12 @@ const SEASON_STAT_ALIASES = {
   "FTM": "Free Throws Made", "Free Throws Made": "Free Throws Made",
   "FTA": "Free Throws Attempted", "Free Throws Attempted": "Free Throws Attempted",
 };
-function remapSeasonStats(stats) {
+function remapSeasonStats(stats, valid) {
   const out = {};
   for (const k in (stats || {})) {
-    const key = String(k).trim();
-    if (SEASON_STAT_ALIASES[key] != null) { out[SEASON_STAT_ALIASES[key]] = stats[k]; continue; }
-    if (/PG$|%/.test(key) || /^(Ht|PF|TO|Min|2FGA|2FGM)$/i.test(key)) continue;
-    out[key] = stats[k];
+    const mapped = SEASON_STAT_ALIASES[String(k).trim()] || String(k).trim();
+    if (valid && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop AI-invented ones
+    out[mapped] = stats[k];
   }
   return out;
 }
@@ -1920,6 +1919,7 @@ function ImportSeasons({ school, roster = [] }) {
       // PDFs: each file is ONE season's roster → AI-extract, then replace just that season
       // (other seasons untouched). Season comes from the filename, else we ask.
       if (pdfFiles.length) {
+        const seasonValid = new Set((SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)));
         let shared = null;
         const bySeason = {};
         const errs = [];
@@ -1945,7 +1945,7 @@ function ImportSeasons({ school, roster = [] }) {
             const fullName = String(a.name || "").trim();
             if (!fullName) continue;
             const key = seasonNameKey(fullName);
-            const stats = remapSeasonStats(a.stats || {});
+            const stats = remapSeasonStats(a.stats || {}, seasonValid);
             if (!bucket[key]) bucket[key] = { player_name: fullName, stats };
             else {
               Object.assign(bucket[key].stats, stats);
@@ -3476,6 +3476,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
     const gradCol = parsed.headers.find(h => /grad.?year|class.?of/i.test(h));
     // Non-stat columns to exclude
     const metaCols = new Set([nameCol, posCol, gradCol].filter(Boolean));
+    const validStats = new Set((SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)));
     const imported = parsed.rows.map((row, i) => {
       const name = nameCol ? String(row[nameCol]).trim() : `Athlete ${i+1}`;
       if (!name || name === "undefined") return null;
@@ -3483,7 +3484,10 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
       parsed.headers.forEach(h => {
         if (metaCols.has(h)) return;
         const val = row[h];
-        if (typeof val === "number" && val > 0) stats[h] = val;
+        if (typeof val !== "number" || val <= 0) return;
+        const mapped = SEASON_STAT_ALIASES[String(h).trim()] || String(h).trim();
+        if (!validStats.has(mapped)) return; // only stats in our structure — no AI-invented ones
+        stats[mapped] = val;
       });
       return { name, gradYear: gradCol ? (Number(row[gradCol]) || null) : null, stats };
     }).filter(Boolean);
