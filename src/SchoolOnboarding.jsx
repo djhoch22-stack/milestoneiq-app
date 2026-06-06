@@ -11,6 +11,7 @@ import {
   inviteMember,
   createProgram,
   redeemPromoCode,
+  onboardNewSchool,
 } from './supabase_client';
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -48,6 +49,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
   const [promoCode, setPromoCode] = useState('');
   const [redeemed, setRedeemed] = useState(false);
   const [isCreator, setIsCreator] = useState(false); // true only on the new-school path (admin) — coaches joining can't redeem
+  const [createdOrgId, setCreatedOrgId] = useState(null); // set once the atomic RPC creates the org (guards retries)
 
   const sf = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -78,30 +80,41 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
     const required = [['name','School name'],['city','City'],['state','State'],['zip','ZIP'],['address','Street address'],['adName','AD name'],['adEmail','AD email']];
     const missing = required.filter(([k]) => !String(form[k] || '').trim()).map(([,label]) => label);
     if (missing.length) { setErr('Please complete all fields — missing: ' + missing.join(', ') + '.'); return; }
-    setBusy(true); setErr('');
-    const { data, error } = await createSchoolWithMembership(form, userId);
-    if (error) { setBusy(false); setErr(error.message); return; }
-    await inviteMember(form.adEmail, data.id, 'admin'); // best-effort
-    setBusy(false);
-    setIsCreator(true); setOrgId(data.id); setSchoolName(form.name); setStep(3);
+    // Defer all DB writes to the atomic RPC on Finish — no half-made orgs if they bail.
+    setErr(''); setIsCreator(true); setSchoolName(form.name); setStep(3);
   };
 
   const createMyProgram = async () => {
     if (!prog.mascot) { setErr('Enter your team name / mascot.'); return; }
     setBusy(true); setErr('');
-    // Apply a beta/promo code first (once) if one was entered, so a new school can
-    // redeem at signup. Guarded by `redeemed` so a retry doesn't double-apply.
-    if (promoCode.trim() && !redeemed) {
-      const { error: rErr } = await redeemPromoCode(promoCode.trim(), orgId);
+    let targetOrg = isCreator ? createdOrgId : orgId;
+    if (isCreator) {
+      // New school: org + admin membership + program in ONE atomic RPC as auth.uid().
+      // Guarded by createdOrgId so a retry (e.g. after a bad promo code) doesn't duplicate it.
+      if (!createdOrgId) {
+        const { data, error } = await onboardNewSchool({
+          name: form.name, city: form.city, state: form.state, address: form.address,
+          zip: form.zip, level: form.level, adName: form.adName, adEmail: form.adEmail,
+          sport: prog.sport, mascot: prog.mascot, color: prog.color,
+        });
+        if (error) { setBusy(false); setErr(error.message || String(error)); return; }
+        targetOrg = data?.org_id || null;
+        setCreatedOrgId(targetOrg);
+      }
+    } else {
+      // Joining an existing school: just add the program to it.
+      const { error } = await createProgram(orgId, {
+        name: schoolName, mascot: prog.mascot, sport: prog.sport, primary_color: prog.color,
+      });
+      if (error) { setBusy(false); setErr(error.message); return; }
+    }
+    // Apply a beta/promo code if one was entered (the org now exists).
+    if (promoCode.trim() && !redeemed && targetOrg) {
+      const { error: rErr } = await redeemPromoCode(promoCode.trim(), targetOrg);
       if (rErr) { setBusy(false); setErr('Promo code: ' + (rErr.message || rErr)); return; }
       setRedeemed(true);
     }
-    const { error } = await createProgram(orgId, {
-      name: schoolName, mascot: prog.mascot, sport: prog.sport,
-      primary_color: prog.color, created_by: userId,
-    });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
     onComplete();
   };
 
