@@ -1873,10 +1873,11 @@ const SEASON_STAT_ALIASES = {
   "FTA": "Free Throws Attempted", "Free Throws Attempted": "Free Throws Attempted",
 };
 function remapSeasonStats(stats, valid) {
+  const useFilter = valid && valid.size > 0; // never filter against an empty set (would drop everything)
   const out = {};
   for (const k in (stats || {})) {
     const mapped = SEASON_STAT_ALIASES[String(k).trim()] || String(k).trim();
-    if (valid && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop AI-invented ones
+    if (useFilter && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop AI-invented ones
     out[mapped] = stats[k];
   }
   return out;
@@ -1919,7 +1920,10 @@ function ImportSeasons({ school, roster = [] }) {
       // PDFs: each file is ONE season's roster → AI-extract, then replace just that season
       // (other seasons untouched). Season comes from the filename, else we ask.
       if (pdfFiles.length) {
-        const seasonValid = new Set((SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)));
+        const seasonValid = new Set([
+          ...(SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)),
+          ...(roster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
+        ]);
         let shared = null;
         const bySeason = {};
         const errs = [];
@@ -3491,7 +3495,10 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
     const gradCol = parsed.headers.find(h => /grad.?year|class.?of/i.test(h));
     // Non-stat columns to exclude
     const metaCols = new Set([nameCol, posCol, gradCol].filter(Boolean));
-    const validStats = new Set((SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)));
+    const validStats = new Set([
+      ...(SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)),
+      ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
+    ]);
     const imported = parsed.rows.map((row, i) => {
       const name = nameCol ? String(row[nameCol]).trim() : `Athlete ${i+1}`;
       if (!name || name === "undefined") return null;
