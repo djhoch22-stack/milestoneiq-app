@@ -46,6 +46,9 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons) {
     incomingCoach: prog.incoming_coach,
     coachHof: prog.coach_hof || {},
     dismissedAlerts: prog.dismissed_alerts || [],
+    slug: prog.slug || null,
+    // Public record book (SEO). Default true to mirror the DB default (public-by-default).
+    isPublic: prog.is_public !== false,
     athletes: (athletes || []).map((a) => ({
       id: a.id,
       name: a.name,
@@ -226,6 +229,7 @@ export default function AppWrapper() {
         incoming_coach: updated.incomingCoach || null,
         coach_hof: updated.coachHof || {},
         dismissed_alerts: updated.dismissedAlerts || [],
+        is_public: updated.isPublic !== false,
       })
       .eq('id', updated.id);
 
