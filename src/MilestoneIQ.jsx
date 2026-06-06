@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons, savePlayerSeason, deletePlayerSeason } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1552,7 +1552,7 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
 
   const load = useCallback(async () => {
     if (!programId || !playerName) { setRows([]); return; }
-    const { data } = await getPlayerSeasons(programId, playerName);
+    const { data } = await fetchPlayerSeasons(programId, playerName);
     setRows(data || []);
   }, [programId, playerName]);
   useEffect(() => { load(); }, [load]);
