@@ -431,6 +431,27 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script
   .hcard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
   .hcard .sc{font-size:22px;font-weight:800;line-height:1}
   .tier{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 10px;margin-top:6px}
+  /* clickable rows/cards → open profile */
+  tr[data-p],.acard[data-p]{cursor:pointer}
+  tr[data-p]:hover{background:#f0f7ff!important}
+  .acard[data-p]:hover{border-color:#1a56db}
+  /* player profile modal */
+  #pmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px}
+  #pmcard{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+  .pmhd{padding:24px;border-radius:16px 16px 0 0;position:relative}
+  .pmx{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.15);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;color:#fff;font-size:18px}
+  .pmav{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
+  .pmname{color:#fff;font-weight:700;font-size:20px}
+  .pmsub{color:rgba(255,255,255,.8);font-size:13px;margin-top:3px}
+  .pmbody{padding:24px}
+  .hbadge{background:rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
+  .hofchips{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .hofchip{border:1px solid;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600}
+  .ptiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .ptile{background:#f9fafb;border:1px solid #f0eeea;border-radius:10px;padding:10px 14px}
+  .ptile .pl{font-size:11px;color:#9ca3af;font-weight:600;margin-bottom:3px}
+  .ptile .pv{font-size:22px;font-weight:700;color:#111}
+  .ptile .psub{font-size:11px;color:#6b7280}
   /* cta + footer */
   .cta{background:#1a3a6b;color:#fff;border-radius:14px;padding:24px;text-align:center;margin-top:40px}
   .cta a.btn{display:inline-block;background:#fff;color:#1a3a6b;font-weight:700;border-radius:9px;padding:11px 22px;margin-top:10px}
