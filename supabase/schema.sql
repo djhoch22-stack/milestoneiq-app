@@ -920,3 +920,31 @@ revoke all on function public.onboard_new_school(text,text,text,text,text,text,t
 grant execute on function public.onboard_new_school(text,text,text,text,text,text,text,text,text,text,text) to authenticated;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.3 — Per-season player stats (powers the Athlete all-years view). One row per
+-- player per season; `stats` jsonb uses the SAME stat-name keys as career stats
+-- (e.g. {"Points":412,"Rebounds":88}) so per-season + career align per sport.
+-- A player-season attaches to a player by (program_id, lower(player_name)) — the
+-- same name-matching the app already uses. Visibility mirrors athletes.
+-- ════════════════════════════════════════════════════════════════════════════
+create table if not exists public.player_seasons (
+  id          uuid primary key default gen_random_uuid(),
+  program_id  uuid references public.programs(id) on delete cascade,
+  player_name text not null,
+  season      text not null,                  -- e.g. '1976-77'
+  grade       text,                           -- optional: Fr/So/Jr/Sr
+  stats       jsonb default '{}'::jsonb,
+  created_at  timestamptz default now()
+);
+create index if not exists idx_player_seasons_prog on public.player_seasons(program_id);
+create unique index if not exists uq_player_seasons on public.player_seasons (program_id, lower(player_name), season);
+grant all privileges on public.player_seasons to anon, authenticated, service_role;
+
+alter table public.player_seasons enable row level security;
+drop policy if exists ps_all on public.player_seasons;
+create policy ps_all on public.player_seasons for all
+  using (program_id in (select public.user_program_ids()))
+  with check (program_id in (select public.user_program_ids()));
+
+NOTIFY pgrst, 'reload schema';
