@@ -432,9 +432,9 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script
   .hcard .sc{font-size:22px;font-weight:800;line-height:1}
   .tier{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 10px;margin-top:6px}
   /* clickable rows/cards → open profile */
-  tr[data-p],.acard[data-p]{cursor:pointer}
+  [data-p]{cursor:pointer}
   tr[data-p]:hover{background:#f0f7ff!important}
-  .acard[data-p]:hover{border-color:#1a56db}
+  .acard[data-p]:hover,.hcard[data-p]:hover{border-color:#1a56db}
   /* player profile modal */
   #pmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px}
   #pmcard{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18)}
