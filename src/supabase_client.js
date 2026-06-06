@@ -387,6 +387,20 @@ export const createSchoolWithMembership = async (school, userId) => {
   return { data: org };
 };
 
+// Atomic onboarding: create org + admin membership + first program in ONE
+// SECURITY DEFINER transaction as the real signed-in user (auth.uid()). Avoids the
+// client-side multi-insert RLS race that left new schools unable to add a program.
+// Returns { data: { org_id, program_id }, error }.
+export const onboardNewSchool = async ({ name, city, state, address, zip, level, adName, adEmail, sport, mascot, color }) => {
+  const { data, error } = await supabase.rpc('onboard_new_school', {
+    p_name: name, p_city: city || null, p_state: state || null,
+    p_address: address || null, p_zip: zip || null, p_level: level || null,
+    p_ad_name: adName || null, p_ad_email: adEmail || null,
+    p_sport: sport || 'basketball_boys', p_mascot: mascot, p_color: color || '#1a3a6b',
+  });
+  return { data, error };
+};
+
 // Join an existing school as a coach.
 export const joinSchoolAsCoach = async (orgId, userId) => {
   const { error } = await supabase
