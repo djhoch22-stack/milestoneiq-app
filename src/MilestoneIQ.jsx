@@ -4054,7 +4054,7 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
           <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:6 }}>Have a beta or promo code?</div>
           {redeemMsg && <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#166534",marginBottom:8 }}>{redeemMsg}</div>}
           <div style={{ display:"flex",gap:8,maxWidth:420 }}>
-            <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="e.g. BETA90"
+            <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="Enter code"
               style={{ flex:1,border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:14,textTransform:"uppercase" }} />
             <button onClick={redeem} disabled={redeeming || !code.trim()}
               style={{ background:"#111827",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:14,fontWeight:600,cursor:redeeming||!code.trim()?"default":"pointer",opacity:redeeming||!code.trim()?0.6:1 }}>
