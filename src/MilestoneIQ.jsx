@@ -2853,12 +2853,13 @@ function calcProgramHofScore(player, school) {
 
 // Cross-sport compound score for a player name across all schools
 function calcCrossSportScore(playerName, allSchools) {
-  const nameLower = playerName.toLowerCase().trim();
+  const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const nameLower = norm(playerName);
   const programScores = [];
 
   allSchools.forEach(school => {
     const roster = school.allTimeRoster || [];
-    const match = roster.find(p => p.name.toLowerCase().trim() === nameLower);
+    const match = roster.find(p => norm(p.name) === nameLower);
     if (match) {
       const score = calcProgramHofScore(match, school);
       if (score > 0) programScores.push({ school, player: match, score });
@@ -3181,6 +3182,8 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   const [sortBy, setSortBy] = useState("score");
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [hofPage, setHofPage] = useState(1);
+  // HOF candidacy scope: "multi" combines an athlete's sports (cross-sport bonus); "single" = this program only.
+  const [hofScope, setHofScope] = useState("multi");
 
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
@@ -3189,14 +3192,14 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   const scored = useMemo(() => roster.map(player => {
     try {
       const programScore = calcProgramHofScore(player, school);
-      const crossResult = allSchools.length > 1 ? calcCrossSportScore(player.name, allSchools) : null;
+      const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools) : null;
       const finalScore = crossResult ? crossResult.finalScore : programScore;
       const confirmed = !!(player.schoolHallOfFame || player.stateHallOfFame);
       return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed };
     } catch(e) {
       return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false };
     }
-  }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools]); // eslint-disable-line
+  }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools, hofScope]); // eslint-disable-line
 
   const filtered = scored
     .filter(r => {
@@ -3273,6 +3276,20 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
           <option value="name">Sort: Name</option>
           <option value="confirmed">Sort: Confirmed first</option>
         </select>
+        {allSchools.length > 1 && (
+          <div style={{ display:"flex", gap:0, border:"1px solid #e5e7eb", borderRadius:8, overflow:"hidden" }}
+            title="Multi-sport combines an athlete's sports into one candidacy; This sport only rates this program alone">
+            {[["multi","🔗 Multi-sport"],["single","This sport only"]].map(([val,label]) => (
+              <button key={val} onClick={() => { setHofScope(val); setHofPage(1); }}
+                style={{ padding:"8px 14px", fontSize:13, border:"none", cursor:"pointer",
+                  fontWeight: hofScope===val ? 700 : 400,
+                  background: hofScope===val ? "#7c3aed" : "#fff",
+                  color: hofScope===val ? "#fff" : "#6b7280" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       )}
 
@@ -3572,7 +3589,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
   );
 }
 
-function SchoolDashboard({ school, onBack, onUpdate }) {
+function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [showImport, setShowImport] = useState(false);
   const [showAddAthlete, setShowAddAthlete] = useState(false);
@@ -4239,7 +4256,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
         )}
 
         {activeTab==="hof" && (
-          <HallOfFameTab school={school} allSchools={[school]} onUpdate={onUpdate} />
+          <HallOfFameTab school={school} allSchools={allSchools.length ? allSchools : [school]} onUpdate={onUpdate} />
         )}
 
         {activeTab==="export" && (
@@ -4471,7 +4488,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   }, [onSignOut]);
 
   if (activeSchool) {
-    return <SchoolDashboard school={activeSchool} onBack={()=>setActiveSchool(null)} onUpdate={updateSchool} />;
+    return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>setActiveSchool(null)} onUpdate={updateSchool} />;
   }
 
   const totalAlerts = schools.reduce((acc,sc) => {
