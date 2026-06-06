@@ -3111,7 +3111,22 @@ function coachHofTier(score) {
 // ── Awards → HOF candidacy ──────────────────────────────────────────────────
 // Structured honors boost HOF scores: players earn all-league/all-state, coaches
 // earn Coach of the Year (league/state). Matched to a person by normalized name.
-const AWARD_POINTS = { all_league: 3, all_state: 6 };   // per player honor
+// Player honors → HOF points (single source of truth; edit `points` to retune).
+// State-level outranks league; Player of the Year > 1st team > 2nd team > Honorable Mention.
+const PLAYER_HONORS = [
+  { kind:"league_poy",     label:"League Player of the Year",    points:8 },
+  { kind:"all_league_1st", label:"First Team All-League",        points:5 },
+  { kind:"all_league_2nd", label:"Second Team All-League",       points:3 },
+  { kind:"all_league_hm",  label:"Honorable Mention All-League", points:2 },
+  { kind:"state_poy",      label:"State Player of the Year",     points:12 },
+  { kind:"all_state_1st",  label:"First Team All-State",         points:9 },
+  { kind:"all_state_2nd",  label:"Second Team All-State",        points:6 },
+  { kind:"all_state_hm",   label:"Honorable Mention All-State",  points:4 },
+];
+const AWARD_POINTS = { all_league: 3, all_state: 6 };   // legacy fallbacks (pre-tiered awards)
+PLAYER_HONORS.forEach(h => { AWARD_POINTS[h.kind] = h.points; });
+const PLAYER_AWARD_LABELS = { all_league:"All-League", all_state:"All-State" };
+PLAYER_HONORS.forEach(h => { PLAYER_AWARD_LABELS[h.kind] = h.label; });
 const COACH_AWARD_POINTS = { league: 5, state: 10 };    // per Coach-of-Year, by level
 function normName(n) { return String(n || "").toLowerCase().replace(/\s+/g, " ").trim(); }
 function playerAwardBonus(name, awards) {
@@ -3137,10 +3152,8 @@ function awardsForHolder(name, scope, awards) {
   return (awards || []).filter(a => a.scope === scope && normName(a.holder_name) === n);
 }
 function awardLabel(a) {
-  if (a.kind === "all_league") return "All-League";
-  if (a.kind === "all_state") return "All-State";
   if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
-  return a.kind;
+  return PLAYER_AWARD_LABELS[a.kind] || a.kind;
 }
 
 function CoachHofSection({ school, awards = [], onUpdate }) {
@@ -3374,8 +3387,7 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
   const honorOptions = isCoach
     ? [{ key:"coy_league", kind:"coach_of_year", level:"league", label:"League Coach of the Year" },
        { key:"coy_state",  kind:"coach_of_year", level:"state",  label:"State Coach of the Year" }]
-    : [{ key:"all_league", kind:"all_league", level:null, label:"All-League" },
-       { key:"all_state",  kind:"all_state",  level:null, label:"All-State" }];
+    : PLAYER_HONORS.map(h => ({ key:h.kind, kind:h.kind, level:null, label:h.label }));
   const toggleHonor = (key) => setSelected(s => s.includes(key) ? s.filter(k=>k!==key) : [...s, key]);
   const setScope = (scope) => { setForm(f=>({...f, scope, holder_name:""})); setSelected([]); setErr(""); };
   const lbl = { display:"block", fontSize:11, fontWeight:600, color:"#6b7280", marginBottom:3 };
