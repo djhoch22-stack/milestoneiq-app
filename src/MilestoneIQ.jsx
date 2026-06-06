@@ -1896,6 +1896,36 @@ function fullerSeasonName(a, b) {
   if (af.length <= 1 && bf.length > 1) return false;
   return String(a).length > String(b).length;
 }
+// Reconcile athletes pulled from multiple PDFs (a roster + a stat sheet) into one row per
+// player. Jersey number is unique on a team, so it differentiates same-name players
+// (siblings/cousins): numbered entries group by last name + number; un-numbered entries
+// attach to a numbered group only when their last-name+initial is unambiguous, else stand alone.
+function reconcileSeasonAthletes(athletes) {
+  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const lastInit = (n) => { const p = norm(n); return p.length >= 2 ? `${p[p.length - 1]}|${p[0][0]}` : p.join(" "); };
+  const groups = {};
+  const numbered = {}; // `${last}|${init}` -> Set(group keys that carry a number)
+  const add = (key, a) => {
+    if (!groups[key]) groups[key] = { player_name: a.name, stats: { ...a.stats } };
+    else {
+      Object.assign(groups[key].stats, a.stats);
+      if (fullerSeasonName(a.name, groups[key].player_name)) groups[key].player_name = a.name;
+    }
+  };
+  for (const a of athletes) {
+    if (a.number == null) continue;
+    const p = norm(a.name);
+    const key = `${p.length ? p[p.length - 1] : ""}|#${a.number}`;
+    add(key, a);
+    (numbered[lastInit(a.name)] = numbered[lastInit(a.name)] || new Set()).add(key);
+  }
+  for (const a of athletes) {
+    if (a.number != null) continue;
+    const cand = numbered[lastInit(a.name)];
+    add(cand && cand.size === 1 ? [...cand][0] : lastInit(a.name), a);
+  }
+  return Object.values(groups).map((g) => ({ player_name: g.player_name, stats: g.stats }));
+}
 function mergeSeasonRows(all) {
   const byPS = {};
   for (const r of all) {
@@ -1925,7 +1955,7 @@ function ImportSeasons({ school, roster = [] }) {
           ...(roster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
         ]);
         let shared = null;
-        const bySeason = {};
+        const rawBySeason = {}; // season -> [{ name, number, stats }]
         const errs = [];
         for (let i = 0; i < pdfFiles.length; i++) {
           const f = pdfFiles[i];
@@ -1944,43 +1974,27 @@ function ImportSeasons({ school, roster = [] }) {
           });
           const { data, error } = await extractPdfStats(base64);
           if (error) { errs.push(`${f.name}: ${error}`); continue; }
-          const bucket = (bySeason[season] = bySeason[season] || {});
+          const arr = (rawBySeason[season] = rawBySeason[season] || []);
           for (const a of (data.athletes || [])) {
-            const fullName = String(a.name || "").trim();
-            if (!fullName) continue;
-            const key = seasonNameKey(fullName);
-            const stats = remapSeasonStats(a.stats || {}, seasonValid);
-            if (!bucket[key]) bucket[key] = { player_name: fullName, stats };
-            else {
-              Object.assign(bucket[key].stats, stats);
-              if (fullerSeasonName(fullName, bucket[key].player_name)) bucket[key].player_name = fullName;
-            }
+            const name = String(a.name || "").trim();
+            if (!name) continue;
+            const number = (a.number != null && String(a.number).trim() !== "") ? String(a.number).trim() : null;
+            arr.push({ name, number, stats: remapSeasonStats(a.stats || {}, seasonValid) });
           }
         }
-        const seasons = Object.keys(bySeason);
+        const seasons = Object.keys(rawBySeason);
         if (!seasons.length) { setBusy(false); setMsg("No season stats found in those PDFs." + (errs.length ? " " + errs[0] : "")); return; }
-        const summary = seasons.map((s) => `${Object.keys(bySeason[s]).length} players for ${s}`).join(", ");
+        // Reconcile each season: merge roster (full names) + stat sheet (abbreviated) into one
+        // row per player, using jersey number to keep same-name players (siblings) separate.
+        const bySeason = {};
+        for (const s of seasons) bySeason[s] = reconcileSeasonAthletes(rawBySeason[s]);
+        const summary = seasons.map((s) => `${bySeason[s].length} players for ${s}`).join(", ");
         if (!window.confirm(`Import ${summary}?\n\nThis replaces those season(s) for ${school.name || "this program"} — every other season is left alone.`)) {
           setBusy(false); setMsg(""); return;
         }
         let total = 0;
         for (const s of seasons) {
-          // Merge with what's already stored for this season so a roster pass + a stat-sheet
-          // pass (imported separately) accumulate instead of overwriting each other.
-          const { data: existing } = await getPlayerSeasonsForSeason(school.id, s);
-          const merged = {};
-          for (const r of (existing || [])) {
-            merged[seasonNameKey(r.player_name)] = { player_name: r.player_name, stats: { ...(r.stats || {}) } };
-          }
-          for (const r of Object.values(bySeason[s])) {
-            const k = seasonNameKey(r.player_name);
-            if (!merged[k]) merged[k] = { player_name: r.player_name, stats: { ...r.stats } };
-            else {
-              Object.assign(merged[k].stats, r.stats);
-              if (fullerSeasonName(r.player_name, merged[k].player_name)) merged[k].player_name = r.player_name;
-            }
-          }
-          const { data, error } = await replacePlayerSeasonRowsForSeason(school.id, s, Object.values(merged));
+          const { data, error } = await replacePlayerSeasonRowsForSeason(school.id, s, bySeason[s]);
           if (error) { setBusy(false); setMsg("Import failed: " + (error.message || error)); return; }
           total += (data && data.inserted) || 0;
         }
