@@ -3774,7 +3774,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
       return { stat, val, rank, total: sorted.length };
     })
     .filter(r => r.rank > 0)
-    .sort((a, b) => a.rank - b.rank);
+    .sort((a, b) => byStatOrder(a.stat, b.stat));   // canonical order, matching every other tab
   const playerHeldRecords = (sch, pl) => {
     const nameLower = (pl.name || "").toLowerCase().trim();
     return (sch.records || []).filter(r => {
