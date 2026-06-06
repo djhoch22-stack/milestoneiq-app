@@ -21,8 +21,8 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
 const PROMPT = `Extract all athlete stats from this document. Return ONLY valid JSON, no markdown, no commentary:
-{"athletes":[{"name":"Full Name","position":"Position or empty string","gradYear":2025,"stats":{"Stat Name":numericValue}}]}
-Rules: numeric stat values only; use the exact stat names shown in the document; if a grad year is unknown use ${new Date().getFullYear() + 2}; include every athlete and every stat you find.`;
+{"athletes":[{"name":"Full Name","position":"Position or empty string","gradYear":2025,"number":12,"stats":{"Stat Name":numericValue}}]}
+Rules: numeric stat values only; use the exact stat names shown in the document; if a grad year is unknown use ${new Date().getFullYear() + 2}; "number" is the player's jersey/uniform number if shown (as an integer), otherwise null; include every athlete and every stat you find.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
