@@ -1793,10 +1793,28 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           {/* Stats grid with rankings */}
           <h3 style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"#374151"}}>Career statistics & all-time rank</h3>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
-            {statsToShow.map(stat => {
+            {statsToShow.flatMap(stat => {
+              // After each "…Attempted" tile, also show its derived shooting % (made ÷ attempted).
+              const d = PCT_DEFS.find(p => p.att === stat);
+              return d ? [{ stat }, { pctDef: d }] : [{ stat }];
+            }).map(entry => {
+              if (entry.pctDef) {
+                const d = entry.pctDef;
+                const v = shootingPct(player.stats, d.made, d.att);
+                if (v == null) return null;
+                return (
+                  <div key={d.name} style={{background:"#f9fafb",borderRadius:10,padding:"10px 14px",border:"1px solid #f0eeea"}}>
+                    <div style={{fontSize:11,color:"#9ca3af",fontWeight:600,marginBottom:3}}>{d.name.toUpperCase()}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:"#111"}}>{v}%</div>
+                      <div style={{fontSize:11,color:"#6b7280",textAlign:"right"}}>{(player.stats[d.made]||0).toLocaleString()}/{(player.stats[d.att]||0).toLocaleString()}</div>
+                    </div>
+                  </div>
+                );
+              }
+              const stat = entry.stat;
               const val = player.stats[stat] || 0;
               const rank = rankFor(player, stat);
-              const total = rankFor(null, stat); // total players with this stat
               return (
                 <div key={stat} style={{background:"#f9fafb",borderRadius:10,padding:"10px 14px",border:"1px solid #f0eeea"}}>
                   <div style={{fontSize:11,color:"#9ca3af",fontWeight:600,marginBottom:3}}>{stat.toUpperCase()}</div>
