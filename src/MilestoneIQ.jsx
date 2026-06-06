@@ -2433,17 +2433,13 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
 }
 
 // ── Season History Tab ────────────────────────────────────────────────────────
-function SeasonsTab({ seasons, onSave }) {
+function SeasonsTab({ seasons = [], onSave }) {
   const [sortDir, setSortDir] = useState("desc");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   const blankForm = { season:"", wins:"", losses:"", leagueWins:"", leagueLosses:"", coach:"", notes:"" };
   const [form, setForm] = useState(blankForm);
-
-  if (!seasons || !seasons.length) return (
-    <div style={{padding:40,textAlign:"center",color:"#9ca3af"}}>No season history available.</div>
-  );
 
   const buildSeason = (f) => {
     const w = f.wins !== "" ? Number(f.wins) : null;
@@ -2565,6 +2561,28 @@ function SeasonsTab({ seasons, onSave }) {
           {submitLabel}
         </button>
       </div>
+    </div>
+  );
+
+  // Empty program: still allow adding the FIRST season/coach (uses SeasonForm defined above).
+  if (!seasons.length) return (
+    <div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+        {!showAddForm && (
+          <button onClick={()=>{setShowAddForm(true);setForm(blankForm);}}
+            style={{background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            + Add season
+          </button>
+        )}
+      </div>
+      {showAddForm && <SeasonForm onSubmit={handleAdd} submitLabel="Add season" />}
+      {!showAddForm && (
+        <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb"}}>
+          <div style={{fontSize:32,marginBottom:8}}>📅</div>
+          <div style={{fontWeight:600,marginBottom:4,color:"#374151"}}>No seasons yet</div>
+          <div style={{fontSize:13}}>Add a season — year, head coach, wins/losses — to start building season &amp; coach history.</div>
+        </div>
+      )}
     </div>
   );
 
@@ -3837,9 +3855,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
     onUpdate({ ...school, allTimeRoster: roster });
   };
 
-  const tabs = ["overview","athletes","milestones","alerts","records","all-time",
-    ...(school.seasons?.length ? ["seasons"] : []),
-    "hof","export"];
+  const tabs = ["overview","athletes","milestones","alerts","records","all-time","seasons","hof","export"];
 
   return (
     <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
