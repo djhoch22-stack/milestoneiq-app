@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -3110,7 +3110,42 @@ function coachHofTier(score) {
   return                  { label:"Developing", color:"#6b7280", bg:"#f9fafb", border:"#e5e7eb" };
 }
 
-function CoachHofSection({ school, onUpdate }) {
+// ── Awards → HOF candidacy ──────────────────────────────────────────────────
+// Structured honors boost HOF scores: players earn all-league/all-state, coaches
+// earn Coach of the Year (league/state). Matched to a person by normalized name.
+const AWARD_POINTS = { all_league: 3, all_state: 6 };   // per player honor
+const COACH_AWARD_POINTS = { league: 5, state: 10 };    // per Coach-of-Year, by level
+function normName(n) { return String(n || "").toLowerCase().replace(/\s+/g, " ").trim(); }
+function playerAwardBonus(name, awards) {
+  const n = normName(name);
+  let bonus = 0;
+  for (const a of (awards || [])) {
+    if (a.scope !== "player" || normName(a.holder_name) !== n) continue;
+    bonus += AWARD_POINTS[a.kind] || 2;
+  }
+  return Math.min(bonus, 20);
+}
+function coachAwardBonus(name, awards) {
+  const n = normName(name);
+  let bonus = 0;
+  for (const a of (awards || [])) {
+    if (a.scope !== "coach" || normName(a.holder_name) !== n) continue;
+    bonus += COACH_AWARD_POINTS[a.level] || COACH_AWARD_POINTS.league;
+  }
+  return Math.min(bonus, 20);
+}
+function awardsForHolder(name, scope, awards) {
+  const n = normName(name);
+  return (awards || []).filter(a => a.scope === scope && normName(a.holder_name) === n);
+}
+function awardLabel(a) {
+  if (a.kind === "all_league") return "All-League";
+  if (a.kind === "all_state") return "All-State";
+  if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
+  return a.kind;
+}
+
+function CoachHofSection({ school, awards = [], onUpdate }) {
   const [selectedCoach, setSelectedCoach] = useState(null);
   const seasons = school.seasons || [];
   const coaches = useMemo(() => buildCoachStats(seasons), [school.id, seasons.length]); // eslint-disable-line
@@ -3123,7 +3158,11 @@ function CoachHofSection({ school, onUpdate }) {
   );
 
   const scored = coaches
-    .map(coach => ({ ...coach, score: calcCoachHofScore(coach, coaches), confirmed: !!confirmedHof[coach.name] }))
+    .map(coach => {
+      const ab = coachAwardBonus(coach.name, awards);
+      const coyCount = awardsForHolder(coach.name, "coach", awards).length;
+      return { ...coach, score: Math.min(calcCoachHofScore(coach, coaches) + ab, 100), coyCount, confirmed: !!confirmedHof[coach.name] };
+    })
     .sort((a, b) => b.score - a.score);
 
   const toggleCoachHof = (coachName) => {
@@ -3168,6 +3207,7 @@ function CoachHofSection({ school, onUpdate }) {
                     <span>{coach.wins}W–{coach.losses}L ({winPct}%)</span>
                     {coach.stateChamps > 0 && <span style={{ color:"#b45309", fontWeight:600 }}>🏆 {coach.stateChamps} state</span>}
                     {coach.leagueChamps > 0 && <span style={{ color:"#1d4ed8", fontWeight:600 }}>🎖 {coach.leagueChamps} league</span>}
+                    {coach.coyCount > 0 && <span style={{ color:"#6b21a8", fontWeight:600 }}>🏅 {coach.coyCount} Coach of the Year</span>}
                   </div>
                 </div>
                 {/* Bar */}
@@ -3303,6 +3343,105 @@ function CoachHofModal({ coach, school, allCoaches, confirmed, onClose, onToggle
   );
 }
 
+function AwardsModal({ school, awards, onClose, onChanged }) {
+  const playerNames = [...new Set([...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name).filter(Boolean))].sort();
+  const coachNames = [...new Set((school.seasons||[]).map(s=>s.coach).filter(Boolean))].sort();
+  const [form, setForm] = useState({ scope:"player", kind:"all_league", level:"league", holder_name:"", season:"" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const isCoach = form.scope === "coach";
+  const lbl = { display:"block", fontSize:11, fontWeight:600, color:"#6b7280", marginBottom:3 };
+  const inp = { border:"1px solid #d1d5db", borderRadius:8, padding:"7px 10px", fontSize:13, boxSizing:"border-box" };
+  const add = async () => {
+    if (!form.holder_name.trim()) { setErr("Choose or type who earned it."); return; }
+    setBusy(true); setErr("");
+    const { error } = await saveAward({
+      program_id: school.id,
+      scope: form.scope,
+      kind: isCoach ? "coach_of_year" : form.kind,
+      level: isCoach ? form.level : null,
+      holder_name: form.holder_name.trim(),
+      season: form.season.trim() || null,
+    });
+    setBusy(false);
+    if (error) { setErr(error.message || String(error)); return; }
+    setForm(f => ({ ...f, holder_name:"", season:"" }));
+    onChanged();
+  };
+  const remove = async (id) => { await deleteAward(id); onChanged(); };
+  const sorted = [...(awards||[])].sort((a,b)=>(a.scope+a.holder_name).localeCompare(b.scope+b.holder_name));
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
+      <div style={{ background:"#fff", borderRadius:16, padding:28, width:640, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+          <div>
+            <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Awards &amp; honors — {school.name}</h2>
+            <p style={{ margin:"4px 0 0", fontSize:13, color:"#666" }}>All-league / all-state (players) and Coach of the Year (coaches) boost HOF candidacy.</p>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#666" }}>✕</button>
+        </div>
+        <div style={{ background:"#f9fafb", borderRadius:12, padding:16, margin:"12px 0 20px", border:"1px solid #e5e7eb" }}>
+          <div style={{ fontWeight:700, fontSize:14, color:"#111", marginBottom:12 }}>+ Add an honor</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+            <div>
+              <label style={lbl}>Who</label>
+              <select value={form.scope} onChange={e=>setForm(f=>({...f, scope:e.target.value, holder_name:""}))} style={{...inp, width:"100%"}}>
+                <option value="player">Player</option>
+                <option value="coach">Coach</option>
+              </select>
+            </div>
+            {isCoach ? (
+              <div>
+                <label style={lbl}>Level</label>
+                <select value={form.level} onChange={e=>setForm(f=>({...f, level:e.target.value}))} style={{...inp, width:"100%"}}>
+                  <option value="league">League Coach of the Year</option>
+                  <option value="state">State Coach of the Year</option>
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label style={lbl}>Honor</label>
+                <select value={form.kind} onChange={e=>setForm(f=>({...f, kind:e.target.value}))} style={{...inp, width:"100%"}}>
+                  <option value="all_league">All-League</option>
+                  <option value="all_state">All-State</option>
+                </select>
+              </div>
+            )}
+            <div>
+              <label style={lbl}>Season (optional)</label>
+              <input value={form.season} onChange={e=>setForm(f=>({...f, season:e.target.value}))} placeholder="2024-2025" style={{...inp, width:"100%"}} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
+            <div style={{ flex:1 }}>
+              <label style={lbl}>{isCoach ? "Coach" : "Player"} name</label>
+              <input list="awards-names" value={form.holder_name} onChange={e=>setForm(f=>({...f, holder_name:e.target.value}))} placeholder="Start typing a name…" style={{...inp, width:"100%"}} />
+              <datalist id="awards-names">{(isCoach ? coachNames : playerNames).map(n=><option key={n} value={n} />)}</datalist>
+            </div>
+            <button onClick={add} disabled={busy} style={{ background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"8px 20px", fontWeight:600, fontSize:13, cursor:busy?"default":"pointer", whiteSpace:"nowrap", opacity:busy?0.6:1 }}>Add honor</button>
+          </div>
+          {err && <div style={{ fontSize:12, color:"#991b1b", marginTop:8 }}>{err}</div>}
+        </div>
+        <div style={{ fontWeight:700, fontSize:14, color:"#111", marginBottom:10 }}>{sorted.length} honor{sorted.length!==1?"s":""} on file</div>
+        {sorted.length === 0
+          ? <div style={{ textAlign:"center", padding:"24px 0", color:"#9ca3af", fontSize:14 }}>No honors yet. Add one above.</div>
+          : <div style={{ border:"1px solid #e5e7eb", borderRadius:10, overflow:"hidden" }}>
+              {sorted.map((a,i)=>(
+                <div key={a.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", fontSize:13, borderBottom:i<sorted.length-1?"1px solid #f3f4f6":"none", background:i%2===0?"#fff":"#fafafa" }}>
+                  <span style={{ background: a.scope==="coach"?"#f5f3ff":"#eff6ff", color: a.scope==="coach"?"#6b21a8":"#1e3a5f", borderRadius:6, padding:"2px 8px", fontSize:11, fontWeight:600 }}>{a.scope==="coach"?"Coach":"Player"}</span>
+                  <span style={{ fontWeight:600, color:"#111" }}>{a.holder_name}</span>
+                  <span style={{ color:"#6b7280" }}>{awardLabel(a)}</span>
+                  {a.season && <span style={{ color:"#9ca3af", fontSize:12 }}>{a.season}</span>}
+                  <button onClick={()=>remove(a.id)} style={{ marginLeft:"auto", background:"none", border:"1px solid #fca5a5", borderRadius:6, padding:"2px 9px", fontSize:11, cursor:"pointer", color:"#991b1b" }}>✕</button>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    </div>
+  );
+}
+
 function HallOfFameTab({ school, allSchools, onUpdate }) {
   const [view, setView] = useState("athletes"); // athletes | coaches
   const [search, setSearch] = useState("");
@@ -3312,6 +3451,10 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   const [hofPage, setHofPage] = useState(1);
   // HOF candidacy scope: "multi" combines an athlete's sports (cross-sport bonus); "single" = this program only.
   const [hofScope, setHofScope] = useState("multi");
+  const [awards, setAwards] = useState([]);
+  const [showAwards, setShowAwards] = useState(false);
+  const loadAwards = useCallback(() => { if (school?.id) getAwards(school.id).then(({ data }) => setAwards(data || [])); }, [school.id]);
+  useEffect(() => { loadAwards(); }, [loadAwards]);
 
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
@@ -3319,15 +3462,16 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   // Build scored athletes list — memoized so it only recalculates when roster changes
   const scored = useMemo(() => roster.map(player => {
     try {
-      const programScore = calcProgramHofScore(player, school);
+      const ab = playerAwardBonus(player.name, awards);
+      const programScore = Math.min(calcProgramHofScore(player, school) + ab, 100);
       const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools) : null;
-      const finalScore = crossResult ? crossResult.finalScore : programScore;
+      const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
       const confirmed = !!(player.schoolHallOfFame || player.stateHallOfFame);
       return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed };
     } catch(e) {
       return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false };
     }
-  }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools, hofScope]); // eslint-disable-line
+  }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools, hofScope, awards]); // eslint-disable-line
 
   const filtered = scored
     .filter(r => {
@@ -3367,19 +3511,25 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
               : `${confirmedCoachCount} inducted · ${(school.seasons||[]).length} seasons of data`}
           </p>
         </div>
-        {hasSeasons && (
-          <div style={{ display:"flex", gap:0, border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden" }}>
-            {[["athletes","👤 Athletes"],["coaches","🎓 Coaches"]].map(([val,label]) => (
-              <button key={val} onClick={() => { setView(val); setSearch(""); setFilter("all"); }}
-                style={{ padding:"8px 18px", fontSize:13, border:"none", cursor:"pointer",
-                  fontWeight: view===val ? 700 : 400,
-                  background: view===val ? "#1a3a6b" : "#fff",
-                  color: view===val ? "#fff" : "#6b7280" }}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <button onClick={()=>setShowAwards(true)} title="All-league / all-state & Coach of the Year"
+            style={{ background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"8px 14px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+            🏅 Awards
+          </button>
+          {hasSeasons && (
+            <div style={{ display:"flex", gap:0, border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden" }}>
+              {[["athletes","👤 Athletes"],["coaches","🎓 Coaches"]].map(([val,label]) => (
+                <button key={val} onClick={() => { setView(val); setSearch(""); setFilter("all"); }}
+                  style={{ padding:"8px 18px", fontSize:13, border:"none", cursor:"pointer",
+                    fontWeight: view===val ? 700 : 400,
+                    background: view===val ? "#1a3a6b" : "#fff",
+                    color: view===val ? "#fff" : "#6b7280" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Athletes view controls */}
@@ -3520,6 +3670,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
           {...selectedPlayer}
           school={school}
           allSchools={allSchools}
+          awards={awards}
           onClose={() => setSelectedPlayer(null)}
           onToggle={toggleConfirmed}
         />
@@ -3528,13 +3679,15 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
 
       {/* Coaches view */}
       {view === "coaches" && (
-        <CoachHofSection school={school} onUpdate={onUpdate} />
+        <CoachHofSection school={school} awards={awards} onUpdate={onUpdate} />
       )}
+
+      {showAwards && <AwardsModal school={school} awards={awards} onClose={()=>setShowAwards(false)} onChanged={loadAwards} />}
     </div>
   );
 }
 
-function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, school, allSchools, onClose, onToggle }) {
+function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, school, allSchools, awards = [], onClose, onToggle }) {
   const tier = hofTier(finalScore);
   // Per-sport breakdown: multi-sport mode shows every sport the athlete played; otherwise just
   // this program. Each context carries that sport's program (school) + its roster entry (player).
@@ -3668,6 +3821,27 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
               );
             })}
           </div>
+
+          {/* Honors (all-league / all-state) */}
+          {(() => {
+            const honors = awardsForHolder(player.name, "player", awards);
+            if (!honors.length) return null;
+            const bonus = playerAwardBonus(player.name, awards);
+            return (
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>
+                  Honors <span style={{ background:"#f5f3ff", color:"#6b21a8", borderRadius:4, padding:"1px 7px", fontSize:11, fontWeight:700, marginLeft:6 }}>+{bonus} pts</span>
+                </div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {honors.map(a => (
+                    <span key={a.id} style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", color:"#6b21a8", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:600 }}>
+                      🏅 {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Records held — per sport when multi-sport */}
           {(() => {
