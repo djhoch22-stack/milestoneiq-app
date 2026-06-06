@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons, savePlayerSeason, deletePlayerSeason } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1543,6 +1543,125 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
 
 
 // ── All-Time Leaderboard Tab ───────────────────────────────────────────────────
+function PlayerSeasons({ programId, playerName, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true }) {
+  const [rows, setRows] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(async () => {
+    if (!programId || !playerName) { setRows([]); return; }
+    const { data } = await getPlayerSeasons(programId, playerName);
+    setRows(data || []);
+  }, [programId, playerName]);
+  useEffect(() => { load(); }, [load]);
+
+  const cols = (columns && columns.length) ? columns : allStats.slice(0, 5);
+  const startEdit = () => { setDraft((rows || []).map(r => ({ ...r, stats: { ...(r.stats || {}) } }))); setErr(""); setEditing(true); };
+  const cancel = () => { setEditing(false); setErr(""); };
+  const addRow = () => setDraft(d => [...d, { _key: `${d.length}-${(rows || []).length}`, season: "", grade: "", stats: {} }]);
+  const setField = (i, key, val) => setDraft(d => d.map((r, j) => j === i ? { ...r, [key]: val } : r));
+  const setStat = (i, stat, val) => setDraft(d => d.map((r, j) => j === i ? { ...r, stats: { ...r.stats, [stat]: val } } : r));
+  const removeRow = async (i) => {
+    const row = draft[i];
+    if (row.id && !window.confirm(`Delete the ${row.season || "selected"} season?`)) return;
+    if (row.id) { const { error } = await deletePlayerSeason(row.id); if (error) { setErr(error.message || String(error)); return; } }
+    setDraft(d => d.filter((_, j) => j !== i));
+  };
+  const save = async () => {
+    setBusy(true); setErr("");
+    for (const row of draft) {
+      if (!String(row.season || "").trim()) continue;
+      const stats = {};
+      for (const k in (row.stats || {})) { const v = row.stats[k]; if (v !== "" && v != null && !isNaN(Number(v))) stats[k] = Number(v); }
+      const { error } = await savePlayerSeason({
+        id: row.id, program_id: programId, player_name: playerName,
+        season: String(row.season).trim(), grade: row.grade ? String(row.grade).trim() : null, stats,
+      });
+      if (error) { setBusy(false); setErr(`Couldn't save ${row.season}: ${error.message || error}`); return; }
+    }
+    setBusy(false); setEditing(false); load();
+  };
+
+  const th = { textAlign: "right", padding: "6px 8px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" };
+  const td = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "#111", whiteSpace: "nowrap" };
+  const inp = { width: 58, border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" };
+  const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0);
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#374151" }}>Season by season</h3>
+        {canEdit && !editing && rows !== null && (
+          <button onClick={startEdit} style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 7, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{rows.length ? "Edit" : "+ Add seasons"}</button>
+        )}
+      </div>
+      {err && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#991b1b", marginBottom: 10 }}>{err}</div>}
+
+      {rows === null ? (
+        <div style={{ fontSize: 13, color: "#9ca3af", padding: "6px 0" }}>Loading seasons…</div>
+      ) : !editing ? (
+        rows.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#9ca3af", padding: "6px 0" }}>No season-by-season stats yet.</div>
+        ) : (
+          <div style={{ overflowX: "auto", border: "1px solid #f0eeea", borderRadius: 10 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
+              <thead><tr style={{ background: "#f9fafb" }}>
+                <th style={{ ...th, textAlign: "left" }}>Season</th>
+                {cols.map(c => <th key={c} style={th}>{c}</th>)}
+              </tr></thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.id} style={{ borderTop: "1px solid #f6f4f0" }}>
+                    <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}{r.grade ? <span style={{ color: "#9ca3af", fontWeight: 400 }}> · {r.grade}</span> : null}</td>
+                    {cols.map(c => <td key={c} style={td}>{r.stats?.[c] != null ? Number(r.stats[c]).toLocaleString() : "—"}</td>)}
+                  </tr>
+                ))}
+                <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
+                  <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Career</td>
+                  {cols.map(c => <td key={c} style={{ ...td, fontWeight: 700 }}>{careerOf(c).toLocaleString()}</td>)}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        <div>
+          <div style={{ overflowX: "auto", border: "1px solid #f0eeea", borderRadius: 10, marginBottom: 10 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
+              <thead><tr style={{ background: "#f9fafb" }}>
+                <th style={{ ...th, textAlign: "left" }}>Season</th>
+                <th style={th}>Grade</th>
+                {cols.map(c => <th key={c} style={th}>{c}</th>)}
+                <th style={th}></th>
+              </tr></thead>
+              <tbody>
+                {draft.map((r, i) => (
+                  <tr key={r.id || r._key} style={{ borderTop: "1px solid #f6f4f0" }}>
+                    <td style={{ padding: "4px 8px" }}><input list="ps-seasons" value={r.season} onChange={e => setField(i, "season", e.target.value)} placeholder="2024-25" style={{ ...inp, width: 82, textAlign: "left" }} /></td>
+                    <td style={{ padding: "4px 8px" }}><input value={r.grade || ""} onChange={e => setField(i, "grade", e.target.value)} placeholder="Sr" style={{ ...inp, width: 44, textAlign: "left" }} /></td>
+                    {cols.map(c => <td key={c} style={{ padding: "4px 8px" }}><input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} /></td>)}
+                    <td style={{ padding: "4px 8px", textAlign: "center" }}><button onClick={() => removeRow(i)} title="Remove season" style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontSize: 15, lineHeight: 1 }}>✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <datalist id="ps-seasons">{seasonOptions.map(s => <option key={s} value={s} />)}</datalist>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={addRow} style={{ background: "#fff", color: "#374151", border: "1px dashed #cbd5e1", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>+ Add season</button>
+            <div style={{ flex: 1 }} />
+            <button onClick={cancel} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>Cancel</button>
+            <button onClick={save} disabled={busy} style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 7, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save seasons"}</button>
+          </div>
+          {cols.length === 0 && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>No stat columns yet for this sport — add career stats first and they'll appear here.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effectiveIsActive, rankFor }) {
   const isActive = effectiveIsActive(player);
 
@@ -1635,6 +1754,15 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
               );
             })}
           </div>
+
+          <PlayerSeasons
+            programId={school.id}
+            playerName={player.name}
+            columns={statsToShow}
+            allStats={ALL_STATS}
+            seasonOptions={(school.seasons || []).map(s => s.season).filter(Boolean)}
+            careerStats={player.stats}
+          />
 
           {/* Active toggle */}
           <div style={{borderTop:"1px solid #f0eeea",paddingTop:18,display:"flex",gap:10}}>
