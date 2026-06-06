@@ -269,6 +269,16 @@ export const replacePlayerSeasonRowsForSeason = async (programId, season, rows) 
   return { data: { inserted } };
 };
 
+// All stored rows for one program+season (so PDF imports can MERGE with existing data).
+export const getPlayerSeasonsForSeason = async (programId, season) => {
+  const { data, error } = await supabase
+    .from('player_seasons')
+    .select('player_name, stats')
+    .eq('program_id', programId)
+    .eq('season', season);
+  return { data: data || [], error };
+};
+
 // AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
 // which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
 export const extractPdfStats = async (pdf) => {
