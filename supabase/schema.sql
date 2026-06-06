@@ -971,3 +971,114 @@ create policy awards_all on public.awards for all
   with check (program_id in (select public.user_program_ids()));
 
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.5 — PUBLIC RECORD BOOK (SEO). Each program gets a stable URL slug and an
+-- is_public flag (PUBLIC BY DEFAULT — schools opt OUT). Anonymous visitors can
+-- read ONLY record-book data (records, all-time players + Hall of Fame, season
+-- history, honors, per-season stats) of programs where is_public = true, and only
+-- via athletic columns — NO contact info (org ad_email/address are never exposed;
+-- the public_teams view selects safe columns only). The Vercel SSR functions read
+-- these with the public anon key to render crawlable /teams/<slug> pages.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- 1) Flags + slug column
+alter table public.programs add column if not exists is_public boolean default true;
+alter table public.programs add column if not exists slug text;
+
+-- 2) Auto-generate a unique slug for every NEW program (school name + sport).
+create or replace function public.set_program_slug()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare base text; cand text; n int := 1; oname text;
+begin
+  if new.slug is not null and length(trim(new.slug)) > 0 then return new; end if;
+  select name into oname from public.organizations where id = new.org_id;
+  base := trim(both '-' from regexp_replace(
+            lower(coalesce(oname,'team') || '-' || coalesce(nullif(new.sport,''),'team')),
+            '[^a-z0-9]+', '-', 'g'));
+  if base = '' then base := 'team'; end if;
+  cand := base;
+  while exists (select 1 from public.programs where slug = cand) loop
+    n := n + 1; cand := base || '-' || n;
+  end loop;
+  new.slug := cand;
+  return new;
+end $$;
+drop trigger if exists set_program_slug_trg on public.programs;
+create trigger set_program_slug_trg before insert on public.programs
+  for each row execute function public.set_program_slug();
+
+-- 3) Backfill slugs for EXISTING programs (dedupe collisions with -2, -3, …).
+with ranked as (
+  select p.id,
+         trim(both '-' from regexp_replace(
+           lower(coalesce(o.name,'team') || '-' || coalesce(nullif(p.sport,''),'team')),
+           '[^a-z0-9]+','-','g')) as base,
+         row_number() over (
+           partition by trim(both '-' from regexp_replace(
+             lower(coalesce(o.name,'team') || '-' || coalesce(nullif(p.sport,''),'team')),
+             '[^a-z0-9]+','-','g'))
+           order by p.created_at, p.id) as rn
+  from public.programs p
+  join public.organizations o on o.id = p.org_id
+  where p.slug is null or length(trim(p.slug)) = 0
+)
+update public.programs p
+   set slug = case when r.rn = 1 then r.base else r.base || '-' || r.rn end
+  from ranked r
+ where r.id = p.id and r.base <> '';
+-- any still-null (e.g. base was empty) → fall back to a short id-based slug
+update public.programs set slug = 'team-' || left(id::text, 8)
+  where slug is null or length(trim(slug)) = 0;
+
+create unique index if not exists uq_programs_slug on public.programs(slug);
+
+-- 4) Helper: ids of public programs (SECURITY DEFINER → bypasses RLS, no recursion).
+create or replace function public.public_program_ids()
+returns setof uuid language sql stable security definer set search_path = public as $$
+  select id from public.programs where coalesce(is_public, true);
+$$;
+grant execute on function public.public_program_ids() to anon, authenticated, service_role;
+
+-- 5) Safe public view: ONLY athletic / non-sensitive columns, ONLY public programs,
+--    joined to the school's directory info. SSR reads this for the page header.
+--    (A plain view runs as its owner → bypasses RLS; the WHERE is the public gate.)
+create or replace view public.public_teams as
+  select p.id, p.slug, p.name, p.mascot, p.sport, p.primary_color, p.logo_url, p.coach_hof,
+         o.id as org_id, o.name as school_name, o.city, o.state, o.level
+  from public.programs p
+  join public.organizations o on o.id = p.org_id
+  where coalesce(p.is_public, true);
+grant select on public.public_teams to anon, authenticated, service_role;
+
+-- 6) Anonymous READ policies on record-book child tables (athletic columns only;
+--    none of these hold contact info). Authenticated users keep their existing
+--    visible_program_ids policies; these ADD public read for the anon role only.
+drop policy if exists atp_pub_sel on public.all_time_players;
+create policy atp_pub_sel on public.all_time_players for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+drop policy if exists rec_pub_sel on public.records;
+create policy rec_pub_sel on public.records for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+drop policy if exists seas_pub_sel on public.seasons;
+create policy seas_pub_sel on public.seasons for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+drop policy if exists awards_pub_sel on public.awards;
+create policy awards_pub_sel on public.awards for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+drop policy if exists ps_pub_sel on public.player_seasons;
+create policy ps_pub_sel on public.player_seasons for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+drop policy if exists ath_pub_sel on public.athletes;
+create policy ath_pub_sel on public.athletes for select to anon
+  using (program_id in (select public.public_program_ids()));
+
+NOTIFY pgrst, 'reload schema';
+
+-- Done (v3.5). Public record book: programs.slug + is_public, public_teams view,
+-- anon read of record-book tables for opted-in (public-by-default) programs.
