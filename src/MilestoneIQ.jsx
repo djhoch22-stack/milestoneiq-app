@@ -3053,13 +3053,11 @@ function buildCoachStats(seasons) {
     if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
     if (/league champ/.test(notes))                      co.leagueChamps   += 1;
   });
-  // Fold in any wins/record a coach brought from a previous school.
+  // Fold in any wins/record a coach brought from a previous school — but ONLY into programs
+  // where they actually coached (already appear in this program's seasons). Without this guard a
+  // hard-coded prior-stats coach (e.g. a basketball coach) wrongly shows up on every sport's list.
   Object.entries(COACH_PRIOR_STATS).forEach(([name, prior]) => {
-    if (!coaches[name]) {
-      coaches[name] = { name, wins:0, losses:0, leagueWins:0, leagueLosses:0, seasons:0,
-        stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0,
-        playoffs:0, leagueChamps:0 };
-    }
+    if (!coaches[name]) return;
     const co = coaches[name];
     Object.keys(prior).forEach(k => { if (typeof co[k] === "number") co[k] += prior[k]; });
   });
