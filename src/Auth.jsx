@@ -1,6 +1,7 @@
 // ── Auth.jsx ──────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import raftersLogo from '../raftersiq-logo.png';
+import useIsMobile from './useIsMobile';
 import {
   signIn,
   signUp,
@@ -829,10 +830,95 @@ export function LockedScreen({ role, status, onCheckout, onManageBilling, onRede
   );
 }
 
+// ── Public marketing landing page (raftersiq.com for logged-out visitors) ──────
+function LandingPage({ onStartTrial, onSignIn }) {
+  const isMobile = useIsMobile();
+  const FEATURES = [
+    { icon: "📊", title: "Career & season stats", desc: "Every athlete's career totals and season-by-season splits — with per-game averages and shooting % computed automatically." },
+    { icon: "🏆", title: "Records & milestones", desc: "School records by stat and variant, plus custom milestone alerts that fire as athletes approach them." },
+    { icon: "🏛️", title: "Hall of Fame engine", desc: "Auto-scored HOF candidacy for athletes and coaches — cross-sport, with all-league / all-state and Coach of the Year honors." },
+    { icon: "📧", title: "Instant alerts", desc: "Email your coaches and AD the moment an athlete nears or breaks a record, or reaches a milestone." },
+    { icon: "📥", title: "Effortless imports", desc: "Bring in stats from CSV, Excel, or any PDF — AI reads MaxPreps sheets and roster exports for you." },
+    { icon: "🎓", title: "Whole-school ready", desc: "Athletic Director dashboard, role-based access, multi-program history, and cross-sport athlete profiles." },
+  ];
+  const wrapPad = isMobile ? "40px 18px" : "64px 24px";
+  return (
+    <div style={{ minHeight:"100vh", background:"#f8f7f4", fontFamily:"Georgia, serif", color:"#111" }}>
+      {/* Nav */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding: isMobile ? "14px 18px" : "18px 32px", maxWidth:1120, margin:"0 auto" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <img src={raftersLogo} alt="RaftersIQ" style={{ width:36, height:36, objectFit:"contain" }} />
+          <span style={{ fontWeight:700, fontSize:20, color:"#1a3a6b" }}>RaftersIQ</span>
+        </div>
+        <button onClick={onSignIn} style={{ background:"none", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 18px", fontSize:14, fontWeight:600, cursor:"pointer", color:"#374151" }}>Sign in</button>
+      </div>
+
+      {/* Hero */}
+      <div style={{ textAlign:"center", padding: isMobile ? "44px 20px 40px" : "76px 24px 60px", maxWidth:840, margin:"0 auto" }}>
+        <div style={{ display:"inline-block", background:"#eff6ff", color:"#1e40af", borderRadius:20, padding:"4px 14px", fontSize:13, fontWeight:600, marginBottom:20 }}>For high-school athletic programs</div>
+        <h1 style={{ fontSize: isMobile ? 32 : 52, lineHeight:1.1, fontWeight:800, margin:"0 0 18px" }}>Every stat, record &amp; Hall of Famer — for your whole program.</h1>
+        <p style={{ fontSize: isMobile ? 16 : 20, color:"#4b5563", lineHeight:1.5, margin:"0 0 28px" }}>RaftersIQ tracks careers, seasons, records, and milestones — and auto-builds your Hall of Fame for athletes and coaches across every sport.</p>
+        <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
+          <button onClick={onStartTrial} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:10, padding:"14px 28px", fontSize:16, fontWeight:700, cursor:"pointer" }}>Start your 7-day free trial →</button>
+          <button onClick={onSignIn} style={{ background:"#fff", color:"#374151", border:"1px solid #d1d5db", borderRadius:10, padding:"14px 24px", fontSize:16, fontWeight:600, cursor:"pointer" }}>Sign in</button>
+        </div>
+        <div style={{ fontSize:13, color:"#9ca3af", marginTop:14 }}>No credit card required · Cancel anytime</div>
+      </div>
+
+      {/* Features */}
+      <div style={{ background:"#fff", borderTop:"1px solid #e8e4dd", borderBottom:"1px solid #e8e4dd", padding: wrapPad }}>
+        <div style={{ maxWidth:1120, margin:"0 auto" }}>
+          <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 8px" }}>Everything your program tracks, in one place</h2>
+          <p style={{ textAlign:"center", fontSize:16, color:"#6b7280", margin:"0 0 36px" }}>Built for coaches and athletic directors — not spreadsheets.</p>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap:16 }}>
+            {FEATURES.map(f => (
+              <div key={f.title} style={{ background:"#f9fafb", border:"1px solid #f0eeea", borderRadius:14, padding:"22px 20px" }}>
+                <div style={{ fontSize:28, marginBottom:10 }}>{f.icon}</div>
+                <div style={{ fontWeight:700, fontSize:17, marginBottom:6 }}>{f.title}</div>
+                <div style={{ fontSize:14, color:"#6b7280", lineHeight:1.5 }}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing */}
+      <div style={{ padding: wrapPad, maxWidth:1120, margin:"0 auto" }}>
+        <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 8px" }}>Simple pricing for every size</h2>
+        <p style={{ textAlign:"center", fontSize:16, color:"#6b7280", margin:"0 0 36px" }}>7-day free trial on every plan · save ~17% annually.</p>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap:14 }}>
+          {PLANS.map(p => (
+            <div key={p.id} style={{ background:"#fff", border:`1px solid ${p.popular?"#1a56db":"#e8e4dd"}`, borderRadius:14, padding:"24px 18px 20px", position:"relative", boxShadow:p.popular?"0 6px 22px rgba(26,86,219,0.14)":"none" }}>
+              {p.popular && <div style={{ position:"absolute", top:-11, left:"50%", transform:"translateX(-50%)", background:"#1a56db", color:"#fff", borderRadius:20, padding:"3px 14px", fontSize:11, fontWeight:700, whiteSpace:"nowrap" }}>MOST POPULAR</div>}
+              <div style={{ fontWeight:700, fontSize:18 }}>{p.name}</div>
+              <div style={{ fontSize:12, color:"#9ca3af", marginBottom:10 }}>{p.description}</div>
+              <div style={{ fontSize:30, fontWeight:800 }}>${p.monthlyPrice}<span style={{ fontSize:14, color:"#9ca3af", fontWeight:400 }}>/mo</span></div>
+              <div style={{ fontSize:12, color:"#166534", fontWeight:600, marginBottom:14 }}>${p.annualPrice}/yr billed annually</div>
+              <button onClick={onStartTrial} style={{ width:"100%", background:p.popular?"#1a56db":"#eff6ff", color:p.popular?"#fff":"#1a56db", border:"none", borderRadius:8, padding:"10px", fontSize:14, fontWeight:700, cursor:"pointer", marginBottom:14 }}>Start free trial</button>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {p.features.map(ft => <div key={ft} style={{ fontSize:13, color:"#374151" }}>✓ {ft}</div>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Closing CTA */}
+      <div style={{ background:"#1a3a6b", color:"#fff", padding: isMobile ? "44px 18px" : "60px 24px", textAlign:"center" }}>
+        <h2 style={{ fontSize: isMobile ? 24 : 32, fontWeight:800, margin:"0 0 12px" }}>Give your program the record book it deserves.</h2>
+        <p style={{ fontSize:16, color:"rgba(255,255,255,0.8)", margin:"0 0 24px" }}>Start preserving your program's history and milestones today.</p>
+        <button onClick={onStartTrial} style={{ background:"#fff", color:"#1a3a6b", border:"none", borderRadius:10, padding:"14px 28px", fontSize:16, fontWeight:700, cursor:"pointer" }}>Start your free trial →</button>
+      </div>
+
+      <div style={{ padding:"24px", textAlign:"center", fontSize:13, color:"#9ca3af" }}>© {new Date().getFullYear()} RaftersIQ · raftersiq.com</div>
+    </div>
+  );
+}
+
 export default function Auth({ onAuthenticated, seedSchools }) {
   const params = new URLSearchParams(window.location.search);
   const invitedEmail = params.get('invite') || '';
-  const [screen, setScreen] = useState(invitedEmail ? 'signup' : 'login');
+  const [screen, setScreen] = useState(invitedEmail ? 'signup' : 'landing');
   const [userId, setUserId] = useState(null);
 
   const handleLoginSuccess = () => window.location.reload();
@@ -852,5 +938,7 @@ export default function Auth({ onAuthenticated, seedSchools }) {
         seedSchools={seedSchools}
       />
     );
+  if (screen === 'landing')
+    return <LandingPage onStartTrial={() => setScreen('signup')} onSignIn={() => setScreen('login')} />;
   return <LoginScreen onSwitch={setScreen} onSuccess={handleLoginSuccess} />;
 }
