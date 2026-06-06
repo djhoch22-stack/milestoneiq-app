@@ -3346,26 +3346,34 @@ function CoachHofModal({ coach, school, allCoaches, confirmed, onClose, onToggle
 function AwardsModal({ school, awards, onClose, onChanged }) {
   const playerNames = [...new Set([...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name).filter(Boolean))].sort();
   const coachNames = [...new Set((school.seasons||[]).map(s=>s.coach).filter(Boolean))].sort();
-  const [form, setForm] = useState({ scope:"player", kind:"all_league", level:"league", holder_name:"", season:"" });
+  const [form, setForm] = useState({ scope:"player", holder_name:"", season:"" });
+  const [selected, setSelected] = useState([]);   // honor keys picked (multi-select, like the Seasons-tab note chips)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const isCoach = form.scope === "coach";
+  const honorOptions = isCoach
+    ? [{ key:"coy_league", kind:"coach_of_year", level:"league", label:"League Coach of the Year" },
+       { key:"coy_state",  kind:"coach_of_year", level:"state",  label:"State Coach of the Year" }]
+    : [{ key:"all_league", kind:"all_league", level:null, label:"All-League" },
+       { key:"all_state",  kind:"all_state",  level:null, label:"All-State" }];
+  const toggleHonor = (key) => setSelected(s => s.includes(key) ? s.filter(k=>k!==key) : [...s, key]);
+  const setScope = (scope) => { setForm(f=>({...f, scope, holder_name:""})); setSelected([]); setErr(""); };
   const lbl = { display:"block", fontSize:11, fontWeight:600, color:"#6b7280", marginBottom:3 };
   const inp = { border:"1px solid #d1d5db", borderRadius:8, padding:"7px 10px", fontSize:13, boxSizing:"border-box" };
   const add = async () => {
     if (!form.holder_name.trim()) { setErr("Choose or type who earned it."); return; }
+    if (!selected.length) { setErr("Pick at least one honor."); return; }
     setBusy(true); setErr("");
-    const { error } = await saveAward({
-      program_id: school.id,
-      scope: form.scope,
-      kind: isCoach ? "coach_of_year" : form.kind,
-      level: isCoach ? form.level : null,
-      holder_name: form.holder_name.trim(),
-      season: form.season.trim() || null,
-    });
+    for (const key of selected) {            // one row per selected honor
+      const h = honorOptions.find(o => o.key === key);
+      const { error } = await saveAward({
+        program_id: school.id, scope: form.scope, kind: h.kind, level: h.level,
+        holder_name: form.holder_name.trim(), season: form.season.trim() || null,
+      });
+      if (error) { setBusy(false); setErr(error.message || String(error)); return; }
+    }
     setBusy(false);
-    if (error) { setErr(error.message || String(error)); return; }
-    setForm(f => ({ ...f, holder_name:"", season:"" }));
+    setForm(f => ({ ...f, holder_name:"", season:"" })); setSelected([]);
     onChanged();
   };
   const remove = async (id) => { await deleteAward(id); onChanged(); };
@@ -3381,44 +3389,43 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
           <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#666" }}>✕</button>
         </div>
         <div style={{ background:"#f9fafb", borderRadius:12, padding:16, margin:"12px 0 20px", border:"1px solid #e5e7eb" }}>
-          <div style={{ fontWeight:700, fontSize:14, color:"#111", marginBottom:12 }}>+ Add an honor</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+          <div style={{ fontWeight:700, fontSize:14, color:"#111", marginBottom:12 }}>+ Add honors</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
             <div>
               <label style={lbl}>Who</label>
-              <select value={form.scope} onChange={e=>setForm(f=>({...f, scope:e.target.value, holder_name:""}))} style={{...inp, width:"100%"}}>
+              <select value={form.scope} onChange={e=>setScope(e.target.value)} style={{...inp, width:"100%"}}>
                 <option value="player">Player</option>
                 <option value="coach">Coach</option>
               </select>
             </div>
-            {isCoach ? (
-              <div>
-                <label style={lbl}>Level</label>
-                <select value={form.level} onChange={e=>setForm(f=>({...f, level:e.target.value}))} style={{...inp, width:"100%"}}>
-                  <option value="league">League Coach of the Year</option>
-                  <option value="state">State Coach of the Year</option>
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label style={lbl}>Honor</label>
-                <select value={form.kind} onChange={e=>setForm(f=>({...f, kind:e.target.value}))} style={{...inp, width:"100%"}}>
-                  <option value="all_league">All-League</option>
-                  <option value="all_state">All-State</option>
-                </select>
-              </div>
-            )}
             <div>
               <label style={lbl}>Season (optional)</label>
               <input value={form.season} onChange={e=>setForm(f=>({...f, season:e.target.value}))} placeholder="2024-2025" style={{...inp, width:"100%"}} />
             </div>
           </div>
-          <div style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
-            <div style={{ flex:1 }}>
-              <label style={lbl}>{isCoach ? "Coach" : "Player"} name</label>
-              <input list="awards-names" value={form.holder_name} onChange={e=>setForm(f=>({...f, holder_name:e.target.value}))} placeholder="Start typing a name…" style={{...inp, width:"100%"}} />
-              <datalist id="awards-names">{(isCoach ? coachNames : playerNames).map(n=><option key={n} value={n} />)}</datalist>
+          <div style={{ marginBottom:10 }}>
+            <label style={lbl}>{isCoach ? "Coach" : "Player"} name</label>
+            <input list="awards-names" value={form.holder_name} onChange={e=>setForm(f=>({...f, holder_name:e.target.value}))} placeholder="Start typing a name…" style={{...inp, width:"100%"}} />
+            <datalist id="awards-names">{(isCoach ? coachNames : playerNames).map(n=><option key={n} value={n} />)}</datalist>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={lbl}>Honors — pick one or more</label>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {honorOptions.map(h => {
+                const on = selected.includes(h.key);
+                return (
+                  <button key={h.key} onClick={()=>toggleHonor(h.key)}
+                    style={{ background:on?"#7c3aed":"#fff", color:on?"#fff":"#6b21a8", border:`1px solid ${on?"#7c3aed":"#ddd6fe"}`, borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                    {on ? "✓ " : "+ "}{h.label}
+                  </button>
+                );
+              })}
             </div>
-            <button onClick={add} disabled={busy} style={{ background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"8px 20px", fontWeight:600, fontSize:13, cursor:busy?"default":"pointer", whiteSpace:"nowrap", opacity:busy?0.6:1 }}>Add honor</button>
+          </div>
+          <div style={{ display:"flex", justifyContent:"flex-end" }}>
+            <button onClick={add} disabled={busy} style={{ background:"#7c3aed", color:"#fff", border:"none", borderRadius:8, padding:"8px 20px", fontWeight:600, fontSize:13, cursor:busy?"default":"pointer", whiteSpace:"nowrap", opacity:busy?0.6:1 }}>
+              {busy ? "Adding…" : (selected.length ? `Add ${selected.length} honor${selected.length===1?"":"s"}` : "Add honors")}
+            </button>
           </div>
           {err && <div style={{ fontSize:12, color:"#991b1b", marginTop:8 }}>{err}</div>}
         </div>
