@@ -251,6 +251,24 @@ export const replacePlayerSeasons = async (programId, rows) => {
   return { data: { inserted } };
 };
 
+// AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
+// which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
+export const extractPdfStats = async (pdf) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ pdf }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'extract failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
+
 export const getSeasons = async (programId) => {
   const { data, error } = await supabase
     .from('seasons')
