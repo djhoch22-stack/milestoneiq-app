@@ -3576,21 +3576,39 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
             );
           })()}
 
-          {/* Team success seasons */}
-          {playerSeasons.length > 0 && (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>Team success during career</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                {playerSeasons.map(s => (
-                  <div key={s.season} style={{ display:"flex", justifyContent:"space-between", background:"#f9fafb", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
-                    <span style={{ fontWeight:600, color:"#111" }}>{s.season}</span>
-                    <span style={{ color:"#6b7280" }}>{s.notes}</span>
-                    <span style={{ fontWeight:700, color:"#92400e" }}>+{getSeasonSuccessScore(s.notes)}</span>
+          {/* Team success seasons — per sport when multi-sport, so each sport is differentiated */}
+          {(() => {
+            const blocks = sportContexts
+              .map(({ school: s, player: pl }) => ({
+                s,
+                secs: (s.seasons || []).filter(season => playerSeasonOverlap(pl, season) && getSeasonSuccessScore(season.notes) > 0)
+              }))
+              .filter(b => b.secs.length);
+            if (!blocks.length) return null;
+            return (
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>Team success during career</div>
+                {blocks.map(({ s, secs }) => (
+                  <div key={s.id} style={{ marginBottom: blocks.length > 1 ? 10 : 0 }}>
+                    {blocks.length > 1 && (
+                      <div style={{ fontSize:12, fontWeight:700, color:"#6b7280", margin:"0 0 6px", display:"flex", alignItems:"center", gap:6 }}>
+                        <span style={{ fontSize:14 }}>{SPORTS[s.sport]?.icon}</span> {SPORTS[s.sport]?.label || s.sport}
+                      </div>
+                    )}
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      {secs.map(season => (
+                        <div key={season.season} style={{ display:"flex", justifyContent:"space-between", background:"#f9fafb", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
+                          <span style={{ fontWeight:600, color:"#111" }}>{season.season}</span>
+                          <span style={{ color:"#6b7280" }}>{season.notes}</span>
+                          <span style={{ fontWeight:700, color:"#92400e" }}>+{getSeasonSuccessScore(season.notes)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Admin HOF toggle buttons */}
           <div style={{ borderTop:"1px solid #f0eeea", paddingTop:16, display:"flex", gap:8 }}>
@@ -3618,7 +3636,8 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
 }
 
 function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => { try { return sessionStorage.getItem("mq_dash_tab") || "overview"; } catch (e) { return "overview"; } });
+  useEffect(() => { try { sessionStorage.setItem("mq_dash_tab", activeTab); } catch (e) {} }, [activeTab]);
   const [showImport, setShowImport] = useState(false);
   const [showAddAthlete, setShowAddAthlete] = useState(false);
   const [showRecords, setShowRecords] = useState(false);
@@ -3775,41 +3794,57 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 </div>
               ))}
             </div>
-            <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden" }}>
-              <div style={{ padding:"14px 20px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111" }}>Athlete leaderboard</div>
-              <table style={{ width:"100%",borderCollapse:"collapse",fontSize:14 }}>
-                <thead><tr style={{ background:"#fafaf8" }}>
-                  <th style={{ padding:"10px 20px",textAlign:"left",fontSize:12,color:"#6b7280",fontWeight:600,borderBottom:"1px solid #f3f0ea" }}>Athlete</th>
-                  {sport.statCategories.slice(0,4).map(c=>(
-                    <th key={c.name} style={{ padding:"10px 12px",textAlign:"right",fontSize:12,color:"#6b7280",fontWeight:600,borderBottom:"1px solid #f3f0ea" }}>{c.name}</th>
-                  ))}
-                  <th style={{ padding:"10px 12px",textAlign:"center",fontSize:12,color:"#6b7280",fontWeight:600,borderBottom:"1px solid #f3f0ea" }}>Alerts</th>
-                </tr></thead>
-                <tbody>
-                  {school.athletes.filter(a=>a.isActive!==false).map((a,i)=>{
-                    const ats = getMilestoneAlerts(a, school.records||[], school.milestones||[])
-                      .filter(al => !isAlertDismissed(a.id, al.statName, al.target));
-                    return (
-                      <tr key={a.id} onClick={()=>{ setSelectedAthlete(a); setActiveTab("athletes"); }}
-                        style={{ borderBottom:"1px solid #f9f7f4",cursor:"pointer",background:i%2===0?"#fff":"#fafaf8" }}>
-                        <td style={{ padding:"11px 20px" }}>
-                          <div style={{ fontWeight:600,color:"#111" }}>{a.name}</div>
-                          <div style={{ fontSize:12,color:"#9ca3af" }}>{a.position} · Class of {a.gradYear}</div>
-                        </td>
-                        {sport.statCategories.slice(0,4).map(c=>(
-                          <td key={c.name} style={{ padding:"11px 12px",textAlign:"right",color:a.stats[c.name]?"#111":"#d1d5db" }}>
-                            {a.stats[c.name]!=null?a.stats[c.name].toLocaleString():"—"}
-                          </td>
-                        ))}
-                        <td style={{ padding:"11px 12px",textAlign:"center" }}>
-                          {ats.length>0?<span style={{ background:"#fef3c7",color:"#92400e",borderRadius:12,padding:"2px 8px",fontSize:12,fontWeight:700 }}>{ats.length}</span>:<span style={{ color:"#d1d5db" }}>—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              // Career stats for ACTIVE players — all stats, same order as the all-time tab /
+              // athlete profile (byStatOrder + each % right after its "Attempted" column).
+              // Name column is frozen (sticky-left); the rest scrolls horizontally.
+              const activeAthletes = school.athletes.filter(a => a.isActive !== false);
+              const baseCols = allStatsFor(activeAthletes);
+              const ovCols = [];
+              for (const c of baseCols) { ovCols.push({ stat: c }); const d = PCT_DEFS.find(p => p.att === c); if (d) ovCols.push({ pct: d }); }
+              const rows = [...activeAthletes].sort((a, b) => a.name.localeCompare(b.name));
+              const cellBg = (i) => i % 2 === 0 ? "#fff" : "#fafaf8";
+              return (
+                <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden" }}>
+                  <div style={{ padding:"14px 20px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <span>Career stats · active roster</span>
+                    {ovCols.length > 4 && <span style={{ fontSize:12,fontWeight:400,color:"#9ca3af" }}>scroll for more →</span>}
+                  </div>
+                  {(!rows.length || !ovCols.length) ? (
+                    <div style={{ padding:"24px 20px",color:"#9ca3af",fontSize:13 }}>No active athletes with stats yet.</div>
+                  ) : (
+                    <div style={{ overflowX:"auto" }}>
+                      <table style={{ borderCollapse:"separate", borderSpacing:0, fontSize:13, minWidth:"100%" }}>
+                        <thead><tr>
+                          <th style={{ position:"sticky", left:0, zIndex:2, background:"#fafaf8", padding:"10px 16px", textAlign:"left", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", borderRight:"1px solid #f0eeea", minWidth:170 }}>Athlete</th>
+                          {ovCols.map(col => (
+                            <th key={col.pct ? "p-"+col.pct.name : col.stat} title={col.pct ? col.pct.name : col.stat}
+                              style={{ background:"#fafaf8", padding:"10px 12px", textAlign:"right", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", whiteSpace:"nowrap" }}>
+                              {col.pct ? col.pct.short : col.stat}
+                            </th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {rows.map((a, i) => (
+                            <tr key={a.id} onClick={()=>{ openAthlete(a); setActiveTab("athletes"); }} style={{ cursor:"pointer" }}>
+                              <td style={{ position:"sticky", left:0, zIndex:1, background:cellBg(i), padding:"10px 16px", borderBottom:"1px solid #f9f7f4", borderRight:"1px solid #f0eeea", minWidth:170 }}>
+                                <div style={{ fontWeight:600, color:"#111", whiteSpace:"nowrap" }}>{a.name}</div>
+                                <div style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>{a.position}{a.gradYear ? ` · Class of ${a.gradYear}` : ""}</div>
+                              </td>
+                              {ovCols.map(col => {
+                                const v = col.pct ? shootingPct(a.stats, col.pct.made, col.pct.att) : a.stats[col.stat];
+                                const display = col.pct ? (v != null ? v + "%" : "—") : (v != null ? Number(v).toLocaleString() : "—");
+                                return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"right", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -4493,6 +4528,22 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     }
   }, [authed, initialSchools]);
 
+  // Remember which program is open so a reload returns to it (not the home page). The persist
+  // effect only WRITES (never clears) so the initial null render before restore can't wipe the
+  // saved id; clearing happens explicitly on Back / sign-out.
+  useEffect(() => {
+    try { if (activeSchool) sessionStorage.setItem("mq_school", String(activeSchool.id)); } catch (e) {}
+  }, [activeSchool]);
+  // On (re)load, reopen the last program once schools are available.
+  useEffect(() => {
+    if (activeSchool || !schools.length) return;
+    let savedId = null;
+    try { savedId = sessionStorage.getItem("mq_school"); } catch (e) {}
+    if (!savedId) return;
+    const sc = schools.find(s => String(s.id) === savedId);
+    if (sc) setActiveSchool(sc);
+  }, [schools, activeSchool]);
+
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -4510,13 +4561,13 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   }, [setSchools, onUpdateSchool]);
 
   const handleSignOut = useCallback(() => {
-    try { sessionStorage.removeItem("mq_tab"); } catch (e) {}   // fresh start (home) on next login
+    try { sessionStorage.removeItem("mq_tab"); sessionStorage.removeItem("mq_school"); sessionStorage.removeItem("mq_dash_tab"); } catch (e) {}   // fresh start (home) on next login
     if (onSignOut) onSignOut();
     else signOut().then(() => window.location.reload());
   }, [onSignOut]);
 
   if (activeSchool) {
-    return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>setActiveSchool(null)} onUpdate={updateSchool} />;
+    return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} />;
   }
 
   const totalAlerts = schools.reduce((acc,sc) => {
