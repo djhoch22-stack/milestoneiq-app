@@ -76,7 +76,7 @@ const PLANS = [
     monthlyPrice: 299,
     annualPrice: 2990,
     monthlyId: 'price_1Tdd1XBzAEImpxa6dlaquzPO',
-    annualId: 'price_1Tdd1XBzAEImpxa6dlaquzPO',
+    annualId: 'price_1Tdd1rBzAEImpxa6NjhJBxV6',
     programs: 999,
     description: 'Full school, unlimited',
     features: [
