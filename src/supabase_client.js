@@ -279,6 +279,16 @@ export const getPlayerSeasonsForSeason = async (programId, season) => {
   return { data: data || [], error };
 };
 
+// EVERY season row for a program (all players, all seasons) — used to compute
+// single-season shooting-% record holders.
+export const getAllPlayerSeasons = async (programId) => {
+  const { data, error } = await supabase
+    .from('player_seasons')
+    .select('player_name, season, grade, stats')
+    .eq('program_id', programId);
+  return { data: data || [], error };
+};
+
 // AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
 // which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
 export const extractPdfStats = async (pdf) => {
