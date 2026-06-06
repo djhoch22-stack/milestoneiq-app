@@ -606,7 +606,7 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
-      <div style={{ background:"#fff",borderRadius:16,padding:28,width:660,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:660,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Milestone thresholds — {school.name}</h2>
@@ -764,7 +764,7 @@ function RecordsModal({ school, onClose, onSave }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 680, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 680, boxSizing: "border-box", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>School records — {school.name}</h2>
@@ -1054,7 +1054,7 @@ function ImportModal({ school, onClose, onImport }) {
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
-      <div style={{ background:"#fff",borderRadius:16,padding:28,width:600,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:600,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import career stats — {school.name}</h2>
@@ -1221,7 +1221,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
-      <div style={{ background:"#fff",borderRadius:16,padding:28,width:600,maxHeight:"90vh",overflowY:"auto" }}>
+      <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:600,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Alert email preview</h2>
@@ -1279,7 +1279,7 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
   };
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
-      <div style={{ background:"#fff",borderRadius:16,padding:28,width:500,maxHeight:"90vh",overflowY:"auto" }}>
+      <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:500,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
           <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Add athlete</h2>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
@@ -1665,7 +1665,7 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const [form, setForm] = useState(() => ({ name:"", mascot:"", sport: openSports[0] || AVAILABLE_SPORTS[0], primaryColor:"#1a3a6b" }));
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
-      <div style={{ background:"#fff",borderRadius:16,padding:28,width:440 }}>
+      <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:440,boxSizing:"border-box" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
           <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Add program</h2>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
@@ -2467,6 +2467,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
 
 // ── Season History Tab ────────────────────────────────────────────────────────
 function SeasonsTab({ seasons = [], onSave }) {
+  const isMobile = useIsMobile();
   const [sortDir, setSortDir] = useState("desc");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -2707,7 +2708,7 @@ function SeasonsTab({ seasons = [], onSave }) {
       {showAddForm && <SeasonForm onSubmit={handleAdd} submitLabel="Add season" />}
 
       {/* Summary stats — top row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,marginBottom:12}}>
+      <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gap:12,marginBottom:12}}>
         {[
           ["Program record",    `${totalWins}-${totalLosses}`,             "📊"],
           ["Win percentage",    `${totalPct}%`,                            "📈"],
@@ -2724,7 +2725,7 @@ function SeasonsTab({ seasons = [], onSave }) {
         ))}
       </div>
       {/* Summary stats — postseason row */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:12,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gap:12,marginBottom:20}}>
         {[
           ["Playoff appearances", playoffApps,   "🏟️", "#eff6ff", "#1e40af", "#bfdbfe"],
           ["Sweet Sixteens",      sweetSixteen,  "⭐", "#fdf4ff", "#7e22ce", "#e9d5ff"],
@@ -3478,7 +3479,7 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
   const sorted = [...(awards||[])].sort((a,b)=>(a.scope+a.holder_name).localeCompare(b.scope+b.holder_name));
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
-      <div style={{ background:"#fff", borderRadius:16, padding:28, width:640, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+      <div style={{ background:"#fff", borderRadius:16, padding:28, width:"100%", maxWidth:640, boxSizing:"border-box", maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
           <div>
             <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>Awards &amp; honors — {school.name}</h2>
@@ -4278,14 +4279,14 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         {/* ATHLETES TAB */}
         {activeTab==="athletes" && (
           <div>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16, flexWrap: isMobile ? "wrap" : "nowrap", gap: isMobile ? 10 : 0 }}>
               <div>
                 <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Athletes</h2>
                 <p style={{ margin:"4px 0 0",fontSize:13,color:"#6b7280" }}>
                   {school.athletes.filter(a=>a.isActive!==false).length} active · {school.athletes.filter(a=>a.isActive===false).length} inactive
                 </p>
               </div>
-              <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+              <div style={{ display:"flex",gap:8,alignItems:"center", flexWrap: isMobile ? "wrap" : "nowrap" }}>
                 <div style={{ display:"flex",gap:0,border:"1px solid #e5e7eb",borderRadius:8,overflow:"hidden" }}>
                   {[["active","Active"],["all","All"],["inactive","Inactive"]].map(([val,label])=>{
                     const [rosterFilter, setRosterFilter] = [school._rosterFilter||"active", (v)=>onUpdate({...school,_rosterFilter:v})];
