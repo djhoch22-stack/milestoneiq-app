@@ -3781,10 +3781,11 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             </div>
           </div>
           <div style={{ display:"flex",gap:8 }}>
-            <button onClick={()=>setShowImport(true)} style={{ background:"#eff6ff",color:"#1a56db",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>↑ Import</button>
-            <button onClick={()=>setShowEmailPreview(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
-              📧 Send alerts ({totalAlertCount})
-            </button>
+            {(activeTab==="milestones" || activeTab==="alerts") && (
+              <button onClick={()=>setShowEmailPreview(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
+                📧 Send alerts ({totalAlertCount})
+              </button>
+            )}
           </div>
         </div>
         <div style={{ display:"flex",gap:0,marginTop:16 }}>
