@@ -867,3 +867,56 @@ create policy om_ins on public.org_members for insert
   );
 
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.2 — Atomic onboarding. The client-side org→membership→program sequence was
+-- intermittently leaving the new user without a usable membership (created_by null,
+-- RLS denying the program insert). This does the WHOLE thing in one transaction as
+-- the real signed-in user (auth.uid(), not a client-passed id), bypassing RLS via
+-- SECURITY DEFINER. If anything fails it all rolls back — no half-made orgs.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.onboard_new_school(
+  p_name text, p_city text, p_state text,
+  p_address text, p_zip text, p_level text, p_ad_name text, p_ad_email text,
+  p_sport text, p_mascot text, p_color text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid  uuid := auth.uid();
+  v_org  uuid;
+  v_prog uuid;
+  v_slug text;
+begin
+  if v_uid is null then raise exception 'Not signed in.'; end if;
+  if coalesce(trim(p_name), '')   = '' then raise exception 'School name is required.'; end if;
+  if coalesce(trim(p_mascot), '') = '' then raise exception 'Team name / mascot is required.'; end if;
+  v_slug := regexp_replace(lower(p_name), '[^a-z0-9]+', '-', 'g');
+
+  insert into public.organizations (name, slug, city, state, address, zip, level, ad_name, ad_email, created_by)
+  values (p_name, v_slug, nullif(trim(p_city), ''), nullif(trim(p_state), ''), nullif(trim(p_address), ''),
+          nullif(trim(p_zip), ''), nullif(trim(p_level), ''), nullif(trim(p_ad_name), ''),
+          nullif(trim(p_ad_email), ''), v_uid)
+  returning id into v_org;
+
+  insert into public.org_members (org_id, user_id, role)
+  values (v_org, v_uid, 'admin')
+  on conflict (org_id, user_id) do update set role = 'admin';
+
+  insert into public.programs (org_id, name, mascot, sport, primary_color)
+  values (v_org, p_name, p_mascot, coalesce(p_sport, 'basketball_boys'), p_color)
+  returning id into v_prog;
+
+  -- Invite the named AD as admin (best effort), unless it's the creator's own email.
+  if p_ad_email is not null and length(trim(p_ad_email)) > 0 then
+    insert into public.pending_invites (org_id, email, role)
+    values (v_org, lower(trim(p_ad_email)), 'admin')
+    on conflict (org_id, email) do nothing;
+  end if;
+
+  return jsonb_build_object('org_id', v_org, 'program_id', v_prog);
+end $$;
+
+revoke all on function public.onboard_new_school(text,text,text,text,text,text,text,text,text,text,text) from anon, public;
+grant execute on function public.onboard_new_school(text,text,text,text,text,text,text,text,text,text,text) to authenticated;
+
+NOTIFY pgrst, 'reload schema';
