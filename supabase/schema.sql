@@ -948,3 +948,26 @@ create policy ps_all on public.player_seasons for all
   with check (program_id in (select public.user_program_ids()));
 
 NOTIFY pgrst, 'reload schema';
+
+-- ── v3.4: awards (all-league / all-state for players, Coach of the Year for coaches) ──
+-- Structured honors that feed HOF candidacy. One row per honor (a player can have many).
+create table if not exists public.awards (
+  id          uuid primary key default gen_random_uuid(),
+  program_id  uuid references public.programs(id) on delete cascade,
+  scope       text not null,                  -- 'player' | 'coach'
+  kind        text not null,                  -- 'all_league' | 'all_state' | 'coach_of_year'
+  level       text,                           -- 'league' | 'state' (used for coach_of_year)
+  holder_name text not null,                  -- the player or coach name
+  season      text,                           -- e.g. '2024-2025' (optional)
+  created_at  timestamptz default now()
+);
+create index if not exists idx_awards_prog on public.awards(program_id);
+grant all privileges on public.awards to anon, authenticated, service_role;
+
+alter table public.awards enable row level security;
+drop policy if exists awards_all on public.awards;
+create policy awards_all on public.awards for all
+  using (program_id in (select public.user_program_ids()))
+  with check (program_id in (select public.user_program_ids()));
+
+NOTIFY pgrst, 'reload schema';
