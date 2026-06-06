@@ -10,6 +10,7 @@ import {
   joinSchoolAsCoach,
   inviteMember,
   createProgram,
+  redeemPromoCode,
 } from './supabase_client';
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -44,6 +45,9 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
 
   const [form, setForm] = useState({ name:'', address:'', city:'', state:'', zip:'', level:'HS', adName:'', adEmail:'' });
   const [prog, setProg] = useState({ sport:'basketball_boys', mascot:'', color:'#1a3a6b' });
+  const [promoCode, setPromoCode] = useState('');
+  const [redeemed, setRedeemed] = useState(false);
+  const [isCreator, setIsCreator] = useState(false); // true only on the new-school path (admin) — coaches joining can't redeem
 
   const sf = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -79,12 +83,19 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
     if (error) { setBusy(false); setErr(error.message); return; }
     await inviteMember(form.adEmail, data.id, 'admin'); // best-effort
     setBusy(false);
-    setOrgId(data.id); setSchoolName(form.name); setStep(3);
+    setIsCreator(true); setOrgId(data.id); setSchoolName(form.name); setStep(3);
   };
 
   const createMyProgram = async () => {
     if (!prog.mascot) { setErr('Enter your team name / mascot.'); return; }
     setBusy(true); setErr('');
+    // Apply a beta/promo code first (once) if one was entered, so a new school can
+    // redeem at signup. Guarded by `redeemed` so a retry doesn't double-apply.
+    if (promoCode.trim() && !redeemed) {
+      const { error: rErr } = await redeemPromoCode(promoCode.trim(), orgId);
+      if (rErr) { setBusy(false); setErr('Promo code: ' + (rErr.message || rErr)); return; }
+      setRedeemed(true);
+    }
     const { error } = await createProgram(orgId, {
       name: schoolName, mascot: prog.mascot, sport: prog.sport,
       primary_color: prog.color, created_by: userId,
@@ -192,6 +203,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
             </div>
             <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} /></div>
             <div style={s.field}><label style={s.label}>Team color</label><input type="color" value={prog.color} onChange={e => setProg(p => ({ ...p, color: e.target.value }))} style={{ width:60, height:38, border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff' }} /></div>
+            {isCreator && <div style={s.field}><label style={s.label}>Beta / promo code <span style={{ color:'#9ca3af', fontWeight:400 }}>(optional)</span></label><input style={{ ...s.input, textTransform:'uppercase' }} value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="e.g. BETA90" /></div>}
             <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open RaftersIQ →'}</button>
           </>
         )}
