@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -1543,7 +1543,7 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
 
 
 // ── All-Time Leaderboard Tab ───────────────────────────────────────────────────
-function PlayerSeasons({ programId, playerName, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true }) {
+function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true }) {
   const [rows, setRows] = useState(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState([]);
@@ -1557,7 +1557,13 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
   }, [programId, playerName]);
   useEffect(() => { load(); }, [load]);
 
-  const cols = (columns && columns.length) ? columns : allStats.slice(0, 5);
+  // Edit grid shows EVERY stat for the sport (so any stat is enterable); the view
+  // table shows only stats that actually have values (career or any season).
+  const sportCols = (SPORTS[sport]?.groups || []).flatMap(g => (g.stats || []).map(s => s.name));
+  const editCols = sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []));
+  const hasVal = (c) => Number(careerStats?.[c]) > 0 || (rows || []).some(r => Number(r.stats?.[c]) > 0);
+  const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c));
+  const viewCols = [...editCols, ...extraKeys].filter(hasVal);
   const startEdit = () => { setDraft((rows || []).map(r => ({ ...r, stats: { ...(r.stats || {}) } }))); setErr(""); setEditing(true); };
   const cancel = () => { setEditing(false); setErr(""); };
   const addRow = () => setDraft(d => [...d, { _key: `${d.length}-${(rows || []).length}`, season: "", grade: "", stats: {} }]);
@@ -1609,18 +1615,18 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
-                {cols.map(c => <th key={c} style={th}>{c}</th>)}
+                {viewCols.map(c => <th key={c} style={th}>{c}</th>)}
               </tr></thead>
               <tbody>
                 {rows.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}{r.grade ? <span style={{ color: "#9ca3af", fontWeight: 400 }}> · {r.grade}</span> : null}</td>
-                    {cols.map(c => <td key={c} style={td}>{r.stats?.[c] != null ? Number(r.stats[c]).toLocaleString() : "—"}</td>)}
+                    {viewCols.map(c => <td key={c} style={td}>{r.stats?.[c] != null ? Number(r.stats[c]).toLocaleString() : "—"}</td>)}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
                   <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Career</td>
-                  {cols.map(c => <td key={c} style={{ ...td, fontWeight: 700 }}>{careerOf(c).toLocaleString()}</td>)}
+                  {viewCols.map(c => <td key={c} style={{ ...td, fontWeight: 700 }}>{careerOf(c).toLocaleString()}</td>)}
                 </tr>
               </tbody>
             </table>
@@ -1633,7 +1639,7 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
                 <th style={th}>Grade</th>
-                {cols.map(c => <th key={c} style={th}>{c}</th>)}
+                {editCols.map(c => <th key={c} style={th}>{c}</th>)}
                 <th style={th}></th>
               </tr></thead>
               <tbody>
@@ -1641,7 +1647,7 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
                   <tr key={r.id || r._key} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ padding: "4px 8px" }}><input list="ps-seasons" value={r.season} onChange={e => setField(i, "season", e.target.value)} placeholder="2024-25" style={{ ...inp, width: 82, textAlign: "left" }} /></td>
                     <td style={{ padding: "4px 8px" }}><input value={r.grade || ""} onChange={e => setField(i, "grade", e.target.value)} placeholder="Sr" style={{ ...inp, width: 44, textAlign: "left" }} /></td>
-                    {cols.map(c => <td key={c} style={{ padding: "4px 8px" }}><input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} /></td>)}
+                    {editCols.map(c => <td key={c} style={{ padding: "4px 8px" }}><input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} /></td>)}
                     <td style={{ padding: "4px 8px", textAlign: "center" }}><button onClick={() => removeRow(i)} title="Remove season" style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontSize: 15, lineHeight: 1 }}>✕</button></td>
                   </tr>
                 ))}
@@ -1655,7 +1661,7 @@ function PlayerSeasons({ programId, playerName, columns = [], allStats = [], sea
             <button onClick={cancel} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>Cancel</button>
             <button onClick={save} disabled={busy} style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 7, padding: "6px 16px", fontSize: 12, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : "Save seasons"}</button>
           </div>
-          {cols.length === 0 && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>No stat columns yet for this sport — add career stats first and they'll appear here.</div>}
+          {editCols.length === 0 && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>No stat columns yet for this sport — add career stats first and they'll appear here.</div>}
         </div>
       )}
     </div>
@@ -1758,6 +1764,7 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           <PlayerSeasons
             programId={school.id}
             playerName={player.name}
+            sport={school.sport}
             columns={statsToShow}
             allStats={ALL_STATS}
             seasonOptions={(school.seasons || []).map(s => s.season).filter(Boolean)}
@@ -1779,6 +1786,101 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Bulk import: season-by-season stats from a spreadsheet ─────────────────────
+// Workbook format: one SHEET per stat (Games, Points, Rebounds, …); each sheet is
+// players-as-rows × seasons-as-columns with a trailing "Total Career" column.
+// SheetJS is loaded from CDN on demand (no build dependency / bundle bloat).
+const SEASON_STAT_MAP = {
+  "Games": "Games Played", "Wins": "Wins", "Points": "Points", "Assists": "Assists",
+  "Rebounds": "Total Rebounds", "O Rebounds": "Offensive Rebounds", "Def. Rebounds": "Defensive Rebounds",
+  "Steals": "Steals", "Blocks": "Blocks", "FGM": "Field Goals Made", "FGA": "Field Goals Attempted",
+  "3pFGM": "Three Pointers Made", "3pFGA": "Three Pointers Attempted", "FTM": "Free Throws Made", "FTA": "Free Throws Attempted",
+};
+function loadSheetJS() {
+  return new Promise((resolve, reject) => {
+    if (window.XLSX) return resolve(window.XLSX);
+    const s = document.createElement("script");
+    s.src = "https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js";
+    s.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error("reader unavailable")));
+    s.onerror = () => reject(new Error("Couldn't load the spreadsheet reader (network?)"));
+    document.head.appendChild(s);
+  });
+}
+function normSeason(h) {
+  const m = String(h || "").match(/\d{4}-\d{4}/);
+  return m ? m[0] : String(h || "").trim();
+}
+function parseSeasonsWorkbook(XLSX, buf) {
+  const wb = XLSX.read(buf, { type: "array" });
+  const byPS = {};
+  for (const sheetName of wb.SheetNames) {
+    const stat = SEASON_STAT_MAP[String(sheetName).trim()];
+    if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false });
+    if (!grid.length) continue;
+    const header = grid[0] || [];
+    const seasonCols = [];
+    for (let c = 1; c < header.length; c++) {
+      const h = String(header[c] || "").trim();
+      if (!h || /total|career/i.test(h)) continue; // skip the career column
+      seasonCols.push({ c, season: normSeason(h) });
+    }
+    for (let r = 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const player = String(row[0] || "").trim();
+      if (!player) continue;
+      for (const sc of seasonCols) {
+        const v = row[sc.c];
+        if (v === "" || v == null) continue;
+        const num = Number(v);
+        if (!isFinite(num) || num === 0) continue;
+        const key = player + "|||" + sc.season;
+        if (!byPS[key]) byPS[key] = { player_name: player, season: sc.season, stats: {} };
+        byPS[key].stats[stat] = num;
+      }
+    }
+  }
+  return Object.values(byPS);
+}
+function ImportSeasons({ school }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!school || !school.id) { setMsg("Open a saved program first."); return; }
+    setBusy(true); setMsg("Reading spreadsheet…");
+    try {
+      const XLSX = await loadSheetJS();
+      const buf = await file.arrayBuffer();
+      const rows = parseSeasonsWorkbook(XLSX, new Uint8Array(buf));
+      if (!rows.length) { setBusy(false); setMsg("No season rows found in that file."); return; }
+      const players = new Set(rows.map((r) => r.player_name)).size;
+      const seasons = new Set(rows.map((r) => r.season)).size;
+      if (!window.confirm(`Import ${rows.length} player-season rows (${players} players, ${seasons} seasons)?\n\nThis REPLACES all existing season-by-season stats for ${school.name || "this program"}.`)) {
+        setBusy(false); setMsg(""); return;
+      }
+      setMsg("Importing…");
+      const { data, error } = await replacePlayerSeasons(school.id, rows);
+      setBusy(false);
+      if (error) { setMsg("Import failed: " + (error.message || error)); return; }
+      setMsg(`✓ Imported ${data.inserted} rows — open a player to see their seasons.`);
+    } catch (err) {
+      setBusy(false); setMsg("Import error: " + (err && err.message ? err.message : String(err)));
+    }
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
+        {busy ? "Working…" : "📥 Import season stats (.xlsx)"}
+        <input type="file" accept=".xlsx,.xls" onChange={onFile} disabled={busy} style={{ display: "none" }} />
+      </label>
+      {msg && <span style={{ fontSize: 12, color: msg.indexOf("✓") === 0 ? "#166534" : ((msg.indexOf("fail") >= 0 || msg.indexOf("error") >= 0) ? "#991b1b" : "#6b7280") }}>{msg}</span>}
     </div>
   );
 }
@@ -1885,6 +1987,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,flex:1,minWidth:160}} />
         <span style={{fontSize:13,color:"#9ca3af",whiteSpace:"nowrap"}}>{filtered.length} players</span>
       </div>
+      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} /></div>}
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
