@@ -329,6 +329,33 @@ function byStatOrder(a, b) {
   return a.localeCompare(b);
 }
 
+// Stat list for a roster — every stat name with any value > 0, in canonical order.
+function allStatsFor(roster) {
+  return [...new Set(roster.flatMap(p => Object.keys(p.stats || {})))]
+    .filter(s => roster.some(p => (p.stats[s] || 0) > 0))
+    .sort(byStatOrder);
+}
+// effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
+function makeEffectiveIsActive(athletes = []) {
+  const activeNames = new Set(athletes.filter(a => a.isActive !== false).map(a => a.name.toLowerCase()));
+  const inactiveNames = new Set(athletes.filter(a => a.isActive === false).map(a => a.name.toLowerCase()));
+  return (p) => {
+    const nameLower = p.name.toLowerCase();
+    if (inactiveNames.has(nameLower)) return false;
+    if (activeNames.has(nameLower)) return true;
+    return p.isCurrent;
+  };
+}
+// rankFor(player, stat) → 1-based rank across the roster; rankFor(null, stat) → count with that stat > 0.
+function makeRankFor(roster) {
+  return (player, stat) => {
+    const sorted = roster.filter(p => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
+    if (player === null) return sorted.length;
+    const idx = sorted.findIndex(p => p.id === player.id);
+    return idx === -1 ? sorted.length + 1 : idx + 1;
+  };
+}
+
 // Default milestone thresholds for football — all stat categories in canonical order
 const DEFAULT_MILESTONES = [
   { id:"dm1",  statName:"Games Played",       values:[25,50,75,100],          alertPct:90 },
@@ -2155,9 +2182,7 @@ function ImportSeasons({ school, roster = [] }) {
 }
 
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
-  const ALL_STATS = [...new Set(roster.flatMap(p => Object.keys(p.stats)))]
-    .filter(s => roster.some(p => (p.stats[s]||0) > 0))
-    .sort(byStatOrder);
+  const ALL_STATS = allStatsFor(roster);
 
   const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
@@ -2171,30 +2196,8 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
     <div style={{padding:40,textAlign:"center",color:"#9ca3af"}}>No all-time roster data available.</div>
   );
 
-  const activeNames = new Set(
-    athletes.filter(a => a.isActive !== false).map(a => a.name.toLowerCase())
-  );
-  const inactiveNames = new Set(
-    athletes.filter(a => a.isActive === false).map(a => a.name.toLowerCase())
-  );
-
-  const effectiveIsActive = (p) => {
-    const nameLower = p.name.toLowerCase();
-    if (inactiveNames.has(nameLower)) return false;
-    if (activeNames.has(nameLower)) return true;
-    return p.isCurrent;
-  };
-
-  // rankFor(player, stat) → 1-based rank of player in that stat across all roster
-  // rankFor(null, stat)   → count of players with that stat > 0
-  const rankFor = (player, stat) => {
-    const sorted = roster
-      .filter(p => (p.stats[stat]||0) > 0)
-      .sort((a,b) => (b.stats[stat]||0) - (a.stats[stat]||0));
-    if (player === null) return sorted.length;
-    const idx = sorted.findIndex(p => p.id === player.id);
-    return idx === -1 ? sorted.length + 1 : idx + 1;
-  };
+  const effectiveIsActive = makeEffectiveIsActive(athletes);
+  const rankFor = makeRankFor(roster);
 
   const filtered = roster
     .filter(p => {
@@ -3597,6 +3600,13 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
     dismissedSet.has(`${athleteId}|${statName}|${target}`);
 
   const sport = SPORTS[school.sport] || SPORTS.football;
+  // Clicking an athlete card opens the SAME full profile modal as the All-Time tab.
+  const atRoster = school.allTimeRoster || [];
+  const atAllStats = allStatsFor(atRoster);
+  const atEffectiveIsActive = makeEffectiveIsActive(school.athletes || []);
+  const atRankFor = makeRankFor(atRoster);
+  // Open by the all-time-roster entry (matched by name) so career totals + rank match the All-Time tab.
+  const openAthlete = (athlete) => setSelectedAthlete(atRoster.find(p => (p.name || "").toLowerCase() === (athlete.name || "").toLowerCase()) || athlete);
   const allAlerts = school.athletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
     alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [])
@@ -3836,7 +3846,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                 );
 
                 return (
-                  <div key={athlete.id} onClick={()=>setSelectedAthlete(isSelected?null:athlete)}
+                  <div key={athlete.id} onClick={()=>openAthlete(athlete)}
                     style={{ background:"#fff",borderRadius:12,
                       border:`1px solid ${isSelected?"#1a56db":isActive?"#e8e4dd":"#e5e7eb"}`,
                       padding:16,cursor:"pointer",opacity:isActive?1:0.6 }}>
@@ -3872,7 +3882,6 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                     ) : (
                       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
                         {Object.entries(athlete.stats)
-                          .filter(([k]) => k !== "Games Played" || Object.keys(athlete.stats).length === 1)
                           .sort(([a],[b]) => byStatOrder(a, b))
                           .flatMap(([k,v])=>{
                             const tile = (
@@ -3894,17 +3903,21 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                           })}
                       </div>
                     )}
-
-                    {isSelected&&ats.length>0&&isActive&&(
-                      <div style={{ marginTop:12,borderTop:"1px solid #f3f0ea",paddingTop:10 }}>
-                        <div style={{ fontSize:12,fontWeight:600,color:"#374151",marginBottom:6 }}>Milestone alerts</div>
-                        {ats.map((a,i)=><AlertBadge key={i} alert={a} mode="short" />)}
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
+            {selectedAthlete && (
+              <PlayerProfileModal
+                player={selectedAthlete}
+                school={school}
+                onClose={()=>setSelectedAthlete(null)}
+                onUpdate={(updated)=>{ onUpdate(updated); setSelectedAthlete(null); }}
+                ALL_STATS={atAllStats}
+                effectiveIsActive={atEffectiveIsActive}
+                rankFor={atRankFor}
+              />
+            )}
           </div>
         )}
 
