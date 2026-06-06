@@ -4223,7 +4223,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                           <th style={{ position:"sticky", left:0, zIndex:2, background:"#fafaf8", padding:"10px 16px", textAlign:"left", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", borderRight:"1px solid #f0eeea", minWidth:170 }}>Athlete</th>
                           {ovCols.map(col => (
                             <th key={col.pct ? "p-"+col.pct.name : col.stat} title={col.pct ? col.pct.name : col.stat}
-                              style={{ background:"#fafaf8", padding:"10px 12px", textAlign:"right", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", whiteSpace:"nowrap" }}>
+                              style={{ background:"#fafaf8", padding:"10px 12px", textAlign:"center", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", whiteSpace:"nowrap" }}>
                               {col.pct ? col.pct.short : col.stat}
                             </th>
                           ))}
@@ -4238,7 +4238,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                               {ovCols.map(col => {
                                 const v = col.pct ? shootingPct(a.stats, col.pct.made, col.pct.att) : a.stats[col.stat];
                                 const display = col.pct ? (v != null ? v + "%" : "—") : (v != null ? Number(v).toLocaleString() : "—");
-                                return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"right", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
+                                return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"center", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
                               })}
                             </tr>
                           ))}
