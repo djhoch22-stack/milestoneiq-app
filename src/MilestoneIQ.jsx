@@ -2037,6 +2037,17 @@ function loadSheetJS() {
     document.head.appendChild(s);
   });
 }
+// ExcelJS — loaded on demand ONLY for the season template (SheetJS can't write frozen panes).
+function loadExcelJS() {
+  return new Promise((resolve, reject) => {
+    if (window.ExcelJS) return resolve(window.ExcelJS);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+    s.onload = () => (window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error("ExcelJS unavailable")));
+    s.onerror = () => reject(new Error("Couldn't load the Excel writer (network?)"));
+    document.head.appendChild(s);
+  });
+}
 function normSeason(h) {
   const m = String(h || "").match(/\d{4}-\d{4}/);
   return m ? m[0] : String(h || "").trim();
@@ -2266,28 +2277,38 @@ function ImportSeasons({ school, roster = [] }) {
   const downloadTemplate = async () => {
     setBusy(true); setMsg("Building template…");
     try {
-      const XLSX = await loadSheetJS();
-      const wb = XLSX.utils.book_new();
+      // ExcelJS (not SheetJS) so we can FREEZE row 1 + column A. No pre-filled names; the
+      // "Total Career" column auto-sums each player's seasons on every stat tab.
+      const ExcelJS = await loadExcelJS();
       const seasonHeaders = [...new Set((school.seasons || []).map((s) => s.season).filter(Boolean))];
       const cols = seasonHeaders.length ? seasonHeaders : ["2023-2024", "2024-2025"];
-      const ROWS = 40;                 // blank player rows for the coach to fill (no pre-filled names)
-      const lastSeasonC = cols.length; // 0-based col of the last season (A=0 player, seasons 1..cols.length)
-      const totalC = cols.length + 1;  // 0-based col of "Total Career"
+      const ROWS = 40;
+      const colLetter = (n) => { let out = ""; while (n > 0) { const m = (n - 1) % 26; out = String.fromCharCode(65 + m) + out; n = Math.floor((n - 1) / 26); } return out; };
+      const firstSeasonCol = 2;               // B (col A = Player)
+      const lastSeasonCol = 1 + cols.length;  // last season column (1-based)
+      const totalCol = 2 + cols.length;       // "Total Career" column (1-based)
+      const wb = new ExcelJS.Workbook();
       for (const sheet of Object.keys(SEASON_STAT_MAP)) {
-        const aoa = [["Player", ...cols, "Total Career"]];
-        for (let i = 0; i < ROWS; i++) aoa.push([]);          // empty rows — no names
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        for (let i = 0; i < ROWS; i++) {                        // auto-sum the season columns → Total Career
-          const r = i + 1;
-          const first = XLSX.utils.encode_cell({ r, c: 1 });
-          const last = XLSX.utils.encode_cell({ r, c: lastSeasonC });
-          ws[XLSX.utils.encode_cell({ r, c: totalC })] = { t: "n", f: `SUM(${first}:${last})` };
+        const ws = wb.addWorksheet(sheet, { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] }); // freeze col A + row 1
+        const header = ws.addRow(["Player", ...cols, "Total Career"]);
+        header.font = { bold: true };
+        for (let i = 0; i < ROWS; i++) {
+          const rowNum = i + 2;
+          ws.getRow(rowNum).getCell(totalCol).value = {
+            formula: `SUM(${colLetter(firstSeasonCol)}${rowNum}:${colLetter(lastSeasonCol)}${rowNum})`,
+            result: 0,
+          };
         }
-        ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: ROWS, c: totalC } });
-        XLSX.utils.book_append_sheet(wb, ws, sheet);
       }
-      XLSX.writeFile(wb, `${String(school.name || "program").replace(/[^a-z0-9]+/gi, "_")}_season_stats_template.xlsx`);
-      setBusy(false); setMsg("✓ Template downloaded — type each player's name + season numbers; Total Career auto-sums.");
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${String(school.name || "program").replace(/[^a-z0-9]+/gi, "_")}_season_stats_template.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBusy(false); setMsg("✓ Template downloaded — header row & name column stay frozen as you scroll; Total Career auto-sums.");
     } catch (err) { setBusy(false); setMsg("Template error: " + (err && err.message ? err.message : String(err))); }
   };
   return (
