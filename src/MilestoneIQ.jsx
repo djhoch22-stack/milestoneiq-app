@@ -3235,6 +3235,7 @@ function CoachHofSection({ school, awards = [], onUpdate }) {
           coach={selectedCoach}
           school={school}
           allCoaches={scored}
+          awards={awards}
           confirmed={!!confirmedHof[selectedCoach.name]}
           onClose={() => setSelectedCoach(null)}
           onToggle={() => { toggleCoachHof(selectedCoach.name); setSelectedCoach(null); }}
@@ -3244,7 +3245,7 @@ function CoachHofSection({ school, awards = [], onUpdate }) {
   );
 }
 
-function CoachHofModal({ coach, school, allCoaches, confirmed, onClose, onToggle }) {
+function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onClose, onToggle }) {
   const tier = coachHofTier(coach.score);
   const winPct = coach.wins+coach.losses>0 ? Math.round(coach.wins/(coach.wins+coach.losses)*100) : 0;
   const seasons = (school.seasons||[]).filter(s=>(s.coach||s["coach"]||"").trim()===coach.name);
@@ -3305,6 +3306,27 @@ function CoachHofModal({ coach, school, allCoaches, confirmed, onClose, onToggle
               );
             })}
           </div>
+
+          {/* Coach of the Year honors */}
+          {(() => {
+            const honors = awardsForHolder(coach.name, "coach", awards);
+            if (!honors.length) return null;
+            const bonus = coachAwardBonus(coach.name, awards);
+            return (
+              <div style={{ marginBottom:18 }}>
+                <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:8 }}>
+                  Coach of the Year <span style={{ background:"#f5f3ff",color:"#6b21a8",borderRadius:4,padding:"1px 7px",fontSize:11,fontWeight:700,marginLeft:6 }}>+{bonus} pts</span>
+                </div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+                  {honors.map(a => (
+                    <span key={a.id} style={{ background:"#f5f3ff",border:"1px solid #ddd6fe",color:"#6b21a8",borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:600 }}>
+                      🏅 {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Notable seasons */}
           {notableSeasons.length>0 && (
