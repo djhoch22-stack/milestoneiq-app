@@ -830,8 +830,8 @@ update public.profiles set is_platform_owner = true
 where lower(email) in ('djhoch22@gmail.com', 'dhoch@denverchristian.org');
 
 -- A starter launch code (or create codes from the in-app panel):
-insert into public.promo_codes (code, kind, trial_days, note)
-values ('BETA90', 'trial_days', 90, 'Launch beta — 90 days free')
+insert into public.promo_codes (code, kind, trial_days, grant_tier, note)
+values ('BETA90', 'trial_days', 90, 'school_plus', 'Launch beta — 90 days of School+')
 on conflict (code) do nothing;
 
 NOTIFY pgrst, 'reload schema';
