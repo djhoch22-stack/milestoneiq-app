@@ -710,8 +710,11 @@ begin
 end $$;
 
 drop trigger if exists gate_org_trial_trg on public.organizations;
-create trigger gate_org_trial_trg before insert on public.organizations
-  for each row execute function public.gate_org_trial();
+-- ⏸ TEMPORARILY DISABLED for testing (one-free-trial-per-email guard OFF). Every new
+--    org just gets the default 7-day trial. To RE-ENABLE, uncomment the trigger below
+--    (and optionally `delete from public.trial_ledger;` so test emails aren't blocked):
+-- create trigger gate_org_trial_trg before insert on public.organizations
+--   for each row execute function public.gate_org_trial();
 NOTIFY pgrst, 'reload schema';
 
 -- ════════════════════════════════════════════════════════════════════════════
