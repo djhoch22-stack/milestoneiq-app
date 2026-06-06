@@ -289,6 +289,25 @@ export const getAllPlayerSeasons = async (programId) => {
   return { data: data || [], error };
 };
 
+// ── Awards (all-league/all-state for players, Coach of the Year for coaches) ──
+export const getAwards = async (programId) => {
+  const { data, error } = await supabase
+    .from('awards')
+    .select('id, scope, kind, level, holder_name, season')
+    .eq('program_id', programId)
+    .order('created_at', { ascending: false });
+  return { data: data || [], error };
+};
+export const saveAward = async (award) => {
+  // award: { program_id, scope, kind, level, holder_name, season }
+  const { data, error } = await supabase.from('awards').insert(award).select().single();
+  return { data, error };
+};
+export const deleteAward = async (id) => {
+  const { error } = await supabase.from('awards').delete().eq('id', id);
+  return { error };
+};
+
 // AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
 // which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
 export const extractPdfStats = async (pdf) => {
