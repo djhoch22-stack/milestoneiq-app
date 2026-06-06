@@ -1854,10 +1854,47 @@ function seasonFromFilename(name) {
   let b = m[2]; if (b.length === 2) b = m[1].slice(0, 2) + b;
   return `${m[1]}-${b}`;
 }
+// MaxPreps / sheet abbreviations → the app's stat names. Per-game averages, percentages,
+// height, fouls, turnovers, and the 2-pt-only splits are dropped (the app tracks totals).
+const SEASON_STAT_ALIASES = {
+  "Games": "Games Played", "GP": "Games Played", "Wins": "Wins", "W": "Wins",
+  "Points": "Points", "Pts": "Points", "PTS": "Points",
+  "Assists": "Assists", "Asst": "Assists", "AST": "Assists",
+  "Rebounds": "Total Rebounds", "Tot Reb": "Total Rebounds", "Reb": "Total Rebounds", "TRB": "Total Rebounds",
+  "O Rebounds": "Offensive Rebounds", "Off Reb": "Offensive Rebounds", "ORB": "Offensive Rebounds",
+  "Def. Rebounds": "Defensive Rebounds", "Def Reb": "Defensive Rebounds", "DRB": "Defensive Rebounds",
+  "Steals": "Steals", "Stls": "Steals", "STL": "Steals",
+  "Blocks": "Blocks", "Blk Shts": "Blocks", "BLK": "Blocks",
+  "FGM": "Field Goals Made", "Field Goals Made": "Field Goals Made",
+  "FGA": "Field Goals Attempted", "Field Goals Attempted": "Field Goals Attempted",
+  "3pFGM": "Three Pointers Made", "3FGM": "Three Pointers Made",
+  "3pFGA": "Three Pointers Attempted", "3FGA": "Three Pointers Attempted",
+  "FTM": "Free Throws Made", "Free Throws Made": "Free Throws Made",
+  "FTA": "Free Throws Attempted", "Free Throws Attempted": "Free Throws Attempted",
+};
 function remapSeasonStats(stats) {
   const out = {};
-  for (const k in (stats || {})) out[SEASON_STAT_MAP[String(k).trim()] || k] = stats[k];
+  for (const k in (stats || {})) {
+    const key = String(k).trim();
+    if (SEASON_STAT_ALIASES[key] != null) { out[SEASON_STAT_ALIASES[key]] = stats[k]; continue; }
+    if (/PG$|%/.test(key) || /^(Ht|PF|TO|Min|2FGA|2FGM)$/i.test(key)) continue;
+    out[key] = stats[k];
+  }
   return out;
+}
+// Match the stat sheet's abbreviated names ("A. Terpstra") to the roster's full names
+// ("Alex Terpstra") by last name + first initial; keep the fuller name as canonical.
+function seasonNameKey(name) {
+  const parts = String(name || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts.join(" ");
+  return `${parts[parts.length - 1]}|${parts[0][0] || ""}`;
+}
+function fullerSeasonName(a, b) {
+  const af = String(a).trim().split(/\s+/)[0].replace(/\./g, "");
+  const bf = String(b).trim().split(/\s+/)[0].replace(/\./g, "");
+  if (af.length > 1 && bf.length <= 1) return true;
+  if (af.length <= 1 && bf.length > 1) return false;
+  return String(a).length > String(b).length;
 }
 function mergeSeasonRows(all) {
   const byPS = {};
@@ -1905,11 +1942,15 @@ function ImportSeasons({ school, roster = [] }) {
           if (error) { errs.push(`${f.name}: ${error}`); continue; }
           const bucket = (bySeason[season] = bySeason[season] || {});
           for (const a of (data.athletes || [])) {
-            const key = String(a.name || "").toLowerCase().trim();
-            if (!key) continue;
+            const fullName = String(a.name || "").trim();
+            if (!fullName) continue;
+            const key = seasonNameKey(fullName);
             const stats = remapSeasonStats(a.stats || {});
-            if (!bucket[key]) bucket[key] = { player_name: a.name, stats };
-            else Object.assign(bucket[key].stats, stats);
+            if (!bucket[key]) bucket[key] = { player_name: fullName, stats };
+            else {
+              Object.assign(bucket[key].stats, stats);
+              if (fullerSeasonName(fullName, bucket[key].player_name)) bucket[key].player_name = fullName;
+            }
           }
         }
         const seasons = Object.keys(bySeason);
