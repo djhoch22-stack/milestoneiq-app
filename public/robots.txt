@@ -1,0 +1,9 @@
+# RaftersIQ — https://raftersiq.com
+# Allow all crawlers to index the public site.
+User-agent: *
+Allow: /
+
+# Don't index Stripe checkout return URLs.
+Disallow: /*?checkout=
+
+Sitemap: https://raftersiq.com/sitemap.xml
