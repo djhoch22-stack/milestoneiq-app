@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -397,6 +397,50 @@ function getMilestoneAlerts(athlete, records = [], milestones = []) {
   }
 
   return alerts;
+}
+
+// ── Derived shooting percentages ─────────────────────────────────────────────
+// FG%/3P%/FT% are NEVER stored, imported, or hand-edited — they're always computed
+// from makes ÷ attempts wherever they appear (season tables, career rows, records),
+// so they can't go stale and the AI can't invent them. A minimum-attempts qualifier
+// stops a 1-for-1 fluke (100%) from owning a record.
+const PCT_DEFS = [
+  { name: "Field Goal Percentage",  short: "FG%", made: "Field Goals Made",   att: "Field Goals Attempted",   minSeasonAtt: 30, minCareerAtt: 100 },
+  { name: "Three Point Percentage", short: "3P%", made: "Three Pointers Made", att: "Three Pointers Attempted", minSeasonAtt: 15, minCareerAtt: 40 },
+  { name: "Free Throw Percentage",  short: "FT%", made: "Free Throws Made",    att: "Free Throws Attempted",    minSeasonAtt: 20, minCareerAtt: 50 },
+];
+function shootingPct(stats, made, att) {
+  const m = Number(stats?.[made]); const a = Number(stats?.[att]);
+  if (!a || a <= 0 || isNaN(m) || isNaN(a)) return null;
+  return Math.round((m / a) * 1000) / 10; // one decimal, e.g. 47.3
+}
+// Auto record-holders for FG%/3P%/FT%: single-season (from player_seasons rows) and
+// career (from the career-totals pool). Returns record objects the Records tab renders.
+function pctRecordsFrom(seasonRows, careerPlayers, sport) {
+  const out = [];
+  for (const d of PCT_DEFS) {
+    let ss = null;
+    for (const r of (seasonRows || [])) {
+      if (Number(r.stats?.[d.att]) < d.minSeasonAtt) continue;
+      const p = shootingPct(r.stats, d.made, d.att);
+      if (p != null && (!ss || p > ss.value)) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, auto: true, ...ss });
+    let car = null;
+    for (const pl of (careerPlayers || [])) {
+      if (Number(pl.stats?.[d.att]) < d.minCareerAtt) continue;
+      const p = shootingPct(pl.stats, d.made, d.att);
+      if (p != null && (!car || p > car.value)) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+    }
+    if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, auto: true, ...car });
+  }
+  return out;
+}
+// Two season labels refer to the same year if they share a 4-digit start year
+// ("2011-2012" ≡ "2011-12"). Used to look up a team's wins for a season.
+function sameSeason(a, b) {
+  const y = (s) => (String(s || "").match(/\d{4}/) || [""])[0];
+  return !!y(a) && y(a) === y(b);
 }
 
 function pct(v, t) { return Math.min(100, Math.round((v / t) * 100)); }
@@ -1596,6 +1640,9 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const td = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "#111", whiteSpace: "nowrap" };
   const inp = { width: 58, border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" };
   const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0);
+  // Derived shooting-% columns (FG%/3P%/FT%) — computed from makes ÷ attempts, shown
+  // only when this program actually tracks attempts so other sports stay unaffected.
+  const pctCols = PCT_DEFS.filter((d) => careerOf(d.att) > 0 || (rows || []).some((r) => Number(r.stats?.[d.att]) > 0));
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -1618,17 +1665,20 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
                 {viewCols.map(c => <th key={c} style={th}>{c}</th>)}
+                {pctCols.map(d => <th key={d.name} style={th} title={d.name}>{d.short}</th>)}
               </tr></thead>
               <tbody>
                 {rows.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f6f4f0" }}>
-                    <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}{r.grade ? <span style={{ color: "#9ca3af", fontWeight: 400 }}> · {r.grade}</span> : null}</td>
+                    <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}</td>
                     {viewCols.map(c => <td key={c} style={td}>{r.stats?.[c] != null ? Number(r.stats[c]).toLocaleString() : "—"}</td>)}
+                    {pctCols.map(d => { const v = shootingPct(r.stats, d.made, d.att); return <td key={d.name} style={td}>{v != null ? v + "%" : "—"}</td>; })}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
                   <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Career</td>
                   {viewCols.map(c => <td key={c} style={{ ...td, fontWeight: 700 }}>{careerOf(c).toLocaleString()}</td>)}
+                  {pctCols.map(d => { const v = shootingPct({ [d.made]: careerOf(d.made), [d.att]: careerOf(d.att) }, d.made, d.att); return <td key={d.name} style={{ ...td, fontWeight: 700 }}>{v != null ? v + "%" : "—"}</td>; })}
                 </tr>
               </tbody>
             </table>
@@ -1640,7 +1690,6 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
-                <th style={th}>Grade</th>
                 {editCols.map(c => <th key={c} style={th}>{c}</th>)}
                 <th style={th}></th>
               </tr></thead>
@@ -1648,7 +1697,6 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                 {draft.map((r, i) => (
                   <tr key={r.id || r._key} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ padding: "4px 8px" }}><input list="ps-seasons" value={r.season} onChange={e => setField(i, "season", e.target.value)} placeholder="2024-25" style={{ ...inp, width: 82, textAlign: "left" }} /></td>
-                    <td style={{ padding: "4px 8px" }}><input value={r.grade || ""} onChange={e => setField(i, "grade", e.target.value)} placeholder="Sr" style={{ ...inp, width: 44, textAlign: "left" }} /></td>
                     {editCols.map(c => <td key={c} style={{ padding: "4px 8px" }}><input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} /></td>)}
                     <td style={{ padding: "4px 8px", textAlign: "center" }}><button onClick={() => removeRow(i)} title="Remove season" style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontSize: 15, lineHeight: 1 }}>✕</button></td>
                   </tr>
@@ -1987,7 +2035,19 @@ function ImportSeasons({ school, roster = [] }) {
         // Reconcile each season: merge roster (full names) + stat sheet (abbreviated) into one
         // row per player, using jersey number to keep same-name players (siblings) separate.
         const bySeason = {};
-        for (const s of seasons) bySeason[s] = reconcileSeasonAthletes(rawBySeason[s]);
+        for (const s of seasons) {
+          bySeason[s] = reconcileSeasonAthletes(rawBySeason[s]);
+          // Wins are a TEAM stat — the team's win total belongs to every player on the
+          // roster, not just whoever appeared in the most games. Use the largest Wins we
+          // saw for the season (a full-season player = the team total), falling back to
+          // the team's recorded win count for that season if the sheet had no per-player wins.
+          const teamWins = Math.max(
+            0,
+            ...bySeason[s].map((p) => Number(p.stats?.Wins) || 0),
+            Number(((school.seasons || []).find((x) => sameSeason(x.season, s)) || {}).wins) || 0,
+          );
+          if (teamWins > 0) for (const p of bySeason[s]) p.stats.Wins = teamWins;
+        }
         const summary = seasons.map((s) => `${bySeason[s].length} players for ${s}`).join(", ");
         if (!window.confirm(`Import ${summary}?\n\nThis replaces those season(s) for ${school.name || "this program"} — every other season is left alone.`)) {
           setBusy(false); setMsg(""); return;
@@ -3085,6 +3145,15 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [hofPage, setHofPage] = useState(1);
 
+  // Every season row for this program — feeds the single-season shooting-% record holders.
+  const [allSeasonRows, setAllSeasonRows] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    if (!school?.id) { setAllSeasonRows([]); return; }
+    getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows(data || []); });
+    return () => { alive = false; };
+  }, [school.id]);
+
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
 
@@ -3802,7 +3871,7 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
               <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
             </div>
 
-            {(school.records||[]).length===0
+            {([...(school.records||[]), ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport)].length===0)
               ? <div style={{ background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb",padding:40,textAlign:"center",color:"#9ca3af" }}>
                   <div style={{ fontSize:32,marginBottom:8 }}>📋</div>
                   <div style={{ fontWeight:600,marginBottom:4 }}>No records on file yet</div>
@@ -3825,8 +3894,14 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
                   const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
+                  // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
+                  // record holders (single-season from player_seasons, career from the roster pool).
+                  const allRecords = [
+                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName]),
+                    ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
+                  ];
                   const byGroup = {};
-                  (school.records||[]).forEach(r => {
+                  allRecords.forEach(r => {
                     const tileStat = PCT_PARENT[r.statName] || r.statName;
                     const grp = getGroup(tileStat);
                     if (!byGroup[grp]) byGroup[grp] = {};
@@ -3864,7 +3939,8 @@ function SchoolDashboard({ school, onBack, onUpdate }) {
                                   const rec = group[0];
                                   const isPct = !!PCT_PARENT[rec.statName];
                                   const leaderVal = leader?.stats[statName];
-                                  const p = leaderVal && rec.variant==="Career total" ? pct(leaderVal, rec.value) : null;
+                                  // % records aren't a "chase the leader" progress bar — only counting records show one.
+                                  const p = (!isPct && leaderVal && rec.variant==="Career total") ? pct(leaderVal, rec.value) : null;
                                   return (
                                     <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
                                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
