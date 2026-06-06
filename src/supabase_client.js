@@ -234,6 +234,22 @@ export const deletePlayerSeason = async (id) => {
   const { error } = await supabase.from('player_seasons').delete().eq('id', id);
   return { error };
 };
+// Bulk import: replace ALL of a program's season rows with `rows` (source-of-truth import).
+export const replacePlayerSeasons = async (programId, rows) => {
+  const del = await supabase.from('player_seasons').delete().eq('program_id', programId);
+  if (del.error) return { error: del.error };
+  let inserted = 0;
+  for (let i = 0; i < rows.length; i += 500) {
+    const chunk = rows.slice(i, i + 500).map((r) => ({
+      program_id: programId, player_name: r.player_name, season: r.season, stats: r.stats || {},
+    }));
+    if (!chunk.length) continue;
+    const { error } = await supabase.from('player_seasons').insert(chunk);
+    if (error) return { error };
+    inserted += chunk.length;
+  }
+  return { data: { inserted } };
+};
 
 export const getSeasons = async (programId) => {
   const { data, error } = await supabase
