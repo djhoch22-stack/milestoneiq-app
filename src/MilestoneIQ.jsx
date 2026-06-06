@@ -1643,6 +1643,15 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   // Derived shooting-% columns (FG%/3P%/FT%) — computed from makes ÷ attempts, shown
   // only when this program actually tracks attempts so other sports stay unaffected.
   const pctCols = PCT_DEFS.filter((d) => careerOf(d.att) > 0 || (rows || []).some((r) => Number(r.stats?.[d.att]) > 0));
+  // Interleave each % right after its "Attempted" column (append any whose attempts column isn't shown).
+  const orderedCols = [];
+  const placedPct = new Set();
+  for (const c of viewCols) {
+    orderedCols.push({ col: c });
+    const d = pctCols.find((p) => p.att === c);
+    if (d) { orderedCols.push({ pct: d }); placedPct.add(d.name); }
+  }
+  for (const d of pctCols) if (!placedPct.has(d.name)) orderedCols.push({ pct: d });
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -1664,21 +1673,24 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
-                {viewCols.map(c => <th key={c} style={th}>{c}</th>)}
-                {pctCols.map(d => <th key={d.name} style={th} title={d.name}>{d.short}</th>)}
+                {orderedCols.map(e => e.pct
+                  ? <th key={"pct-" + e.pct.name} style={th} title={e.pct.name}>{e.pct.short}</th>
+                  : <th key={e.col} style={th}>{e.col}</th>)}
               </tr></thead>
               <tbody>
                 {rows.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}</td>
-                    {viewCols.map(c => <td key={c} style={td}>{r.stats?.[c] != null ? Number(r.stats[c]).toLocaleString() : "—"}</td>)}
-                    {pctCols.map(d => { const v = shootingPct(r.stats, d.made, d.att); return <td key={d.name} style={td}>{v != null ? v + "%" : "—"}</td>; })}
+                    {orderedCols.map(e => e.pct
+                      ? <td key={"pct-" + e.pct.name} style={td}>{(() => { const v = shootingPct(r.stats, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
+                      : <td key={e.col} style={td}>{r.stats?.[e.col] != null ? Number(r.stats[e.col]).toLocaleString() : "—"}</td>)}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
                   <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Career</td>
-                  {viewCols.map(c => <td key={c} style={{ ...td, fontWeight: 700 }}>{careerOf(c).toLocaleString()}</td>)}
-                  {pctCols.map(d => { const v = shootingPct({ [d.made]: careerOf(d.made), [d.att]: careerOf(d.att) }, d.made, d.att); return <td key={d.name} style={{ ...td, fontWeight: 700 }}>{v != null ? v + "%" : "—"}</td>; })}
+                  {orderedCols.map(e => e.pct
+                    ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{(() => { const v = shootingPct({ [e.pct.made]: careerOf(e.pct.made), [e.pct.att]: careerOf(e.pct.att) }, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
+                    : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{careerOf(e.col).toLocaleString()}</td>)}
                 </tr>
               </tbody>
             </table>
