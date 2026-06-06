@@ -1977,6 +1977,17 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
             })}
           </div>
 
+          {(() => {
+            // Per-game averages need Games Played — nudge coaches who entered stats but no games.
+            const hasGames = Number(player.stats?.["Games Played"]) > 0;
+            const hasPerGameStat = PERGAME_DEFS.some(d => Number(player.stats?.[d.stat]) > 0);
+            return (!hasGames && hasPerGameStat) ? (
+              <div style={{ fontSize:12, color:"#92400e", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, padding:"8px 12px", marginBottom:20 }}>
+                💡 Add <strong>Games Played</strong> to see per-game averages (PPG, APG, RPG, …).
+              </div>
+            ) : null;
+          })()}
+
           <PlayerSeasons
             programId={school.id}
             playerName={player.name}
