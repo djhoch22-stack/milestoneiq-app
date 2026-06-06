@@ -3,11 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary meta -->
+    <title>RaftersIQ — High School Stats, Records &amp; Hall of Fame Software</title>
+    <meta
+      name="description"
+      content="Track career & season stats, school records, milestones, and an auto-built Hall of Fame for high school athletic programs — across every sport. Start a free trial."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="high school stats, high school sports records, athletic program software, hall of fame, basketball stats tracker, school record book" />
+    <meta name="theme-color" content="#1a3a6b" />
+    <link rel="canonical" href="https://raftersiq.com/" />
+
+    <!-- Icons -->
     <link rel="icon" type="image/png" href="/raftersiq-logo.png" />
-    <title>RaftersIQ</title>
+    <link rel="apple-touch-icon" href="/raftersiq-logo.png" />
+
+    <!-- Open Graph (Facebook, LinkedIn, iMessage, etc.) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RaftersIQ" />
+    <meta property="og:title" content="RaftersIQ — Stats, Records & Hall of Fame for your whole program" />
+    <meta
+      property="og:description"
+      content="Record-book software for high school athletic programs: career & season stats, school records, milestones, and an auto-built Hall of Fame across every sport."
+    />
+    <meta property="og:url" content="https://raftersiq.com/" />
+    <meta property="og:image" content="https://raftersiq.com/raftersiq-logo.png" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RaftersIQ — High School Stats, Records & Hall of Fame Software" />
+    <meta
+      name="twitter:description"
+      content="Track career & season stats, school records, milestones, and an auto-built Hall of Fame for high school athletic programs — across every sport."
+    />
+    <meta name="twitter:image" content="https://raftersiq.com/raftersiq-logo.png" />
+
+    <!-- Structured data: tells Google what RaftersIQ is -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://raftersiq.com/#organization",
+          "name": "RaftersIQ",
+          "url": "https://raftersiq.com/",
+          "logo": "https://raftersiq.com/raftersiq-logo.png",
+          "description": "Record-book software for high school athletic programs — stats, records, milestones, and an auto-built Hall of Fame for athletes and coaches across every sport."
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://raftersiq.com/#website",
+          "url": "https://raftersiq.com/",
+          "name": "RaftersIQ",
+          "publisher": { "@id": "https://raftersiq.com/#organization" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "RaftersIQ",
+          "applicationCategory": "SportsApplication",
+          "operatingSystem": "Web",
+          "url": "https://raftersiq.com/",
+          "description": "Track career and season stats, school records, milestones, and Hall of Fame candidacy for high school athletic programs. Import from CSV, Excel, or PDF; email alerts when athletes near records.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "description": "7-day free trial, no credit card required"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Fallback content for crawlers that don't run JavaScript -->
+    <noscript>
+      <div style="max-width:680px;margin:48px auto;padding:0 20px;font-family:Georgia,serif;color:#111">
+        <h1>RaftersIQ — High School Stats, Records &amp; Hall of Fame Software</h1>
+        <p>
+          RaftersIQ is record-book software for high school athletic programs. Track every athlete's
+          career and season stats, maintain your school records and milestones, and auto-build your
+          Hall of Fame for athletes and coaches — across every sport. Import from CSV, Excel, or PDF,
+          and get instant email alerts when athletes approach a record.
+        </p>
+        <p><a href="https://raftersiq.com/">Visit raftersiq.com</a> to start a free trial.</p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
