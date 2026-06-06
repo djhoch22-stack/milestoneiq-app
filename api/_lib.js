@@ -170,6 +170,144 @@ export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   return out;
 }
 
+// ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
+const HOF_STAT_WEIGHTS = {
+  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 8, "Games Played": 3,
+  "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
+  "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
+  "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
+  "Total Tackles": 8, "Sacks": 8, "Interceptions": 7, "Total TDs": 9,
+  "Goals": 10, "Saves": 8, "Clean Sheets": 7, "Coach Wins": 0,
+};
+function getSeasonSuccessScore(notes) {
+  if (!notes) return 0;
+  const n = notes.toLowerCase(); let score = 0;
+  if (/state champ/.test(n)) score += 30; else if (/state runner.?up/.test(n)) score += 22;
+  else if (/final.?four|final 4/.test(n)) score += 16; else if (/elite.?8/.test(n)) score += 12;
+  else if (/sweet.?16/.test(n)) score += 8; else if (/round of|first round|playoff/.test(n)) score += 4;
+  if (/league champ/.test(n)) score += 10;
+  return score;
+}
+function playerYears(player) {
+  if (player.firstYear && player.lastYear) {
+    const a = parseInt(String(player.firstYear).split("-")[1]); const b = parseInt(String(player.lastYear).split("-")[1]);
+    const yrs = []; for (let y = a; y <= b; y++) yrs.push(y); return yrs;
+  }
+  if (player.gradYear) { const g = Number(player.gradYear); return [g - 3, g - 2, g - 1, g]; }
+  return [];
+}
+function playerSeasonOverlap(player, season) {
+  const ys = playerYears(player); if (!ys.length) return false;
+  return ys.includes(parseInt(String(season.season || "").split("-")[1]));
+}
+export function calcProgramHofScore(player, school) {
+  if (!player || !school) return 0;
+  const roster = school.allTimeRoster || []; if (!roster.length) return 0;
+  const stats = player.stats || {}; let statScore = 0, totalWeight = 0;
+  Object.entries(stats).forEach(([stat, val]) => {
+    const weight = HOF_STAT_WEIGHTS[stat]; if (!weight || !val) return; totalWeight += weight;
+    const sorted = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
+    const rank = sorted.findIndex((p) => p.id === player.id) + 1; const total = sorted.length; if (!rank || !total) return;
+    let rankPct;
+    if (rank === 1) rankPct = 1.00; else if (rank === 2) rankPct = 0.85; else if (rank === 3) rankPct = 0.70;
+    else if (rank / total <= 0.10) rankPct = 0.50; else if (rank / total <= 0.25) rankPct = 0.35;
+    else if (rank / total <= 0.50) rankPct = 0.20; else rankPct = 0.05;
+    statScore += weight * rankPct;
+  });
+  const statNorm = totalWeight > 0 ? (statScore / totalWeight) * 70 : 0;
+  let teamScore = 0;
+  (school.seasons || []).forEach((s) => { if (playerSeasonOverlap(player, s)) teamScore += getSeasonSuccessScore(s.notes); });
+  const teamNorm = Math.min(teamScore / 3, 30);
+  const pn = (player.name || "").toLowerCase().trim(); let recordBonus = 0;
+  (school.records || []).forEach((rec) => {
+    const h = (rec.holderName || "").toLowerCase().trim();
+    if (!h || h === "multiple players") return;
+    if (h === pn) recordBonus += (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
+  });
+  return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
+}
+// Coach aggregation (public: no prior-school fold). Adds firstYear/lastYear/titles like the Seasons tab.
+export function buildCoachStats(seasons) {
+  const coaches = {};
+  (seasons || []).forEach((s) => {
+    const name = (s.coach || "").trim(); if (!name) return;
+    if (!coaches[name]) coaches[name] = { name, wins: 0, losses: 0, leagueWins: 0, leagueLosses: 0, seasons: 0,
+      stateChamps: 0, stateRunnerUp: 0, finalFours: 0, eliteEights: 0, sweetSixteens: 0, playoffs: 0, leagueChamps: 0,
+      titles: 0, firstYear: s.season, lastYear: s.season };
+    const co = coaches[name];
+    co.seasons += 1; co.wins += (s.wins || 0); co.losses += (s.losses || 0);
+    co.leagueWins += (s.leagueWins || 0); co.leagueLosses += (s.leagueLosses || 0);
+    const notes = (s.notes || "").toLowerCase();
+    if (/state champ/.test(notes)) co.stateChamps += 1;
+    if (/runner.?up|runner-up/.test(notes)) co.stateRunnerUp += 1;
+    if (/final.?four|final 4/.test(notes)) co.finalFours += 1;
+    if (/elite.?8/.test(notes)) co.eliteEights += 1;
+    if (/sweet.?16/.test(notes)) co.sweetSixteens += 1;
+    if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
+    if (/league champ/.test(notes)) co.leagueChamps += 1;
+    if (/champion/i.test(s.notes || "")) co.titles += 1;
+    if (String(s.season) < String(co.firstYear)) co.firstYear = s.season;
+    if (String(s.season) > String(co.lastYear)) co.lastYear = s.season;
+  });
+  return Object.values(coaches);
+}
+export function calcCoachHofScore(coach, all) {
+  const total = all.length; if (!total) return 0;
+  const winRank = [...all].sort((a, b) => b.wins - a.wins).findIndex((c) => c.name === coach.name) + 1;
+  const winScore = winRank === 1 ? 25 : winRank === 2 ? 20 : winRank === 3 ? 15 : (winRank / total) <= 0.25 ? 10 : 5;
+  const games = coach.wins + coach.losses; const pct = games >= 20 ? coach.wins / games : 0;
+  const pctScore = pct >= 0.75 ? 15 : pct >= 0.65 ? 12 : pct >= 0.55 ? 8 : pct >= 0.45 ? 4 : 0;
+  const seasRank = [...all].sort((a, b) => b.seasons - a.seasons).findIndex((c) => c.name === coach.name) + 1;
+  const seasScore = seasRank === 1 ? 10 : seasRank === 2 ? 8 : seasRank === 3 ? 6 : (coach.seasons >= 5 ? 4 : 2);
+  const postScore = Math.min(coach.stateChamps * 10 + coach.stateRunnerUp * 6 + coach.finalFours * 5 + coach.eliteEights * 3 + coach.sweetSixteens * 2 + coach.leagueChamps * 2, 35);
+  const lgRank = [...all].sort((a, b) => b.leagueChamps - a.leagueChamps).findIndex((c) => c.name === coach.name) + 1;
+  const lgScore = lgRank === 1 && coach.leagueChamps > 0 ? 15 : lgRank === 2 && coach.leagueChamps > 0 ? 10 : coach.leagueChamps > 0 ? 5 : 0;
+  return Math.min(Math.round(winScore + pctScore + seasScore + postScore + lgScore), 100);
+}
+export function hofTier(score) {
+  if (score >= 90) return { label: "Legend", color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" };
+  if (score >= 75) return { label: "Elite", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" };
+  if (score >= 60) return { label: "Strong", color: "#065f46", bg: "#f0fdf4", border: "#6ee7b7" };
+  if (score >= 45) return { label: "Contender", color: "#92400e", bg: "#fffbeb", border: "#fcd34d" };
+  if (score >= 30) return { label: "Honorable", color: "#374151", bg: "#f9fafb", border: "#d1d5db" };
+  return { label: "Developing", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" };
+}
+// Awards → HOF bonuses (ported)
+const PLAYER_HONORS = [
+  { kind: "league_poy", label: "League Player of the Year", points: 8 },
+  { kind: "all_league_1st", label: "First Team All-League", points: 5 },
+  { kind: "all_league_2nd", label: "Second Team All-League", points: 3 },
+  { kind: "all_league_hm", label: "Honorable Mention All-League", points: 2 },
+  { kind: "state_poy", label: "State Player of the Year", points: 12 },
+  { kind: "all_state_1st", label: "First Team All-State", points: 9 },
+  { kind: "all_state_2nd", label: "Second Team All-State", points: 6 },
+  { kind: "all_state_hm", label: "Honorable Mention All-State", points: 4 },
+];
+const AWARD_POINTS = { all_league: 3, all_state: 6 };
+PLAYER_HONORS.forEach((h) => { AWARD_POINTS[h.kind] = h.points; });
+const PLAYER_AWARD_LABELS = { all_league: "All-League", all_state: "All-State" };
+PLAYER_HONORS.forEach((h) => { PLAYER_AWARD_LABELS[h.kind] = h.label; });
+const COACH_AWARD_POINTS = { league: 5, state: 10 };
+export function normName(n) { return String(n || "").toLowerCase().replace(/\s+/g, " ").trim(); }
+export function playerAwardBonus(name, awards) {
+  const n = normName(name); let b = 0;
+  for (const a of (awards || [])) { if (a.scope !== "player" || normName(a.holder_name) !== n) continue; b += AWARD_POINTS[a.kind] || 2; }
+  return Math.min(b, 20);
+}
+export function coachAwardBonus(name, awards) {
+  const n = normName(name); let b = 0;
+  for (const a of (awards || [])) { if (a.scope !== "coach" || normName(a.holder_name) !== n) continue; b += COACH_AWARD_POINTS[a.level] || COACH_AWARD_POINTS.league; }
+  return Math.min(b, 20);
+}
+export function awardsForHolder(name, scope, awards) {
+  const n = normName(name);
+  return (awards || []).filter((a) => a.scope === scope && normName(a.holder_name) === n);
+}
+export function awardLabel(a) {
+  if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
+  return PLAYER_AWARD_LABELS[a.kind] || a.kind;
+}
+
 // Full HTML document shell with SEO meta + JSON-LD + app-matching styles +
 // JS-free CSS tabs. `body` is the page content (may include the .tabs markup).
 export function htmlShell({ title, description, canonical, image, jsonld, body, noindex }) {
@@ -253,8 +391,46 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script
   .tabbar label{padding:10px 16px;font-size:14px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;flex-shrink:0}
   .tabbar label:hover{color:#374151}
   .panel{display:none}
-  #t-records:checked~.p-records,#t-alltime:checked~.p-alltime,#t-seasons:checked~.p-seasons,#t-hof:checked~.p-hof{display:block}
-  #t-records:checked~.tabbar label[for="t-records"],#t-alltime:checked~.tabbar label[for="t-alltime"],#t-seasons:checked~.tabbar label[for="t-seasons"],#t-hof:checked~.tabbar label[for="t-hof"]{color:#1a56db;font-weight:700;border-bottom-color:#1a56db}
+  #t-overview:checked~.p-overview,#t-athletes:checked~.p-athletes,#t-records:checked~.p-records,#t-alltime:checked~.p-alltime,#t-seasons:checked~.p-seasons,#t-hof:checked~.p-hof{display:block}
+  #t-overview:checked~.tabbar label[for="t-overview"],#t-athletes:checked~.tabbar label[for="t-athletes"],#t-records:checked~.tabbar label[for="t-records"],#t-alltime:checked~.tabbar label[for="t-alltime"],#t-seasons:checked~.tabbar label[for="t-seasons"],#t-hof:checked~.tabbar label[for="t-hof"]{color:#1a56db;font-weight:700;border-bottom-color:#1a56db}
+  /* overview stat cards */
+  .ovcards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .ovcard{background:#fff;border:1px solid #e8e4dd;border-radius:12px;padding:16px 20px}
+  .ovcard .ic{font-size:22px;margin-bottom:4px}
+  .ovcard .v{font-size:26px;font-weight:700;color:#111}
+  .ovcard .l{font-size:12px;color:#6b7280}
+  @media(max-width:560px){.ovcards{grid-template-columns:repeat(2,1fr)}}
+  /* athlete cards */
+  .acards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  @media(max-width:560px){.acards{grid-template-columns:1fr}}
+  .acard{background:#fff;border:1px solid #e8e4dd;border-radius:12px;padding:16px}
+  .acard .nm{font-weight:700;font-size:15px;color:#111}
+  .acard .pos{font-size:12px;color:#6b7280;margin-bottom:10px}
+  .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .scell{background:#f9fafb;border-radius:6px;padding:5px 8px}
+  .scell .k{font-size:10px;color:#9ca3af;line-height:1.2}
+  .scell .sv{font-size:13px;font-weight:600;color:#111}
+  .glabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;padding:2px 6px;display:inline-block;margin:6px 0 5px}
+  /* all-time controls + leaderboard */
+  .ctrls{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+  .ctrls select,.ctrls input{border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:#fff}
+  .ctrls input{flex:1;min-width:160px}
+  .fbtns{display:flex;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+  .fbtn{padding:8px 14px;font-size:13px;border:none;cursor:pointer;background:#fff;color:#6b7280;font-family:inherit}
+  .fbtn.on{background:#1a56db;color:#fff;font-weight:700}
+  /* hof view toggle */
+  .hvin{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+  .hvbar{display:inline-flex;border:1px solid #e5e7eb;border-radius:9px;overflow:hidden;margin-bottom:16px}
+  .hvbar label{padding:8px 18px;font-size:13px;color:#6b7280;cursor:pointer}
+  .hvpanel{display:none}
+  #hv-ath:checked~.hv-ath,#hv-coach:checked~.hv-coach{display:block}
+  #hv-ath:checked~.hvbar label[for="hv-ath"],#hv-coach:checked~.hvbar label[for="hv-coach"]{background:#1a3a6b;color:#fff;font-weight:700}
+  /* hof cards */
+  .hcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .hcard{background:#fff;border:1px solid #e8e4dd;border-radius:12px;padding:14px 16px}
+  .hcard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .hcard .sc{font-size:22px;font-weight:800;line-height:1}
+  .tier{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 10px;margin-top:6px}
   /* cta + footer */
   .cta{background:#1a3a6b;color:#fff;border-radius:14px;padding:24px;text-align:center;margin-top:40px}
   .cta a.btn{display:inline-block;background:#fff;color:#1a3a6b;font-weight:700;border-radius:9px;padding:11px 22px;margin-top:10px}
