@@ -4075,6 +4075,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const [showMilestoneSettings, setShowMilestoneSettings] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   // Every season row for this program — feeds the single-season shooting-% record holders.
   const [allSeasonRows, setAllSeasonRows] = useState([]);
   useEffect(() => {
@@ -4206,6 +4207,45 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
           <div>
+            {(() => {
+              // Public record book (SEO). Public-by-default; this is the opt-out + share control.
+              const isPub = school.isPublic !== false;
+              const publicUrl = school.slug ? `${window.location.origin}/teams/${school.slug}` : null;
+              return (
+                <div style={{ background:"#fff",border:"1px solid #e8e4dd",borderRadius:12,padding:16,marginBottom:20,display:"flex",flexDirection: isMobile?"column":"row",gap:12,alignItems: isMobile?"stretch":"center",justifyContent:"space-between" }}>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontWeight:700,fontSize:14,color:"#111",marginBottom:3 }}>
+                      🌐 Public record book
+                      {isPub
+                        ? <span style={{ fontSize:11,fontWeight:600,color:"#166534",background:"#dcfce7",borderRadius:20,padding:"2px 8px",marginLeft:6 }}>Live</span>
+                        : <span style={{ fontSize:11,fontWeight:600,color:"#92400e",background:"#fef3c7",borderRadius:20,padding:"2px 8px",marginLeft:6 }}>Hidden</span>}
+                    </div>
+                    <div style={{ fontSize:12,color:"#6b7280",lineHeight:1.5 }}>
+                      {isPub
+                        ? "Your records, Hall of Fame & season history are searchable on Google — bringing recruits, parents & boosters to your program."
+                        : "Hidden from Google and visitors. Turn on so people can find your program's records & Hall of Fame."}
+                    </div>
+                    {isPub && publicUrl && (
+                      <a href={publicUrl} target="_blank" rel="noreferrer" style={{ fontSize:12,color:"#1a56db",wordBreak:"break-all" }}>{publicUrl.replace(/^https?:\/\//,"")}</a>
+                    )}
+                    {isPub && !publicUrl && (
+                      <div style={{ fontSize:12,color:"#9ca3af" }}>Your public link will appear here right after the next sync.</div>
+                    )}
+                  </div>
+                  <div style={{ display:"flex",gap:8,flexShrink:0,flexWrap:"wrap" }}>
+                    {isPub && publicUrl && (
+                      <>
+                        <a href={publicUrl} target="_blank" rel="noreferrer" style={{ background:"#eff6ff",color:"#1a56db",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,textDecoration:"none" }}>View</a>
+                        <button onClick={()=>{ try { navigator.clipboard?.writeText(publicUrl); } catch(e){} setCopiedLink(true); setTimeout(()=>setCopiedLink(false),1500); }} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>{copiedLink ? "Copied!" : "Copy link"}</button>
+                      </>
+                    )}
+                    <button onClick={()=>onUpdate({ ...school, isPublic: !isPub })} style={{ background: isPub ? "#fff" : "#1a56db", color: isPub ? "#b91c1c" : "#fff", border: isPub ? "1px solid #fca5a5" : "none", borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
+                      {isPub ? "Make private" : "Make public"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             {totalAlertCount > 0 && (
               <div style={{ background:"#fffbeb",border:"1px solid #fde68a",borderRadius:12,padding:16,marginBottom:20 }}>
                 <div style={{ fontWeight:700,fontSize:14,color:"#92400e",marginBottom:12 }}>🔔 {totalAlertCount} active milestone alerts</div>
