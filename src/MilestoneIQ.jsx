@@ -2804,7 +2804,8 @@ function SeasonsTab({ seasons = [], onSave }) {
             {sortDir === "desc" ? "Oldest first ↑" : "Newest first ↓"}
           </button>
         </div>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+        <div style={{ overflowX:"auto" }}>
+        <table style={{width:"100%",minWidth:560,borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
               {["Season","Coach","Record","League","Win %","Postseason / Notes",""].map(h => (
@@ -2855,6 +2856,7 @@ function SeasonsTab({ seasons = [], onSave }) {
             })}
           </tbody>
         </table>
+        </div>
         <div style={{padding:"10px 20px",fontSize:12,color:"#9ca3af",borderTop:"1px solid #f3f0ea",background:"#fafaf8"}}>
           Overall: {totalWins}-{totalLosses} ({totalPct}%) · League: {totalLeagueWins}-{totalLeagueLosses} ({leaguePct}%)
         </div>
