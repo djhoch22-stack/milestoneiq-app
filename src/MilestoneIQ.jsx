@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import raftersLogo from '../raftersiq-logo.png';
@@ -808,49 +808,51 @@ function ImportModal({ school, onClose, onImport }) {
     reader.readAsText(file);
   };
 
-  const handlePDFFile = async (file) => {
-    setError(null); setPdfLoading(true); setPdfResult(null); setPdfFileName(file.name);
-    try {
-      const base64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result.split(",")[1]);
-        r.onerror = () => rej(new Error("Failed to read file"));
-        r.readAsDataURL(file);
-      });
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-              { type: "text", text: `Extract all athlete stats from this document. Return ONLY valid JSON, no markdown:
-{"athletes":[{"name":"Full Name","position":"Position or empty","gradYear":2025,"stats":{"Stat Name":numericValue}}]}
-Rules: numeric stats only, exact stat names from document, unknown grad year = ${new Date().getFullYear()+2}, include every athlete and stat found.` }
-            ]
-          }]
-        })
-      });
-      const data = await response.json();
-      const text = data.content?.map(c => c.text || "").join("") || "";
-      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-      if (!parsed.athletes?.length) throw new Error("No athletes found in this PDF.");
-      setPdfResult(parsed.athletes);
-    } catch (err) {
-      setError("Could not parse PDF: " + (err.message || "Try a CSV instead."));
-    } finally { setPdfLoading(false); }
+  const handlePDFFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    if (!files.length) return;
+    setError(null); setPdfLoading(true); setPdfResult(null);
+    setPdfFileName(files.length === 1 ? files[0].name : `${files.length} PDFs`);
+    const byName = {};
+    const errs = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setPdfFileName(`Reading ${i + 1} of ${files.length}: ${f.name}…`);
+      try {
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(",")[1]);
+          r.onerror = () => rej(new Error("read failed"));
+          r.readAsDataURL(f);
+        });
+        const { data, error } = await extractPdfStats(base64);
+        if (error) { errs.push(`${f.name}: ${error}`); continue; }
+        for (const a of (data.athletes || [])) {
+          const key = String(a.name || "").toLowerCase().trim();
+          if (!key) continue;
+          if (!byName[key]) byName[key] = { ...a, stats: { ...(a.stats || {}) } };
+          else Object.assign(byName[key].stats, a.stats || {});
+        }
+      } catch (err) { errs.push(`${f.name}: ${err.message || err}`); }
+    }
+    setPdfLoading(false);
+    setPdfFileName(files.length === 1 ? files[0].name : `${files.length} PDFs`);
+    const merged = Object.values(byName);
+    if (!merged.length) { setError("Couldn't extract athletes from those PDFs." + (errs.length ? " " + errs[0] : "")); return; }
+    if (errs.length) setError(`Imported ${files.length - errs.length} of ${files.length} files. Issues: ${errs.join("; ")}`);
+    setPdfResult(merged);
   };
+  const handlePDFFile = (file) => handlePDFFiles([file]);
 
   const handleDrop = (e) => {
     e.preventDefault(); setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    if (file.name.endsWith(".csv")) { setActiveTab("csv"); handleCSVFile(file); }
-    else if (file.name.endsWith(".pdf")) { setActiveTab("pdf"); handlePDFFile(file); }
-    else setError("Please drop a .csv or .pdf file");
+    const dropped = Array.from(e.dataTransfer.files || []);
+    if (!dropped.length) return;
+    const pdfs = dropped.filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    const csv = dropped.find(f => f.name.toLowerCase().endsWith(".csv"));
+    if (pdfs.length) { setActiveTab("pdf"); handlePDFFiles(pdfs); }
+    else if (csv) { setActiveTab("csv"); handleCSVFile(csv); }
+    else setError("Please drop .csv or .pdf file(s)");
   };
 
   const handlePDFImport = () => {
@@ -984,10 +986,10 @@ Rules: numeric stats only, exact stat names from document, unknown grad year = $
               <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
                 style={{ border:`2px dashed ${dragOver?"#1a56db":"#ddd"}`,borderRadius:12,padding:36,textAlign:"center",background:dragOver?"#eff6ff":"#fafafa",marginBottom:16 }}>
                 <div style={{ fontSize:40,marginBottom:8 }}>📋</div>
-                <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your PDF here</div>
-                <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>Stat sheets, program booklets, MaxPreps exports — any format</div>
-                <input type="file" accept=".pdf" onChange={e=>e.target.files[0]&&handlePDFFile(e.target.files[0])} style={{ display:"none" }} id="pdf-input" />
-                <label htmlFor="pdf-input" style={{ background:"#1a56db",color:"#fff",padding:"10px 24px",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:600 }}>Choose PDF</label>
+                <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your PDFs here</div>
+                <div style={{ fontSize:13,color:"#888",marginBottom:16 }}>Stat sheets, program booklets, MaxPreps exports — one or many, any format</div>
+                <input type="file" accept=".pdf" multiple onChange={e=>e.target.files.length&&handlePDFFiles(e.target.files)} style={{ display:"none" }} id="pdf-input" />
+                <label htmlFor="pdf-input" style={{ background:"#1a56db",color:"#fff",padding:"10px 24px",borderRadius:8,cursor:"pointer",fontSize:14,fontWeight:600 }}>Choose PDFs</label>
               </div>
             )}
             {pdfLoading && (
