@@ -480,6 +480,49 @@ function sameSeason(a, b) {
   return !!y(a) && y(a) === y(b);
 }
 
+// ── Derived per-game averages ───────────────────────────────────────────────
+// Per-game = counting stat ÷ Games Played. Like shooting %, NEVER stored — computed
+// wherever shown, and their record-holders auto-computed. Records attach to the PARENT
+// stat as variants ("Per game avg (season)"/"(career)") so the Records tab nests them.
+const PERGAME_DEFS = [
+  { name: "Points Per Game",             short: "PPG",  stat: "Points" },
+  { name: "Assists Per Game",            short: "APG",  stat: "Assists" },
+  { name: "Rebounds Per Game",           short: "RPG",  stat: "Total Rebounds" },
+  { name: "Offensive Rebounds Per Game", short: "ORPG", stat: "Offensive Rebounds" },
+  { name: "Defensive Rebounds Per Game", short: "DRPG", stat: "Defensive Rebounds" },
+  { name: "Steals Per Game",             short: "SPG",  stat: "Steals" },
+  { name: "Blocks Per Game",             short: "BPG",  stat: "Blocks" },
+];
+const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
+const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
+function perGame(stats, statKey) {
+  const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"]);
+  if (!g || g <= 0 || isNaN(v) || isNaN(g)) return null;
+  return Math.round((v / g) * 10) / 10; // one decimal, e.g. 18.3
+}
+// Auto per-game record-holders: single-season high (from player_seasons) + career avg
+// (career stat ÷ career games). Returned as variants of the parent stat.
+function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
+  const out = [];
+  for (const d of PERGAME_DEFS) {
+    let ss = null;
+    for (const r of (seasonRows || [])) {
+      if (Number(r.stats?.["Games Played"]) < PERGAME_MIN_SEASON_GP) continue;
+      const v = perGame(r.stats, d.stat);
+      if (v != null && (!ss || v > ss.value)) ss = { value: v, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (ss) out.push({ id: `auto-pg-ss-${d.stat}`, statName: d.stat, variant: "Per game avg (season)", sport, auto: true, ...ss });
+    let car = null;
+    for (const pl of (careerPlayers || [])) {
+      if (Number(pl.stats?.["Games Played"]) < PERGAME_MIN_CAREER_GP) continue;
+      const v = perGame(pl.stats, d.stat);
+      if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+    }
+    if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: "Per game avg (career)", sport, auto: true, ...car });
+  }
+  return out;
+}
+
 function pct(v, t) { return Math.min(100, Math.round((v / t) * 100)); }
 
 function ProgressBar({ value, max, color = "#1a56db" }) {
@@ -1705,14 +1748,18 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const td = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "#111", whiteSpace: "nowrap" };
   const inp = { width: 58, border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" };
   const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0);
-  // Derived shooting-% columns (FG%/3P%/FT%) — computed from makes ÷ attempts, shown
-  // only when this program actually tracks attempts so other sports stay unaffected.
+  // Derived columns — shooting % (made÷att) and per-game (stat÷GP) — computed, shown only
+  // when the program tracks the inputs so other sports stay unaffected.
   const pctCols = PCT_DEFS.filter((d) => careerOf(d.att) > 0 || (rows || []).some((r) => Number(r.stats?.[d.att]) > 0));
-  // Interleave each % right after its "Attempted" column (append any whose attempts column isn't shown).
+  const hasGP = careerOf("Games Played") > 0 || (rows || []).some((r) => Number(r.stats?.["Games Played"]) > 0);
+  const pgCols = hasGP ? PERGAME_DEFS.filter((d) => careerOf(d.stat) > 0 || (rows || []).some((r) => Number(r.stats?.[d.stat]) > 0)) : [];
+  // Interleave per-game right after its stat, and % right after its "Attempted" column.
   const orderedCols = [];
   const placedPct = new Set();
   for (const c of viewCols) {
     orderedCols.push({ col: c });
+    const pg = pgCols.find((p) => p.stat === c);
+    if (pg) orderedCols.push({ pg });
     const d = pctCols.find((p) => p.att === c);
     if (d) { orderedCols.push({ pct: d }); placedPct.add(d.name); }
   }
@@ -1738,7 +1785,9 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
               <thead><tr style={{ background: "#f9fafb" }}>
                 <th style={{ ...th, textAlign: "left" }}>Season</th>
-                {orderedCols.map(e => e.pct
+                {orderedCols.map(e => e.pg
+                  ? <th key={"pg-" + e.pg.stat} style={th} title={e.pg.name}>{e.pg.short}</th>
+                  : e.pct
                   ? <th key={"pct-" + e.pct.name} style={th} title={e.pct.name}>{e.pct.short}</th>
                   : <th key={e.col} style={th}>{e.col}</th>)}
               </tr></thead>
@@ -1746,14 +1795,18 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                 {rows.map(r => (
                   <tr key={r.id} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ ...td, textAlign: "left", fontWeight: 600 }}>{r.season}</td>
-                    {orderedCols.map(e => e.pct
+                    {orderedCols.map(e => e.pg
+                      ? <td key={"pg-" + e.pg.stat} style={td}>{(() => { const v = perGame(r.stats, e.pg.stat); return v != null ? v : "—"; })()}</td>
+                      : e.pct
                       ? <td key={"pct-" + e.pct.name} style={td}>{(() => { const v = shootingPct(r.stats, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
                       : <td key={e.col} style={td}>{r.stats?.[e.col] != null ? Number(r.stats[e.col]).toLocaleString() : "—"}</td>)}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
                   <td style={{ ...td, textAlign: "left", fontWeight: 700 }}>Career</td>
-                  {orderedCols.map(e => e.pct
+                  {orderedCols.map(e => e.pg
+                    ? <td key={"pg-" + e.pg.stat} style={{ ...td, fontWeight: 700 }}>{(() => { const v = perGame({ [e.pg.stat]: careerOf(e.pg.stat), "Games Played": careerOf("Games Played") }, e.pg.stat); return v != null ? v : "—"; })()}</td>
+                    : e.pct
                     ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{(() => { const v = shootingPct({ [e.pct.made]: careerOf(e.pct.made), [e.pct.att]: careerOf(e.pct.att) }, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
                     : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{careerOf(e.col).toLocaleString()}</td>)}
                 </tr>
@@ -1871,10 +1924,28 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           <h3 style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"#374151"}}>Career statistics & all-time rank</h3>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
             {statsToShow.flatMap(stat => {
-              // After each "…Attempted" tile, also show its derived shooting % (made ÷ attempted).
+              // After each stat show its per-game avg; after each "…Attempted" its shooting %.
+              const out = [{ stat }];
+              const pg = PERGAME_DEFS.find(p => p.stat === stat);
+              if (pg) out.push({ pgDef: pg });
               const d = PCT_DEFS.find(p => p.att === stat);
-              return d ? [{ stat }, { pctDef: d }] : [{ stat }];
+              if (d) out.push({ pctDef: d });
+              return out;
             }).map(entry => {
+              if (entry.pgDef) {
+                const pg = entry.pgDef;
+                const v = perGame(player.stats, pg.stat);
+                if (v == null) return null;
+                return (
+                  <div key={pg.name} style={{background:"#f9fafb",borderRadius:10,padding:"10px 14px",border:"1px solid #f0eeea"}}>
+                    <div style={{fontSize:11,color:"#9ca3af",fontWeight:600,marginBottom:3}}>{pg.name.toUpperCase()}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+                      <div style={{fontSize:22,fontWeight:700,color:"#111"}}>{v}</div>
+                      <div style={{fontSize:11,color:"#6b7280",textAlign:"right"}}>per game</div>
+                    </div>
+                  </div>
+                );
+              }
               if (entry.pctDef) {
                 const d = entry.pctDef;
                 const v = shootingPct(player.stats, d.made, d.att);
@@ -3999,16 +4070,25 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                 <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{typeof v==="number"?v.toLocaleString():v}</div>
                               </div>
                             );
-                            // After an "…Attempted" tile, also show its derived % (made ÷ attempted).
+                            const out = [tile];
+                            // After a stat show its per-game avg; after an "…Attempted" its shooting %.
+                            const pg = PERGAME_DEFS.find(p => p.stat === k);
+                            const pgVal = pg ? perGame(athlete.stats, pg.stat) : null;
+                            if (pg && pgVal != null) out.push(
+                              <div key={pg.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
+                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{pg.name}</div>
+                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{pgVal}</div>
+                              </div>
+                            );
                             const d = PCT_DEFS.find(p => p.att === k);
                             const pctVal = d ? shootingPct(athlete.stats, d.made, d.att) : null;
-                            if (d && pctVal != null) return [tile, (
+                            if (d && pctVal != null) out.push(
                               <div key={d.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
                                 <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{d.name}</div>
                                 <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{pctVal}%</div>
                               </div>
-                            )];
-                            return [tile];
+                            );
+                            return out;
                           })}
                       </div>
                     )}
@@ -4041,7 +4121,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
             </div>
 
-            {([...(school.records||[]), ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport)].length===0)
+            {([...(school.records||[]), ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport), ...pergameRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport)].length===0)
               ? <div style={{ background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb",padding:40,textAlign:"center",color:"#9ca3af" }}>
                   <div style={{ fontSize:32,marginBottom:8 }}>📋</div>
                   <div style={{ fontWeight:600,marginBottom:4 }}>No records on file yet</div>
@@ -4060,15 +4140,16 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
 
                   const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
                   const recStatIdx = (n) => { const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i; };
-                  const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)"];
+                  const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
                   const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const allRecords = [
-                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName]),
+                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && !String(r.variant||"").startsWith("Per game avg")),
                     ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
+                    ...pergameRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
