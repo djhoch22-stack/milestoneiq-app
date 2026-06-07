@@ -1135,6 +1135,17 @@ begin
   where p.ly = maxseason
     and not exists (select 1 from public.athletes ath where ath.program_id = p_program and lower(ath.name) = p.lname);
 
+  -- 5) collapse case-variant duplicates (e.g. "Van andel" vs "Van Andel"): keep the row whose
+  --    exact name matches player_seasons, delete the mis-cased sibling. Prevents split careers.
+  delete from public.all_time_players a
+  where a.program_id = p_program
+    and not exists (select 1 from public.player_seasons ps
+                    where ps.program_id = p_program and ps.player_name = a.name)
+    and exists (select 1 from public.all_time_players b
+                where b.program_id = p_program and b.id <> a.id and lower(b.name) = lower(a.name)
+                  and exists (select 1 from public.player_seasons ps
+                              where ps.program_id = p_program and ps.player_name = b.name));
+
   drop table if exists _pc;
 end $$;
 grant execute on function public.recompute_career_from_seasons(uuid) to anon, authenticated, service_role;
