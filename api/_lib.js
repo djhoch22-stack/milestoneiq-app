@@ -75,6 +75,7 @@ export const STAT_ORDER = [
   "Field Goals Attempts","PAT Mades","PAT Attempts",
   "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
   "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
+  "All-Purpose Yards",
   "Coach Wins",
 ];
 
