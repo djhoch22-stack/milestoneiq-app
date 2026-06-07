@@ -4744,7 +4744,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               };
               const effectiveMilestones = [
                 ...userMilestones
-                  .filter(m => m.statName !== "Coach Wins"),
+                  .filter(m => m.statName !== "Coach Wins")
+                  .sort((a, b) => byStatOrder(a.statName, b.statName)),
                 COACH_WINS_MILESTONE,
               ];
               const sport2 = SPORTS[school.sport] || SPORTS.football;
