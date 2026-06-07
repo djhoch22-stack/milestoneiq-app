@@ -1723,7 +1723,7 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
 
 
 // ── All-Time Leaderboard Tab ───────────────────────────────────────────────────
-function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true }) {
+function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true, onSaved }) {
   const [rows, setRows] = useState(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState([]);
@@ -1757,6 +1757,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   };
   const save = async () => {
     setBusy(true); setErr("");
+    const career = {}; // accumulate this player's career = sum of their seasons, so the all-time leaderboard updates
     for (const row of draft) {
       if (!String(row.season || "").trim()) continue;
       const stats = {};
@@ -1766,8 +1767,12 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
         season: String(row.season).trim(), grade: row.grade ? String(row.grade).trim() : null, stats,
       });
       if (error) { setBusy(false); setErr(`Couldn't save ${row.season}: ${error.message || error}`); return; }
+      for (const k in stats) career[k] = (career[k] || 0) + stats[k];
     }
     setBusy(false); setEditing(false); load();
+    // Roll the edited seasons into the player's career so their all-time rank + totals refresh
+    // right away (only THIS player is touched — no program-wide recompute).
+    if (onSaved) onSaved(career);
   };
 
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" };
@@ -2022,6 +2027,14 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
             allStats={ALL_STATS}
             seasonOptions={(school.seasons || []).map(s => s.season).filter(Boolean)}
             careerStats={player.stats}
+            onSaved={(career) => {
+              // Push the recomputed career into the all-time roster + active roster so the
+              // leaderboard position and totals update immediately (persisted via id upsert).
+              if (!career || !Object.keys(career).length) return;
+              const key = normName(player.name);
+              const merge = (arr) => (arr || []).map(p => normName(p.name) === key ? { ...p, stats: career } : p);
+              onUpdate({ ...school, allTimeRoster: merge(school.allTimeRoster), athletes: merge(school.athletes) });
+            }}
           />
 
           {/* Active toggle */}
