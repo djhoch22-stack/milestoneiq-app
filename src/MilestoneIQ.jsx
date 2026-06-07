@@ -2717,7 +2717,7 @@ function SeasonsTab({ seasons = [], onSave }) {
     const isState = /state|final|runner|sweet|elite|round/i.test(notes);
     const bg = isChamp ? "#fef3c7" : isState ? "#eff6ff" : "#f3f4f6";
     const tc = isChamp ? "#92400e" : isState ? "#1e40af" : "#6b7280";
-    const icon = isChamp ? "🏆 " : isState ? "🏀 " : "";
+    const icon = isChamp ? "🏆 " : isState ? "🏅 " : "";
     return (
       <span style={{background:bg,color:tc,borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600,whiteSpace:"nowrap"}}>
         {icon}{notes}
