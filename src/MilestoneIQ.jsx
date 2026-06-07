@@ -577,6 +577,27 @@ function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   }
   return out;
 }
+// Coach Wins records from the seasons table: career total (a coach's total wins in this program)
+// + single season (most wins by a coach in one season). All tied holders included. Per program.
+function coachWinsRecordsFrom(seasons, sport) {
+  const out = [];
+  const byCoach = {};
+  let ssMax = 0;
+  for (const s of (seasons || [])) {
+    if (!s.coach || s.wins == null) continue;
+    const w = Number(s.wins) || 0;
+    byCoach[s.coach] = (byCoach[s.coach] || 0) + w;
+    if (w > ssMax) ssMax = w;
+  }
+  const careerMax = Object.keys(byCoach).length ? Math.max(...Object.values(byCoach)) : 0;
+  if (careerMax > 0)
+    for (const coach in byCoach) if (byCoach[coach] === careerMax)
+      out.push({ id: `auto-cw-c-${coach.replace(/\s+/g, "")}`, statName: "Coach Wins", variant: "Career total", value: careerMax, holderName: coach, holderYear: "", sport, auto: true });
+  if (ssMax > 0)
+    for (const s of (seasons || [])) if (s.coach && (Number(s.wins) || 0) === ssMax)
+      out.push({ id: `auto-cw-ss-${(s.coach || "").replace(/\s+/g, "")}-${s.season}`, statName: "Coach Wins", variant: "Single season", value: ssMax, holderName: s.coach, holderYear: s.season || "", sport, auto: true });
+  return out;
+}
 
 function pct(v, t) { return Math.min(100, Math.round((v / t) * 100)); }
 
@@ -4656,6 +4677,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
+                    ...coachWinsRecordsFrom(school.seasons || [], school.sport),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
