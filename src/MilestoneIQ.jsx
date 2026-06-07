@@ -2511,10 +2511,14 @@ function SeasonForm({ form, setForm, noteSuggestions = [], onSubmit, submitLabel
           <input type="number" min="0" value={form.wins} onChange={e=>setForm(f=>({...f,wins:e.target.value}))} placeholder="0" style={fld} /></div>
         <div><label style={lbl}>Losses</label>
           <input type="number" min="0" value={form.losses} onChange={e=>setForm(f=>({...f,losses:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>Ties</label>
+          <input type="number" min="0" value={form.ties} onChange={e=>setForm(f=>({...f,ties:e.target.value}))} placeholder="0" style={fld} /></div>
         <div><label style={lbl}>League wins</label>
           <input type="number" min="0" value={form.leagueWins} onChange={e=>setForm(f=>({...f,leagueWins:e.target.value}))} placeholder="0" style={fld} /></div>
         <div><label style={lbl}>League losses</label>
           <input type="number" min="0" value={form.leagueLosses} onChange={e=>setForm(f=>({...f,leagueLosses:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>League ties</label>
+          <input type="number" min="0" value={form.leagueTies} onChange={e=>setForm(f=>({...f,leagueTies:e.target.value}))} placeholder="0" style={fld} /></div>
         <div><label style={lbl}>Head coach</label>
           <input value={form.coach} onChange={e=>setForm(f=>({...f,coach:e.target.value}))} placeholder="Coach name" style={fld} /></div>
       </div>
@@ -2545,21 +2549,25 @@ function SeasonsTab({ seasons = [], onSave }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const blankForm = { season:"", wins:"", losses:"", leagueWins:"", leagueLosses:"", coach:"", notes:"" };
+  const blankForm = { season:"", wins:"", losses:"", ties:"", leagueWins:"", leagueLosses:"", leagueTies:"", coach:"", notes:"" };
   const [form, setForm] = useState(blankForm);
 
   const buildSeason = (f) => {
     const w = f.wins !== "" ? Number(f.wins) : null;
     const l = f.losses !== "" ? Number(f.losses) : null;
+    const t = f.ties !== "" ? Number(f.ties) : 0;
     return {
       season: f.season,
       wins: w,
       losses: l,
+      ties: t,
       leagueWins:   f.leagueWins   !== "" ? Number(f.leagueWins)   : null,
       leagueLosses: f.leagueLosses !== "" ? Number(f.leagueLosses) : null,
+      leagueTies:   f.leagueTies   !== "" ? Number(f.leagueTies)   : 0,
       coach:  f.coach  || null,
       notes:  f.notes  || null,
-      winPct: w != null && l != null && (w + l) > 0 ? Math.round(w / (w + l) * 1000) / 10 : null
+      // Win % counts ties in the denominator: W / (W + L + T)
+      winPct: w != null && l != null && (w + l + t) > 0 ? Math.round(w / (w + l + t) * 1000) / 10 : null
     };
   };
 
@@ -2577,8 +2585,10 @@ function SeasonsTab({ seasons = [], onSave }) {
       season:       s.season || "",
       wins:         s.wins   ?? "",
       losses:       s.losses ?? "",
+      ties:         s.ties   ?? "",
       leagueWins:   s.leagueWins   ?? "",
       leagueLosses: s.leagueLosses ?? "",
+      leagueTies:   s.leagueTies   ?? "",
       coach:        s.coach  || "",
       notes:        s.notes  || "",
     });
@@ -2643,8 +2653,8 @@ function SeasonsTab({ seasons = [], onSave }) {
     if (!s.coach) return;
     if (!coachMap[s.coach]) {
       coachMap[s.coach] = {
-        wins: 0, losses: 0,
-        leagueWins: 0, leagueLosses: 0,
+        wins: 0, losses: 0, ties: 0,
+        leagueWins: 0, leagueLosses: 0, leagueTies: 0,
         seasons: 0, titles: 0,
         firstYear: s.season, lastYear: s.season
       };
@@ -2653,8 +2663,10 @@ function SeasonsTab({ seasons = [], onSave }) {
     rec.seasons++;
     if (s.wins != null) rec.wins += s.wins;
     if (s.losses != null) rec.losses += s.losses;
+    if (s.ties != null) rec.ties += s.ties;
     if (s.leagueWins != null) rec.leagueWins += s.leagueWins;
     if (s.leagueLosses != null) rec.leagueLosses += s.leagueLosses;
+    if (s.leagueTies != null) rec.leagueTies += s.leagueTies;
     if (s.notes && /champion/i.test(s.notes)) rec.titles++;
     if (s.season < rec.firstYear) rec.firstYear = s.season;
     if (s.season > rec.lastYear) rec.lastYear = s.season;
@@ -2663,10 +2675,12 @@ function SeasonsTab({ seasons = [], onSave }) {
   const seasonsWithRecord = seasons.filter(s => s.wins != null && s.losses != null);
   const totalWins = seasonsWithRecord.reduce((a, s) => a + (s.wins || 0), 0);
   const totalLosses = seasonsWithRecord.reduce((a, s) => a + (s.losses || 0), 0);
-  const totalPct = totalWins + totalLosses > 0 ? ((totalWins / (totalWins + totalLosses)) * 100).toFixed(1) : "—";
+  const totalTies = seasons.reduce((a, s) => a + (s.ties || 0), 0);
+  const totalPct = totalWins + totalLosses + totalTies > 0 ? ((totalWins / (totalWins + totalLosses + totalTies)) * 100).toFixed(1) : "—";
   const totalLeagueWins = seasons.reduce((a, s) => a + (s.leagueWins || 0), 0);
   const totalLeagueLosses = seasons.reduce((a, s) => a + (s.leagueLosses || 0), 0);
-  const leaguePct = totalLeagueWins + totalLeagueLosses > 0 ? ((totalLeagueWins / (totalLeagueWins + totalLeagueLosses)) * 100).toFixed(1) : "—";
+  const totalLeagueTies = seasons.reduce((a, s) => a + (s.leagueTies || 0), 0);
+  const leaguePct = totalLeagueWins + totalLeagueLosses + totalLeagueTies > 0 ? ((totalLeagueWins / (totalLeagueWins + totalLeagueLosses + totalLeagueTies)) * 100).toFixed(1) : "—";
   // Helper reads both legacy notes strings AND boolean flags
   const sf = (s, boolKey, noteRx) => s[boolKey] || (s.notes && noteRx.test(s.notes));
   const champSeasons = seasons.filter(s => sf(s,'leagueChampion', /league champion|league champ/i)).length;
@@ -2717,9 +2731,9 @@ function SeasonsTab({ seasons = [], onSave }) {
       {/* Summary stats — top row */}
       <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gap:12,marginBottom:12}}>
         {[
-          ["Program record",    `${totalWins}-${totalLosses}`,             "📊"],
+          ["Program record",    `${totalWins}-${totalLosses}${totalTies?`-${totalTies}`:""}`,             "📊"],
           ["Win percentage",    `${totalPct}%`,                            "📈"],
-          ["League record",     `${totalLeagueWins}-${totalLeagueLosses}`, "🏅"],
+          ["League record",     `${totalLeagueWins}-${totalLeagueLosses}${totalLeagueTies?`-${totalLeagueTies}`:""}`, "🏅"],
           ["League win %",      `${leaguePct}%`,                           "📉"],
           ["Seasons tracked",   seasonsWithRecord.length,                  "📅"],
           ["League titles",     champSeasons,                              "🏆"],
@@ -2759,8 +2773,8 @@ function SeasonsTab({ seasons = [], onSave }) {
             .sort((a,b) => b[1].wins - a[1].wins)
             .map(([coach, rec], i) => {
               const isCurrent = coach === mostRecentCoach;
-              const pct = rec.wins + rec.losses > 0 ? ((rec.wins/(rec.wins+rec.losses))*100).toFixed(1) : "—";
-              const lPct = rec.leagueWins + rec.leagueLosses > 0 ? ((rec.leagueWins/(rec.leagueWins+rec.leagueLosses))*100).toFixed(1) : "—";
+              const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? ((rec.wins/(rec.wins+rec.losses+(rec.ties||0)))*100).toFixed(1) : "—";
+              const lPct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins/(rec.leagueWins+rec.leagueLosses+(rec.leagueTies||0)))*100).toFixed(1) : "—";
               const yearRange = rec.firstYear === rec.lastYear ? rec.firstYear : `${rec.firstYear} – ${rec.lastYear}`;
               return (
                 <div key={coach} style={{
@@ -2781,12 +2795,12 @@ function SeasonsTab({ seasons = [], onSave }) {
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div style={{background:isCurrent?"#dbeafe":"#f9fafb",borderRadius:8,padding:"8px 12px"}}>
                       <div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>Overall</div>
-                      <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{rec.wins}-{rec.losses}</div>
+                      <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{rec.wins}-{rec.losses}{rec.ties?`-${rec.ties}`:""}</div>
                       <div style={{fontSize:11,color:"#6b7280"}}>{pct}%</div>
                     </div>
                     <div style={{background:isCurrent?"#dbeafe":"#f9fafb",borderRadius:8,padding:"8px 12px"}}>
                       <div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>League</div>
-                      <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{rec.leagueWins}-{rec.leagueLosses}</div>
+                      <div style={{fontWeight:700,fontSize:16,color:"#111"}}>{rec.leagueWins}-{rec.leagueLosses}{rec.leagueTies?`-${rec.leagueTies}`:""}</div>
                       <div style={{fontSize:11,color:"#6b7280"}}>{lPct}%</div>
                     </div>
                   </div>
@@ -2825,8 +2839,8 @@ function SeasonsTab({ seasons = [], onSave }) {
           <tbody>
             {sorted.map((s, i) => {
               const pct = s.winPct != null ? `${s.winPct}%` : "—";
-              const record = s.wins != null ? `${s.wins}-${s.losses ?? "?"}` : "—";
-              const leagueRecord = s.leagueWins != null ? `${s.leagueWins}-${s.leagueLosses ?? "?"}` : "—";
+              const record = s.wins != null ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
+              const leagueRecord = s.leagueWins != null ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
               const isChamp = s.leagueChampion || (s.notes && /league champion/i.test(s.notes));
               const isEditing = editingId === s.season;
 
