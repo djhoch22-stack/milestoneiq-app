@@ -527,7 +527,7 @@ function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
 }
 // Coach Wins records from the seasons table: career total (a coach's total wins in this program)
 // + single season (most wins by a coach in one season). All tied holders included. Per program.
-function coachWinsRecordsFrom(seasons, sport) {
+function coachWinsRecordsFrom(seasons, sport, prior = {}) {
   const out = [];
   const byCoach = {};
   let ssMax = 0;
@@ -537,6 +537,8 @@ function coachWinsRecordsFrom(seasons, sport) {
     byCoach[s.coach] = (byCoach[s.coach] || 0) + w;
     if (w > ssMax) ssMax = w;
   }
+  // wins a coach brought from PRIOR schools count toward their career total
+  Object.entries(prior || {}).forEach(([coach, pr]) => { if (pr && pr.wins) byCoach[coach] = (byCoach[coach] || 0) + Number(pr.wins || 0); });
   const careerMax = Object.keys(byCoach).length ? Math.max(...Object.values(byCoach)) : 0;
   if (careerMax > 0)
     for (const coach in byCoach) if (byCoach[coach] === careerMax)
@@ -2587,11 +2589,59 @@ function SeasonForm({ form, setForm, noteSuggestions = [], onSubmit, submitLabel
 }
 
 // ── Season History Tab ────────────────────────────────────────────────────────
-function SeasonsTab({ seasons = [], onSave }) {
+// Edit a coach's wins + accomplishments earned at PRIOR schools (any sport). Counts toward their
+// career Coach Wins record and Hall of Fame résumé. Stored per-program in school.coachPrior.
+function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
+  const FIELDS = [
+    ["wins", "Wins"], ["losses", "Losses"],
+    ["leagueChamps", "League Championships"], ["stateChamps", "State Championships"],
+    ["stateRunnerUp", "State Runner-Ups"], ["finalFours", "Final Fours"], ["eliteEights", "Elite Eights"],
+  ];
+  const [vals, setVals] = useState(() => {
+    const o = {}; FIELDS.forEach(([k]) => { o[k] = prior[k] != null ? String(prior[k]) : ""; });
+    o.note = prior.note || ""; return o;
+  });
+  const setV = (k, v) => setVals(p => ({ ...p, [k]: v }));
+  const save = () => {
+    const out = {};
+    FIELDS.forEach(([k]) => { const n = Number(vals[k]); if (n) out[k] = n; });
+    if ((vals.note || "").trim()) out.note = vals.note.trim();
+    onSave(out);
+  };
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:14, padding:24, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto" }}>
+        <div style={{ fontSize:18, fontWeight:700, color:"#111", marginBottom:4 }}>Prior-school record — {coach}</div>
+        <div style={{ fontSize:13, color:"#6b7280", marginBottom:16 }}>Wins &amp; accomplishments {coach} earned at other schools. These add to their career Coach Wins record and Hall of Fame résumé.</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+          {FIELDS.map(([k, label]) => (
+            <label key={k} style={{ fontSize:12, color:"#374151", fontWeight:600 }}>
+              {label}
+              <input type="number" min="0" value={vals[k]} onChange={e=>setV(k, e.target.value)}
+                style={{ display:"block", width:"100%", marginTop:4, padding:"8px 10px", border:"1px solid #d1d5db", borderRadius:8, fontSize:14, boxSizing:"border-box" }} />
+            </label>
+          ))}
+        </div>
+        <label style={{ fontSize:12, color:"#374151", fontWeight:600 }}>
+          Previous school(s) / notes
+          <input type="text" value={vals.note} onChange={e=>setV("note", e.target.value)} placeholder="e.g. Lincoln HS (2005-2014)"
+            style={{ display:"block", width:"100%", marginTop:4, padding:"8px 10px", border:"1px solid #d1d5db", borderRadius:8, fontSize:14, boxSizing:"border-box" }} />
+        </label>
+        <div style={{ display:"flex", justifyContent:"flex-end", gap:10, marginTop:20 }}>
+          <button onClick={onClose} style={{ background:"#f3f4f6", color:"#374151", border:"1px solid #e5e7eb", borderRadius:8, padding:"9px 18px", fontSize:14, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+          <button onClick={save} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"9px 18px", fontSize:14, fontWeight:600, cursor:"pointer" }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior }) {
   const isMobile = useIsMobile();
   const [sortDir, setSortDir] = useState("desc");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingCoach, setEditingCoach] = useState(null);
 
   const blankForm = { season:"", wins:"", losses:"", ties:"", leagueWins:"", leagueLosses:"", leagueTies:"", coach:"", notes:"" };
   const [form, setForm] = useState(blankForm);
@@ -2715,6 +2765,14 @@ function SeasonsTab({ seasons = [], onSave }) {
     if (s.season < rec.firstYear) rec.firstYear = s.season;
     if (s.season > rec.lastYear) rec.lastYear = s.season;
   });
+  // Fold each coach's PRIOR-school wins/accomplishments (edited via the pencil on each coach tile).
+  Object.entries(coachPrior || {}).forEach(([coach, pr]) => {
+    if (!coachMap[coach] || !pr) return;
+    const rec = coachMap[coach];
+    rec.priorWins = Number(pr.wins || 0); rec.priorNote = pr.note || "";
+    rec.wins += Number(pr.wins || 0); rec.losses += Number(pr.losses || 0);
+    rec.titles += Number(pr.leagueChamps || 0) + Number(pr.stateChamps || 0);
+  });
 
   const seasonsWithRecord = seasons.filter(s => s.wins != null && s.losses != null);
   const totalWins = seasonsWithRecord.reduce((a, s) => a + (s.wins || 0), 0);
@@ -2760,6 +2818,7 @@ function SeasonsTab({ seasons = [], onSave }) {
 
   return (
     <div>
+      {editingCoach && <CoachPriorModal coach={editingCoach} prior={coachPrior[editingCoach] || {}} onClose={()=>setEditingCoach(null)} onSave={(pr)=>{ if (onSaveCoachPrior) onSaveCoachPrior({ ...coachPrior, [editingCoach]: pr }); setEditingCoach(null); }} />}
       {/* Add season button + form */}
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
         {!showAddForm && !editingId && (
@@ -2834,8 +2893,13 @@ function SeasonsTab({ seasons = [], onSave }) {
                         Current
                       </span>
                     )}
+                    <button onClick={()=>setEditingCoach(coach)} title="Add wins & accomplishments from prior schools"
+                      style={{marginLeft:"auto",background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",color:"#374151",fontWeight:600,whiteSpace:"nowrap"}}>✏️ Prior</button>
                   </div>
                   <div style={{fontSize:12,color:"#6b7280",marginBottom:8}}>{yearRange} · {rec.seasons} season{rec.seasons!==1?"s":""}</div>
+                  {rec.priorWins > 0 && (
+                    <div style={{fontSize:11,color:"#1e40af",marginBottom:8}}>+{rec.priorWins} wins from prior schools{rec.priorNote?` · ${rec.priorNote}`:""}</div>
+                  )}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div style={{background:isCurrent?"#dbeafe":"#f9fafb",borderRadius:8,padding:"8px 12px"}}>
                       <div style={{fontSize:10,color:"#9ca3af",marginBottom:2}}>Overall</div>
@@ -3130,7 +3194,7 @@ const COACH_PRIOR_STATS = {
 };
 
 function buildCoachStats(seasons, opts = {}) {
-  const { includePrior = true } = opts;
+  const { includePrior = true, prior = {} } = opts;
   const coaches = {};
   (seasons || []).forEach(s => {
     const name = (s.coach || s["coach"] || "").trim();
@@ -3165,10 +3229,10 @@ function buildCoachStats(seasons, opts = {}) {
   });
   // Fold in wins/record a coach brought from a PREVIOUS school — only when enabled (toggle), and
   // only into programs where they actually coached (so a basketball coach doesn't appear on football).
-  if (includePrior) Object.entries(COACH_PRIOR_STATS).forEach(([name, prior]) => {
-    if (!coaches[name]) return;
+  if (includePrior) Object.entries({ ...COACH_PRIOR_STATS, ...prior }).forEach(([name, pr]) => {
+    if (!coaches[name] || !pr) return;
     const co = coaches[name];
-    Object.keys(prior).forEach(k => { if (typeof co[k] === "number") co[k] += prior[k]; });
+    Object.keys(pr).forEach(k => { if (typeof co[k] === "number" && typeof pr[k] === "number") co[k] += pr[k]; });
   });
   return Object.values(coaches);
 }
@@ -3294,7 +3358,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
     });
   });
   const allCoaches = useMemo(
-    () => buildCoachStats(combinedSeasons, { includePrior }),
+    () => buildCoachStats(combinedSeasons, { includePrior, prior: Object.assign({}, school.coachPrior || {}, ...(allSchools || []).map(x => x.coachPrior || {})) }),
     [school.id, crossProgram, includePrior, (allSchools||[]).length, combinedSeasons.length] // eslint-disable-line
   );
   // Only LIST coaches who actually coached THIS program (their record may still span other teams).
@@ -4652,7 +4716,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
-                    ...coachWinsRecordsFrom(school.seasons || [], school.sport),
+                    ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
                   ];
                   // Manual records are AUTHORITATIVE: a manually entered/edited record overrides the
                   // auto-computed one for the same stat+variant (e.g. an edited best FG%/3P%/FT%).
@@ -4955,7 +5019,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 </p>
               </div>
             </div>
-            <SeasonsTab seasons={school.seasons} onSave={(updatedSeasons) => onUpdate({...school, seasons: updatedSeasons})} />
+            <SeasonsTab seasons={school.seasons} onSave={(updatedSeasons) => onUpdate({...school, seasons: updatedSeasons})} coachPrior={school.coachPrior || {}} onSaveCoachPrior={(cp) => onUpdate({...school, coachPrior: cp})} />
           </div>
         )}
 
