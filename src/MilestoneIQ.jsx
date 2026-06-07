@@ -336,6 +336,20 @@ function allStatsFor(roster) {
     .filter(s => roster.some(p => (p.stats[s] || 0) > 0))
     .sort(byStatOrder);
 }
+// Stats a program should ALWAYS surface on its tabs — even before any data is entered.
+// Sports NOT listed here fall back to "stats present in the data" (no behavior change).
+const DISPLAY_STATS = {
+  soccer:       ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  soccer_girls: ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+};
+// Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
+// data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
+function statsToDisplay(roster, sport) {
+  const base = DISPLAY_STATS[sport] || [];
+  const present = [...new Set((roster || []).flatMap(p => Object.keys(p.stats || {})))]
+    .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
+  return [...new Set([...base, ...present])].sort(byStatOrder);
+}
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
   const activeNames = new Set(athletes.filter(a => a.isActive !== false).map(a => a.name.toLowerCase()));
@@ -381,9 +395,24 @@ const DEFAULT_MILESTONES = [
   { id:"dm20", statName:"Punt Return Yards",  values:[250,500],               alertPct:90 },
 ];
 
-function getMilestoneAlerts(athlete, records = [], milestones = []) {
+// Sensible default milestone thresholds per stat (used when a program hasn't customized them).
+const MILESTONE_THRESHOLDS = {
+  "Games Played": [25,50,75,100], "Wins": [25,50,75,100], "Points": [25,50,100,150],
+  "Goals": [10,25,50,75,100], "Assists": [10,25,50,75], "Shots": [50,100,200,300],
+  "Saves": [50,100,250,500], "Shutouts": [5,10,15,25],
+};
+// Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
+// those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
+function defaultMilestonesFor(sport) {
+  const base = DISPLAY_STATS[sport];
+  if (!base) return DEFAULT_MILESTONES;
+  const ms = base.filter(s => MILESTONE_THRESHOLDS[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: MILESTONE_THRESHOLDS[s], alertPct: 90 }));
+  return ms.length ? ms : DEFAULT_MILESTONES;
+}
+
+function getMilestoneAlerts(athlete, records = [], milestones = [], sport) {
   const alerts = [];
-  const effectiveMilestones = milestones.length > 0 ? milestones : DEFAULT_MILESTONES;
+  const effectiveMilestones = milestones.length > 0 ? milestones : defaultMilestonesFor(sport);
 
   for (const rec of records) {
     if (rec.variant !== "Career total") continue;
@@ -587,7 +616,10 @@ function AlertBadge({ alert, mode = "short" }) {
 function MilestoneSettingsModal({ school, onClose, onSave }) {
   const sportDef = SPORTS[school.sport] || SPORTS.football;
   // Build stat list in the same order as the All-Time tab
-  const rawStatNames = sportDef.statCategories.map(s => s.name).filter(n => n !== "Coach Wins");
+  const rawStatNames = [...new Set([
+    ...(DISPLAY_STATS[school.sport] || []),
+    ...sportDef.statCategories.map(s => s.name).filter(n => n !== "Coach Wins"),
+  ])];
   const allStatNames = [
     ...STAT_ORDER.filter(s => rawStatNames.includes(s)),
     ...rawStatNames.filter(s => !STAT_ORDER.includes(s))
@@ -595,7 +627,7 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
   const [milestones, setMilestones] = useState(
     school.milestones && school.milestones.length > 0
       ? school.milestones.map(m => ({ ...m, _valStr: m.values.join(", ") }))
-      : DEFAULT_MILESTONES.map(m => ({ ...m, _valStr: m.values.join(", ") }))
+      : defaultMilestonesFor(school.sport).map(m => ({ ...m, _valStr: m.values.join(", ") }))
   );
   const [newStat, setNewStat] = useState(allStatNames[0]);
   const [newVals, setNewVals] = useState("");
@@ -744,7 +776,7 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
         </div>
 
         <div style={{ display:"flex",gap:10 }}>
-          <button onClick={() => setMilestones(DEFAULT_MILESTONES.map(m => ({ ...m, _valStr: m.values.join(", ") })))}
+          <button onClick={() => setMilestones(defaultMilestonesFor(school.sport).map(m => ({ ...m, _valStr: m.values.join(", ") })))}
             style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:8,padding:"10px 16px",fontWeight:600,fontSize:13,cursor:"pointer",color:"#374151" }}>
             Reset to defaults
           </button>
@@ -1898,7 +1930,7 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
     onClose();
   };
 
-  const statsToShow = ALL_STATS.filter(s => (player.stats[s] || 0) > 0);
+  const statsToShow = statsToDisplay([player], school.sport);
   const initials = player.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
   const years = (player.firstYear && player.lastYear)
@@ -1992,15 +2024,17 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
                 );
               }
               const stat = entry.stat;
-              const val = player.stats[stat] || 0;
-              const rank = rankFor(player, stat);
+              const raw = player.stats[stat];
+              const has = raw != null && Number(raw) > 0;
+              const val = Number(raw) || 0;
+              const rank = has ? rankFor(player, stat) : null;
               return (
                 <div key={stat} style={{background:"#f9fafb",borderRadius:10,padding:"10px 14px",border:"1px solid #f0eeea"}}>
                   <div style={{fontSize:11,color:"#9ca3af",fontWeight:600,marginBottom:3}}>{stat.toUpperCase()}</div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-                    <div style={{fontSize:22,fontWeight:700,color:"#111"}}>{val.toLocaleString()}</div>
-                    <div style={{fontSize:11,color: rank===1?"#b45309":"#6b7280",fontWeight:rank<=3?700:400,textAlign:"right"}}>
-                      {rank===1?"🥇 All-time leader":rank===2?"🥈 #2 all-time":rank===3?"🥉 #3 all-time":`#${rank} all-time`}
+                    <div style={{fontSize:22,fontWeight:700,color: has?"#111":"#d1d5db"}}>{has?val.toLocaleString():"—"}</div>
+                    <div style={{fontSize:11,color: rank===1?"#b45309":"#6b7280",fontWeight:rank&&rank<=3?700:400,textAlign:"right"}}>
+                      {rank ? (rank===1?"🥇 All-time leader":rank===2?"🥈 #2 all-time":rank===3?"🥉 #3 all-time":`#${rank} all-time`) : ""}
                     </div>
                   </div>
                 </div>
@@ -2365,7 +2399,7 @@ function ImportSeasons({ school, roster = [] }) {
 }
 
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
-  const ALL_STATS = allStatsFor(roster);
+  const ALL_STATS = statsToDisplay(roster, school?.sport);
 
   const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
@@ -4172,7 +4206,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const sport = SPORTS[school.sport] || SPORTS.football;
   // Clicking an athlete card opens the SAME full profile modal as the All-Time tab.
   const atRoster = school.allTimeRoster || [];
-  const atAllStats = allStatsFor(atRoster);
+  const atAllStats = statsToDisplay(atRoster, school.sport);
   const atEffectiveIsActive = makeEffectiveIsActive(school.athletes || []);
   const atRankFor = makeRankFor(atRoster);
   // Open by the all-time-roster entry (matched by name) so career totals + rank match the All-Time tab.
@@ -4188,7 +4222,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   });
   const allAlerts = careerAthletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
-    alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [])
+    alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [], school.sport)
       .filter(alert => !isAlertDismissed(a.id, alert.statName, alert.target))
   })).filter(x => x.alerts.length > 0);
 
@@ -4352,7 +4386,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               // athlete profile (byStatOrder + each % right after its "Attempted" column).
               // Name column is frozen (sticky-left); the rest scrolls horizontally.
               const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
-              const baseCols = allStatsFor(activeAthletes);
+              const baseCols = statsToDisplay(activeAthletes, school.sport);
               const ovCols = [];
               for (const c of baseCols) { ovCols.push({ stat: c }); const d = PCT_DEFS.find(p => p.att === c); if (d) ovCols.push({ pct: d }); }
               const rows = [...activeAthletes].sort((a, b) => a.name.localeCompare(b.name));
@@ -4438,7 +4472,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   return true;
                 })
                 .map(athlete=>{
-                const ats = getMilestoneAlerts(athlete, school.records||[], school.milestones||[])
+                const ats = getMilestoneAlerts(athlete, school.records||[], school.milestones||[], school.sport)
                   .filter(a => !isAlertDismissed(athlete.id, a.statName, a.target));
                 const isSelected = selectedAthlete?.id===athlete.id;
                 const isActive = athlete.isActive !== false;
@@ -4514,25 +4548,17 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                       </div>
                     ) : (
                       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
-                        {Object.entries(athlete.stats)
-                          .sort(([a],[b]) => byStatOrder(a, b))
-                          .flatMap(([k,v])=>{
+                        {statsToDisplay([athlete], school.sport)
+                          .flatMap((k)=>{
+                            const v = athlete.stats?.[k];
                             const tile = (
                               <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
                                 <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
-                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{typeof v==="number"?v.toLocaleString():v}</div>
+                                <div style={{ fontSize:13,fontWeight:600,color: v==null?"#d1d5db":"#111" }}>{v==null?"—":(typeof v==="number"?v.toLocaleString():v)}</div>
                               </div>
                             );
                             const out = [tile];
-                            // After a stat show its per-game avg; after an "…Attempted" its shooting %.
-                            const pg = PERGAME_DEFS.find(p => p.stat === k);
-                            const pgVal = pg ? perGame(athlete.stats, pg.stat) : null;
-                            if (pg && pgVal != null) out.push(
-                              <div key={pg.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{pg.name}</div>
-                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{pgVal}</div>
-                              </div>
-                            );
+                            // After an "…Attempted" stat show its shooting %.
                             const d = PCT_DEFS.find(p => p.att === k);
                             const pctVal = d ? shootingPct(athlete.stats, d.made, d.att) : null;
                             if (d && pctVal != null) out.push(
@@ -4606,7 +4632,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && !String(r.variant||"").startsWith("Per game avg") && r.variant !== "Career total" && r.variant !== "Single season"),
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
-                    ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), allStatsFor(recPool), school.sport),
+                    ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
@@ -4710,7 +4736,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             </div>
 
             {(() => {
-              const userMilestones = (school.milestones && school.milestones.length > 0) ? school.milestones : DEFAULT_MILESTONES;
+              const userMilestones = (school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport);
               // Coach Wins is always automatic and always last
               const COACH_WINS_MILESTONE = {
                 id: "__coach_wins__", statName: "Coach Wins", alertPct: 90,
@@ -5155,7 +5181,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     return acc + sc.athletes
       .filter(a => a.isActive !== false)
       .reduce((a, athlete) =>
-        a + getMilestoneAlerts(athlete, sc.records||[], sc.milestones||[])
+        a + getMilestoneAlerts(athlete, sc.records||[], sc.milestones||[], sc.sport)
           .filter(al => !dismissed.has(`${athlete.id}|${al.statName}|${al.target}`)).length
       , 0);
   }, 0);
@@ -5386,7 +5412,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
               const alerts = school.athletes
                 .filter(a => a.isActive !== false)
                 .reduce((a,athlete) =>
-                  a + getMilestoneAlerts(athlete,school.records||[],school.milestones||[])
+                  a + getMilestoneAlerts(athlete,school.records||[],school.milestones||[],school.sport)
                     .filter(al => !dismissed.has(`${athlete.id}|${al.statName}|${al.target}`)).length
                 , 0);
               const topAthlete = [...school.athletes].filter(a=>a.isActive!==false).sort((a,b)=>{
