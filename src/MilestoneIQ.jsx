@@ -514,10 +514,15 @@ function sameSeason(a, b) {
 // Per-game = counting stat ÷ Games Played. Like shooting %, NEVER stored — computed
 // wherever shown, and their record-holders auto-computed. Records attach to the PARENT
 // stat as variants ("Per game avg (season)"/"(career)") so the Records tab nests them.
-// Per-game averages (PPG/APG/RPG/etc.) are intentionally NOT displayed anywhere — not on
-// player cards, profiles, the all-time grid, milestones, the season table, or records.
-// Emptying this list removes them from every view at once (all call sites are guarded).
+// Per-game DISPLAY (PPG/APG/RPG/etc.) is intentionally OFF everywhere — player cards, profiles,
+// the all-time grid, milestones, the season table. (Empty = removed from all of them.)
 const PERGAME_DEFS = [];
+// Per-game RECORDS, however, ARE shown on the Records tab — nested inside each stat's tile as
+// "Per game avg (season)" + "(career)". This list = the stats we compute those records for.
+const PERGAME_RECORD_DEFS = [
+  { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
+  { stat: "Total Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
 function perGame(stats, statKey) {
@@ -529,7 +534,7 @@ function perGame(stats, statKey) {
 // (career stat ÷ career games). Returned as variants of the parent stat.
 function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  for (const d of PERGAME_DEFS) {
+  for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
       if (Number(r.stats?.["Games Played"]) < PERGAME_MIN_SEASON_GP) continue;
