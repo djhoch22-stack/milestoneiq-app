@@ -819,6 +819,12 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
 // ── Records Manager Modal ──────────────────────────────────────────────────────
 function RecordsModal({ school, onClose, onSave }) {
   const sportDef = SPORTS[school.sport] || SPORTS.football;
+  // Every stat a record can be submitted for: the sport's canonical display stats UNION its
+  // record categories (so soccer offers all 8 — Games Played…Shutouts — not just 4) + Coach Wins.
+  const statOptions = [...new Set([
+    ...(DISPLAY_STATS[school.sport] || []),
+    ...sportDef.statCategories.map(s => s.name),
+  ])].sort(byStatOrder);
   const [records, setRecords] = useState(school.records || []);
   const [editingId, setEditingId] = useState(null);
   const variantsForStat = (statName) => {
@@ -826,7 +832,7 @@ function RecordsModal({ school, onClose, onSave }) {
     return found ? found.variants : STAT_VARIANTS_STANDARD;
   };
 
-  const firstStat = sportDef.statCategories[0]?.name || "Passing Yards";
+  const firstStat = statOptions[0] || sportDef.statCategories[0]?.name || "Passing Yards";
   const [newForm, setNewForm] = useState({ statName: firstStat, variant: variantsForStat(firstStat)[0], holderName: "", holderYear: "", value: "" });
   const [filter, setFilter] = useState("");
 
@@ -872,7 +878,7 @@ function RecordsModal({ school, onClose, onSave }) {
                   <optgroup key={g.group} label={g.group}>
                     {g.stats.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
                   </optgroup>
-                )) : sportDef.statCategories.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                )) : statOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
