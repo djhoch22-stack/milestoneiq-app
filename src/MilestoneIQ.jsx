@@ -4727,7 +4727,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                   return (
                                     <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
                                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
-                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? "Best %" : rec.variant}</span>
+                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best %" : rec.variant === "Single season" ? "Season best %" : `Best % (${rec.variant})`) : rec.variant}</span>
                                         <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
                                       </div>
                                       {(() => {
