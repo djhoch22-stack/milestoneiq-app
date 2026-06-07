@@ -60,7 +60,7 @@ export function fmtNum(v) {
 
 // ── Stat ordering (ported from MilestoneIQ.jsx STAT_ORDER / byStatOrder) ──────
 export const STAT_ORDER = [
-  "Games Played","Wins","Points","Assists",
+  "Games Played","Wins","Points","Goals","Assists","Shots","Saves","Clean Sheets","Goals Against","Shots on Goal",
   "Total Rebounds","Offensive Rebounds","Defensive Rebounds",
   "Steals","Blocks",
   "Field Goals Made","Field Goals Attempted",
