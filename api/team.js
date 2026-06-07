@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
-    ...coachWinsRecordsFrom(seasonsList, team.sport),
+    ...coachWinsRecordsFrom(seasonsList, team.sport, team.coach_prior || {}),
   ];
   // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
   const manualKeys = new Set(storedRecords.map((r) => r.statName + "|" + r.variant));
