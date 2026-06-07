@@ -37,8 +37,8 @@ FOOTBALL — use these EXACT stat names, mapping the column within each section:
 - Total Yards section: Total→"Total Yards"
 - Tackles section: "Tot Tckls"→"Combined Tackles", Solo→"Solo Tackles", Asst→"Assisted Tackles", TFL→"Tackles for Loss"
 - Sacks section: Sacks→"Sacks" (it is a decimal like 1.0/3.0; ignore Ydl/Hurs)
-- Defensive section: Int→"Interceptions", PD→"Passes Defended", "Fmb Rec"→"Fumbles Recovered"
-- Returns: "KR Yds"→"Kick Return Yards", punt-return Yds→"Punt Return Yards"
+- Defensive section: Int→"Interceptions", PD→"Passes Defended", "Fmb Rec"→"Fumbles Recovered", Caus→"Forced Fumbles" (ignore Int Yds, FR Yds, Blk Pnts, Blk FGs)
+- "Kickoff and Punt Returns" section: "KO Rets"→"Kick Returns", the Yds column right after KO Rets→"Kick Return Yards", "P Rets"→"Punt Returns", the Yds column right after P Rets→"Punt Return Yards" (ignore Avg/Lng/FC and the combined "KR Yds" total)
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
 For non-football sports (basketball, soccer, etc.) there is usually one table — use the exact stat names shown.
