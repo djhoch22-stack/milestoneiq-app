@@ -442,9 +442,9 @@ function getMilestoneAlerts(athlete, records = [], milestones = [], sport) {
 // so they can't go stale and the AI can't invent them. A minimum-attempts qualifier
 // stops a 1-for-1 fluke (100%) from owning a record.
 const PCT_DEFS = [
-  { name: "Field Goal Percentage",  short: "FG%", made: "Field Goals Made",   att: "Field Goals Attempted",   minSeasonAtt: 30, minCareerAtt: 100 },
-  { name: "Three Point Percentage", short: "3P%", made: "Three Pointers Made", att: "Three Pointers Attempted", minSeasonAtt: 15, minCareerAtt: 40 },
-  { name: "Free Throw Percentage",  short: "FT%", made: "Free Throws Made",    att: "Free Throws Attempted",    minSeasonAtt: 20, minCareerAtt: 50 },
+  { name: "Field Goal Percentage",  short: "FG%", made: "Field Goals Made",   att: "Field Goals Attempted",   minSeasonAtt: 25, minCareerAtt: 100 },
+  { name: "Three Point Percentage", short: "3P%", made: "Three Pointers Made", att: "Three Pointers Attempted", minSeasonAtt: 25, minCareerAtt: 100 },
+  { name: "Free Throw Percentage",  short: "FT%", made: "Free Throws Made",    att: "Free Throws Attempted",    minSeasonAtt: 25, minCareerAtt: 100 },
 ];
 function shootingPct(stats, made, att) {
   const m = Number(stats?.[made]); const a = Number(stats?.[att]);
@@ -491,7 +491,7 @@ const PERGAME_DEFS = [];
 // "Per game avg (season)" + "(career)". This list = the stats we compute those records for.
 const PERGAME_RECORD_DEFS = [
   { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
-  { stat: "Total Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+  { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
@@ -4664,14 +4664,19 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
-                  const allRecords = [
-                    // keep only stored records we DON'T auto-compute (e.g. single-game); career +
-                    // single-season + %/per-game are derived from data so they match the All-Time tab.
-                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && !String(r.variant||"").startsWith("Per game avg") && r.variant !== "Career total" && r.variant !== "Single season"),
+                  const autoRecs = [
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
                     ...coachWinsRecordsFrom(school.seasons || [], school.sport),
+                  ];
+                  // Show a manually-entered record UNLESS an auto-computed one exists for the same
+                  // stat+variant. So manual entries (incl. ones the data can't yet derive) persist &
+                  // appear in their tile, while data-derived records stay authoritative where present.
+                  const autoKeys = new Set(autoRecs.map(r => r.statName + "|" + r.variant));
+                  const allRecords = [
+                    ...(school.records||[]).filter(r => !autoKeys.has(r.statName + "|" + r.variant)),
+                    ...autoRecs,
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
