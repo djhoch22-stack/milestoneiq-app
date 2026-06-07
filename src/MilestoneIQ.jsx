@@ -4103,7 +4103,16 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const atRankFor = makeRankFor(atRoster);
   // Open by the all-time-roster entry (matched by name) so career totals + rank match the All-Time tab.
   const openAthlete = (athlete) => setSelectedAthlete(atRoster.find(p => (p.name || "").toLowerCase() === (athlete.name || "").toLowerCase()) || athlete);
-  const allAlerts = school.athletes.filter(a => a.isActive !== false).map(a => ({
+  // Active players' CAREER stats live in the all-time roster; the athletes table may hold only the
+  // current season. Merge by name so Overview / Athletes / Milestones show career totals (matching
+  // the player profile), not a single season — fixes card-vs-profile stat mismatches.
+  const careerByName = {};
+  atRoster.forEach(p => { if (p && p.name) careerByName[p.name.toLowerCase().trim()] = p.stats; });
+  const careerAthletes = (school.athletes || []).map(a => {
+    const cs = careerByName[(a.name || "").toLowerCase().trim()];
+    return cs ? { ...a, stats: cs } : a;
+  });
+  const allAlerts = careerAthletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
     alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [])
       .filter(alert => !isAlertDismissed(a.id, alert.statName, alert.target))
@@ -4268,7 +4277,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               // Career stats for ACTIVE players — all stats, same order as the all-time tab /
               // athlete profile (byStatOrder + each % right after its "Attempted" column).
               // Name column is frozen (sticky-left); the rest scrolls horizontally.
-              const activeAthletes = school.athletes.filter(a => a.isActive !== false);
+              const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
               const baseCols = allStatsFor(activeAthletes);
               const ovCols = [];
               for (const c of baseCols) { ovCols.push({ stat: c }); const d = PCT_DEFS.find(p => p.att === c); if (d) ovCols.push({ pct: d }); }
@@ -4347,7 +4356,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               </div>
             </div>
             <div style={{ display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px,1fr))",gap:12 }}>
-              {school.athletes
+              {careerAthletes
                 .filter(a => {
                   const f = school._rosterFilter || "active";
                   if (f==="active") return a.isActive !== false;
@@ -4568,9 +4577,22 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                         <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? "Best %" : rec.variant}</span>
                                         <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
                                       </div>
-                                      {group.map(r => r.holderName && (
-                                        <div key={r.id} style={{ fontSize:12,color:"#6b7280" }}>🏅 {r.holderName}{r.holderYear?` · ${r.holderYear}`:""}</div>
-                                      ))}
+                                      {(() => {
+                                        // Show ALL players tied at this record's value (team stats like Wins
+                                        // are shared by every player on those rosters), not just one holder.
+                                        const stored = group.filter(r => r.holderName).map(r => ({ key:r.id, name:r.holderName, year:r.holderYear }));
+                                        const seen = new Set(stored.map(h => (h.name||"").toLowerCase().trim()));
+                                        const tied = isPct ? []
+                                          : rec.variant === "Career total"
+                                          ? atRoster.filter(p => (p.stats?.[statName] ?? null) === rec.value && !seen.has((p.name||"").toLowerCase().trim()))
+                                              .map(p => ({ key:"t-"+p.id, name:p.name, year:(p.firstYear&&p.lastYear)?(p.firstYear===p.lastYear?p.firstYear:`${p.firstYear}-${p.lastYear}`):(p.gradYear?`Class of ${p.gradYear}`:"") }))
+                                          : rec.variant === "Single season"
+                                          ? (() => { const ns=new Set(); return (allSeasonRows||[]).filter(r => (r.stats?.[statName] ?? null) === rec.value && r.player_name && !seen.has(r.player_name.toLowerCase().trim()) && !ns.has(r.player_name.toLowerCase().trim()) && (ns.add(r.player_name.toLowerCase().trim())||true)).map(r => ({ key:"s-"+(r.id||r.player_name+r.season), name:r.player_name, year:r.season })); })()
+                                          : [];
+                                        return [...stored, ...tied].map(h => (
+                                          <div key={h.key} style={{ fontSize:12,color:"#6b7280" }}>🏅 {h.name}{h.year?` · ${h.year}`:""}</div>
+                                        ));
+                                      })()}
                                       {p!==null&&rec.variant==="Career total"&&(
                                         <div style={{ marginTop:8 }}>
                                           <div style={{ fontSize:11,color:"#6b7280",marginBottom:3 }}>{leader.name}: {leaderVal.toLocaleString()} ({p}%)</div>
@@ -4630,7 +4652,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 return g ? g.group : null;
               };
 
-              const activeAthletes = school.athletes.filter(a => a.isActive !== false);
+              const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
 
               // Build current head coach win total from seasons data for Coach Wins milestones
               const currentCoach = (school.seasons || [])
