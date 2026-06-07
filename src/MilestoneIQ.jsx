@@ -3092,17 +3092,24 @@ function buildCoachStats(seasons, opts = {}) {
     const name = (s.coach || s["coach"] || "").trim();
     if (!name) return;
     if (!coaches[name]) {
-      coaches[name] = { name, wins:0, losses:0, leagueWins:0, leagueLosses:0, seasons:0,
+      coaches[name] = { name, wins:0, losses:0, ties:0, leagueWins:0, leagueLosses:0, leagueTies:0, seasons:0,
         stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0,
-        playoffs:0, leagueChamps:0, teams: new Set() };
+        playoffs:0, leagueChamps:0, teams: new Set(), byTeam: {} };
     }
     const co = coaches[name];
     if (s._team) co.teams.add(s._team);   // track which program(s)/sport(s) the coach led
     co.seasons    += 1;
     co.wins       += (s.wins || s["wins"] || 0);
     co.losses     += (s.losses || s["losses"] || 0);
+    co.ties       += (s.ties || 0);
     co.leagueWins += (s.leagueWins || s["leagueWins"] || 0);
     co.leagueLosses += (s.leagueLosses || s["leagueLosses"] || 0);
+    co.leagueTies += (s.leagueTies || 0);
+    // per-sport/team breakdown (e.g. Boys Basketball vs Girls Soccer)
+    const _tm = s._team || "Team";
+    if (!co.byTeam[_tm]) co.byTeam[_tm] = { wins:0, losses:0, ties:0, seasons:0 };
+    const _bt = co.byTeam[_tm];
+    _bt.wins += (s.wins || 0); _bt.losses += (s.losses || 0); _bt.ties += (s.ties || 0); _bt.seasons += 1;
     const notes = (s.notes || s["notes"] || "").toLowerCase();
     if (/state champ/.test(notes))                       co.stateChamps    += 1;
     if (/runner.?up|runner-up/.test(notes))              co.stateRunnerUp  += 1;
@@ -3280,8 +3287,8 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
         {scored.map((coach, i) => {
           const tier = coachHofTier(coach.score);
-          const winPct = coach.wins + coach.losses > 0
-            ? Math.round(coach.wins/(coach.wins+coach.losses)*100) : 0;
+          const winPct = coach.wins + coach.losses + (coach.ties||0) > 0
+            ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
           return (
             <div key={coach.name}
               style={{ background:"#fff", borderRadius:10, border:`1px solid ${coach.confirmed?"#c4b5fd":"#e8e4dd"}`,
@@ -3305,7 +3312,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
                   </div>
                   <div style={{ fontSize:11, color:"#9ca3af", marginTop:1, display:"flex", gap:10, flexWrap:"wrap" }}>
                     <span>{coach.seasons} seasons</span>
-                    <span>{coach.wins}W–{coach.losses}L ({winPct}%)</span>
+                    <span>{coach.wins}W–{coach.losses}L{coach.ties?`–${coach.ties}T`:""} ({winPct}%)</span>
                     {coach.stateChamps > 0 && <span style={{ color:"#b45309", fontWeight:600 }}>🏆 {coach.stateChamps} state</span>}
                     {coach.leagueChamps > 0 && <span style={{ color:"#1d4ed8", fontWeight:600 }}>🎖 {coach.leagueChamps} league</span>}
                     {coach.coyCount > 0 && <span style={{ color:"#6b21a8", fontWeight:600 }}>🏅 {coach.coyCount} Coach of the Year</span>}
@@ -3349,7 +3356,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
 
 function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onClose, onToggle }) {
   const tier = coachHofTier(coach.score);
-  const winPct = coach.wins+coach.losses>0 ? Math.round(coach.wins/(coach.wins+coach.losses)*100) : 0;
+  const winPct = coach.wins+coach.losses+(coach.ties||0)>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
   const seasons = (school.seasons||[]).filter(s=>(s.coach||s["coach"]||"").trim()===coach.name);
   const notableSeasons = seasons.filter(s=>getSeasonSuccessScore(s.notes||s["notes"]||"")>0)
     .sort((a,b)=>getSeasonSuccessScore(b.notes||b["notes"]||"")-getSeasonSuccessScore(a.notes||a["notes"]||""));
@@ -3381,13 +3388,29 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onCl
                 {coach.name}{confirmed?" 🏛️":""}
               </div>
               <div style={{ color:"rgba(255,255,255,0.75)",fontSize:12,marginTop:2 }}>
-                {coach.seasons} seasons · {coach.wins}W–{coach.losses}L ({winPct}% win rate)
+                {coach.seasons} seasons · {coach.wins}W–{coach.losses}L{coach.ties?`–${coach.ties}T`:""} ({winPct}% win rate)
               </div>
             </div>
           </div>
         </div>
 
         <div style={{ padding:22 }}>
+          {/* Per-sport breakdown (e.g. Boys Basketball vs Girls Soccer) when a coach led multiple teams */}
+          {coach.byTeam && Object.keys(coach.byTeam).length > 1 && (
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:8 }}>By sport</div>
+              {Object.keys(coach.byTeam).sort().map(tm => {
+                const b = coach.byTeam[tm];
+                const p = b.wins+b.losses+(b.ties||0)>0 ? Math.round(b.wins/(b.wins+b.losses+(b.ties||0))*100) : 0;
+                return (
+                  <div key={tm} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f3f0ea" }}>
+                    <span style={{ fontSize:13,color:"#111",fontWeight:600 }}>{tm}</span>
+                    <span style={{ fontSize:13,color:"#6b7280" }}>{b.wins}-{b.losses}{b.ties?`-${b.ties}`:""} ({p}%) · {b.seasons} szn</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {/* Stat breakdown */}
           <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:10 }}>Program rankings</div>
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:18 }}>
