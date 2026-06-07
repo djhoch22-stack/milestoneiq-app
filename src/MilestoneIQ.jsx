@@ -523,32 +523,32 @@ function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   }
   return out;
 }
-// Wins is a TEAM stat shared by every player on a roster, so the win record is almost
-// always a tie. Auto-compute it from loaded data (like %/per-game): single-season =
-// the best season in player_seasons; career = the most career wins — returned once PER
-// tied holder so the Records tile lists the whole team. Reflects whatever seasons are loaded.
-function winsRecordsFrom(seasonRows, careerPlayers, sport) {
+// Auto-compute records straight from the all-time + season data so the Records tab ALWAYS
+// matches the All-Time tab (Wins, Goals, Assists, Saves, Points, Shutouts, …). For each
+// stat: career = the most over the all-time roster; single-season = the best player_seasons
+// row. Returned once PER tied holder so the Records tile lists everyone sharing the value.
+function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   const out = [];
-  let maxSS = 0;
-  for (const r of (seasonRows || [])) { const w = Number(r.stats?.["Wins"]); if (w > maxSS) maxSS = w; }
-  if (maxSS > 0) {
-    const seen = new Set();
-    for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.["Wins"]) !== maxSS) continue;
-      const k = (r.player_name || "").toLowerCase().trim();
-      if (seen.has(k)) continue; seen.add(k);
-      out.push({ id: `auto-wins-ss-${k}`, statName: "Wins", variant: "Single season", value: maxSS, holderName: r.player_name, holderYear: r.season || "", sport, auto: true });
+  for (const stat of (statNames || [])) {
+    let mc = 0;
+    for (const p of (careerPlayers || [])) { const v = Number(p.stats?.[stat]); if (v > mc) mc = v; }
+    if (mc > 0) {
+      const seen = new Set();
+      for (const p of (careerPlayers || [])) {
+        if (Number(p.stats?.[stat]) !== mc) continue;
+        const k = (p.name || "").toLowerCase().trim(); if (seen.has(k)) continue; seen.add(k);
+        out.push({ id: `auto-c-${stat}-${k}`, statName: stat, variant: "Career total", value: mc, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport, auto: true });
+      }
     }
-  }
-  let maxC = 0;
-  for (const p of (careerPlayers || [])) { const w = Number(p.stats?.["Wins"]); if (w > maxC) maxC = w; }
-  if (maxC > 0) {
-    const seen = new Set();
-    for (const p of (careerPlayers || [])) {
-      if (Number(p.stats?.["Wins"]) !== maxC) continue;
-      const k = (p.name || "").toLowerCase().trim();
-      if (seen.has(k)) continue; seen.add(k);
-      out.push({ id: `auto-wins-c-${k}`, statName: "Wins", variant: "Career total", value: maxC, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport, auto: true });
+    let ms = 0;
+    for (const r of (seasonRows || [])) { const v = Number(r.stats?.[stat]); if (v > ms) ms = v; }
+    if (ms > 0) {
+      const seen = new Set();
+      for (const r of (seasonRows || [])) {
+        if (Number(r.stats?.[stat]) !== ms) continue;
+        const k = (r.player_name || "").toLowerCase().trim(); if (seen.has(k)) continue; seen.add(k);
+        out.push({ id: `auto-ss-${stat}-${k}`, statName: stat, variant: "Single season", value: ms, holderName: r.player_name, holderYear: r.season || "", sport, auto: true });
+      }
     }
   }
   return out;
@@ -3205,6 +3205,13 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
   const [includePrior, setIncludePrior] = useState(true);   // count prior-school wins toward HOF?
   const [crossProgram, setCrossProgram] = useState(true);   // combine a coach's record across the teams they led?
   const confirmedHof = school.coachHof || {};
+  // A coach inducted into the HOF for ANY program at the school is inducted for ALL the
+  // teams they coached (cross-sport). Union the induction flags across every program.
+  const inductedCoachNames = new Set();
+  ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
+    const ch = p.coachHof || {};
+    Object.keys(ch).forEach(n => { if (ch[n]) inductedCoachNames.add(normName(n)); });
+  });
   const multiProgram = (allSchools || []).length > 1;
 
   // Seasons to score over: every program at the school (so a coach who led multiple teams gets one
@@ -3229,7 +3236,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
     .map(coach => {
       const ab = coachAwardBonus(coach.name, awards);
       const coyCount = awardsForHolder(coach.name, "coach", awards).length;
-      return { ...coach, score: Math.min(calcCoachHofScore(coach, coaches) + ab, 100), coyCount, confirmed: !!confirmedHof[coach.name] };
+      return { ...coach, score: Math.min(calcCoachHofScore(coach, coaches) + ab, 100), coyCount, confirmed: inductedCoachNames.has(normName(coach.name)) };
     })
     .sort((a, b) => b.score - a.score);
 
@@ -4507,7 +4514,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
             </div>
 
-            {([...(school.records||[]), ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport), ...pergameRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport)].length===0)
+            {((school.records||[]).length===0 && allStatsFor([...(school.athletes||[]), ...(school.allTimeRoster||[])]).length===0 && (allSeasonRows||[]).length===0)
               ? <div style={{ background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb",padding:40,textAlign:"center",color:"#9ca3af" }}>
                   <div style={{ fontSize:32,marginBottom:8 }}>📋</div>
                   <div style={{ fontWeight:600,marginBottom:4 }}>No records on file yet</div>
@@ -4532,11 +4539,14 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
+                  const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
                   const allRecords = [
-                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && r.statName !== "Wins" && !String(r.variant||"").startsWith("Per game avg")),
-                    ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
-                    ...pergameRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
-                    ...winsRecordsFrom(allSeasonRows, (school.allTimeRoster||[]), school.sport),
+                    // keep only stored records we DON'T auto-compute (e.g. single-game); career +
+                    // single-season + %/per-game are derived from data so they match the All-Time tab.
+                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && !String(r.variant||"").startsWith("Per game avg") && r.variant !== "Career total" && r.variant !== "Single season"),
+                    ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
+                    ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
+                    ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), allStatsFor(recPool), school.sport),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
