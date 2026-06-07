@@ -146,9 +146,13 @@ export function pctRecordsFrom(seasonRows, careerPlayers, sport) {
 }
 
 // ── Per-game averages (ported) ────────────────────────────────────────────────
-// Per-game averages (PPG/APG/etc.) intentionally not shown on public profiles either —
-// kept empty so the public record book matches the app (no per-game tiles anywhere).
+// Per-game DISPLAY (PPG/APG/etc.) stays OFF on public profiles (matches the app — no per-game tiles).
 export const PERGAME_DEFS = [];
+// Per-game RECORDS appear on the Records tab (nested in each stat's tile). Stats we compute them for:
+const PERGAME_RECORD_DEFS = [
+  { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
+  { stat: "Total Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
 export function perGame(stats, statKey) {
@@ -158,7 +162,7 @@ export function perGame(stats, statKey) {
 }
 export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  for (const d of PERGAME_DEFS) {
+  for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
       if (Number(r.stats?.["Games Played"]) < PERGAME_MIN_SEASON_GP) continue;
