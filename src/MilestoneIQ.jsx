@@ -4601,6 +4601,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     const g = sport.groups.find(g => g.stats.some(s => s.name === statName));
                     return g ? g.group : "Other";
                   };
+                  // Render groups in the sport's declared group order (not record-insertion order).
+                  const groupOrder = (sport.groups || []).map(g => g.group);
+                  const grpIdx = (name) => { const i = groupOrder.indexOf(name); return i === -1 ? 999 : i; };
 
                   const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
                   const recStatIdx = (n) => {
@@ -4638,7 +4641,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     byGroup[grp][tileStat].push(r);
                   });
 
-                  return Object.entries(byGroup).map(([grpName, statMap]) => (
+                  return Object.entries(byGroup).sort((a, b) => grpIdx(a[0]) - grpIdx(b[0])).map(([grpName, statMap]) => (
                     <div key={grpName} style={{ marginBottom:20 }}>
                       <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:10 }}>
                         <span style={{ background:groupColors[grpName]||"#f1f5f9",color:groupTextColors[grpName]||"#334155",borderRadius:20,padding:"3px 14px",fontSize:12,fontWeight:700 }}>{grpName}</span>
@@ -4740,7 +4743,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               const effectiveMilestones = [
                 ...userMilestones
                   .filter(m => m.statName !== "Coach Wins")
-                  .sort((a, b) => byStatOrder(a.statName, b.statName)),
+                  .sort((a, b) => byStatOrder(a.statName, b.statName, school.sport)),
                 COACH_WINS_MILESTONE,
               ];
               const sport2 = SPORTS[school.sport] || SPORTS.football;
