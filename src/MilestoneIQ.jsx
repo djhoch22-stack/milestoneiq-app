@@ -2347,8 +2347,11 @@ function ImportSeasons({ school, roster = [] }) {
           if (error) { setBusy(false); setMsg("Import failed: " + (error.message || error)); return; }
           total += (data && data.inserted) || 0;
         }
+        // Roll the imported season(s) up into career totals so the players appear on the
+        // Overview / Athletes / All-Time / Records / Milestones tabs (the .xlsx path already did this).
+        await recomputeCareerFromSeasons(school.id);
         setBusy(false);
-        setMsg(`✓ Imported ${total} player-season rows${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — open a player to see them.`);
+        setMsg(`✓ Imported ${total} player-season rows & updated career totals${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — reload to see them.`);
         return;
       }
       // Spreadsheet matrix (one workbook = the WHOLE history) → replace all season data.
