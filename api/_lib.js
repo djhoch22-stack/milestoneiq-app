@@ -99,6 +99,19 @@ export function allStatsFor(roster) {
     .filter((s) => roster.some((p) => (p.stats[s] || 0) > 0))
     .sort(byStatOrder);
 }
+// Stats a program should ALWAYS surface (even before data exists). Mirrors MilestoneIQ.jsx.
+// Sports not listed fall back to "stats present in the data" (no behavior change).
+export const DISPLAY_STATS = {
+  soccer:       ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  soccer_girls: ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+};
+// Canonical display stats UNION any stat with data, in canonical order.
+export function statsToDisplay(roster, sport) {
+  const base = DISPLAY_STATS[sport] || [];
+  const present = [...new Set((roster || []).flatMap((p) => Object.keys(p.stats || {})))]
+    .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
+  return [...new Set([...base, ...present])].sort(byStatOrder);
+}
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
 export const PCT_DEFS = [
