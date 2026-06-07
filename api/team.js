@@ -4,7 +4,7 @@
 // click-to-open player profile modal (career stats + all-time rank + seasons + records).
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER,
-  byStatOrder, allStatsFor, PCT_DEFS, shootingPct, pctRecordsFrom,
+  byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, PCT_DEFS, shootingPct, pctRecordsFrom,
   PERGAME_DEFS, perGame, pergameRecordsFrom, autoStatRecords,
   buildCoachStats, awardsForHolder, awardLabel, normName,
 } from "./_lib.js";
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   const yearsStr = (p) => p.firstYear && p.lastYear
     ? (String(p.firstYear) === String(p.lastYear) ? esc(String(p.firstYear)) : esc(String(p.firstYear)) + "–" + esc(String(p.lastYear)))
     : (p.gradYear ? "Class of " + esc(String(p.gradYear)) : "");
-  const statTile = (k, v) => `<div class="scell"><div class="k">${esc(k)}</div><div class="sv">${typeof v === "number" ? v.toLocaleString() : esc(v)}</div></div>`;
+  const statTile = (k, v) => `<div class="scell"><div class="k">${esc(k)}</div><div class="sv"${v == null || v === "" ? ' style="color:#d1d5db"' : ""}>${v == null || v === "" ? "—" : (typeof v === "number" ? v.toLocaleString() : esc(v))}</div></div>`;
 
   // ── RECORDS (stored + auto %/per-game) ──────────────────────────────────────
   const PCT_PARENT = { "Field Goal Percentage": "Field Goals Made", "Three Point Percentage": "Three Pointers Made", "Free Throw Percentage": "Free Throws Made" };
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     ...storedRecords.filter((r) => !PCT_PARENT[r.statName] && !String(r.variant || "").startsWith("Per game avg") && r.variant !== "Career total" && r.variant !== "Single season"),
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
-    ...autoStatRecords(seasonRows, careerPool, allStatsFor(careerPool), team.sport),
+    ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
   ];
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
   ].map(([ic, v, l]) => `<div class="ovcard"><div class="ic">${ic}</div><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
   let ovTable = `<div class="empty">No active roster stats yet.</div>`;
   if (activeAth.length) {
-    const base = allStatsFor(activeAth);
+    const base = statsToDisplay(activeAth, team.sport);
     const cols = []; for (const c of base) { cols.push({ stat: c }); const d = PCT_DEFS.find((p) => p.att === c); if (d) cols.push({ pct: d }); }
     if (cols.length) {
       const rows = activeAth.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -155,10 +155,8 @@ export default async function handler(req, res) {
     if (isFootball && ((off.length && def.length) || spc.length)) {
       inner = grp("Offense", "#dbeafe", "#1e40af", off) + grp("Defense", "#fee2e2", "#991b1b", def) + grp("Special Teams", "#ffedd5", "#c2410c", spc);
     } else {
-      const tiles = Object.entries(a.stats).sort(([x], [y]) => byStatOrder(x, y)).flatMap(([k, v]) => {
-        const out = [statTile(k, v)];
-        const pgd = PERGAME_DEFS.find((p) => p.stat === k); const pgv = pgd ? perGame(a.stats, pgd.stat) : null;
-        if (pgd && pgv != null) out.push(`<div class="scell"><div class="k">${esc(pgd.name)}</div><div class="sv">${pgv}</div></div>`);
+      const tiles = statsToDisplay([a], team.sport).flatMap((k) => {
+        const out = [statTile(k, a.stats[k])];
         const d = PCT_DEFS.find((p) => p.att === k); const pv = d ? shootingPct(a.stats, d.made, d.att) : null;
         if (d && pv != null) out.push(`<div class="scell"><div class="k">${esc(d.name)}</div><div class="sv">${pv}%</div></div>`);
         return out;
@@ -177,7 +175,7 @@ export default async function handler(req, res) {
   if (!atPlayers.length) {
     alltimeSection = `<div class="empty">No all-time players published yet.</div>`;
   } else {
-    const base = allStatsFor(atPlayers);
+    const base = statsToDisplay(atPlayers, team.sport);
     const lead = base.includes("Points") ? "Points" : (base.includes("Rushing Yards") ? "Rushing Yards" : base[0]);
     const sorted = atPlayers.slice().filter((p) => (Number(p.stats[lead]) || 0) > 0).sort((a, b) => (Number(b.stats[lead]) || 0) - (Number(a.stats[lead]) || 0));
     const max = sorted.length ? (Number(sorted[0].stats[lead]) || 1) : 1;
@@ -359,9 +357,10 @@ export default async function handler(req, res) {
   const soJson = JSON.stringify(STAT_ORDER);
   const pgJson = JSON.stringify(PERGAME_DEFS.map((d) => ({ n: d.name, stat: d.stat })));
   const pcJson = JSON.stringify(PCT_DEFS.map((d) => ({ n: d.name, made: d.made, att: d.att })));
+  const dsJson = JSON.stringify(DISPLAY_STATS[team.sport] || []);
   const pColor = JSON.stringify(logoColor);
   const script =
-    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var PC=${pcJson};` +
+    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var PC=${pcJson};var DS=${dsJson};` +
     `(function(){function e(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}` +
     `function ord(ks){return ks.slice().sort(function(a,b){var i=SO.indexOf(a),j=SO.indexOf(b);if(i!==-1&&j!==-1)return i-j;if(i!==-1)return -1;if(j!==-1)return 1;return a<b?-1:a>b?1:0;});}` +
     `function pgv(s,k){var v=Number(s[k]),g=Number(s["Games Played"]);if(!g||g<=0||isNaN(v))return null;return Math.round(v/g*10)/10;}` +
@@ -373,7 +372,7 @@ export default async function handler(req, res) {
     `function lb(){if(!sel)return;var st=sel.value,t=(q.value||"").toLowerCase();var rows=ATL.filter(function(p){if(f==="current"&&!p.a)return false;if(f==="alumni"&&p.a)return false;if(t&&p.n.toLowerCase().indexOf(t)<0)return false;return (Number(p.s[st])||0)>0;}).sort(function(x,y){return (Number(y.s[st])||0)-(Number(x.s[st])||0);});var mx=rows.length?Number(rows[0].s[st])||1:1;hd.textContent=st;tb.innerHTML=rows.map(function(p,i){return row(p,i,st,mx);}).join("");info.textContent=rows.length+" players";}` +
     `if(sel){sel.onchange=lb;q.oninput=lb;var bs=document.querySelectorAll(".p-alltime .fbtn");for(var i=0;i<bs.length;i++){(function(btn){btn.onclick=function(){f=btn.getAttribute("data-filt");for(var j=0;j<bs.length;j++)bs[j].className=bs[j].getAttribute("data-filt")===f?"fbtn on":"fbtn";lb();};})(bs[i]);}lb();}` +
     `function tile(l,v,sub){return '<div class="ptile"><div class="pl">'+e(l)+'</div><div class="pv">'+e(String(v))+'</div><div class="psub">'+e(sub)+"</div></div>";}` +
-    `function tiles(p){var ks=ord(Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;}));var out="";ks.forEach(function(stat){var val=Number(p.s[stat])||0;var r=rankOf(stat,val);var rs=r===1?"🥇 All-time leader":r===2?"🥈 #2 all-time":r===3?"🥉 #3 all-time":("#"+r+" all-time");out+=tile(stat.toUpperCase(),val.toLocaleString(),rs);var g=null,i;for(i=0;i<PG.length;i++){if(PG[i].stat===stat){g=PG[i];break;}}if(g){var gv=pgv(p.s,g.stat);if(gv!=null)out+=tile(g.n.toUpperCase(),gv,"per game");}var d=null;for(i=0;i<PC.length;i++){if(PC[i].att===stat){d=PC[i];break;}}if(d){var dv=pcv(p.s,d.made,d.att);if(dv!=null)out+=tile(d.n.toUpperCase(),dv+"%",(Number(p.s[d.made])||0).toLocaleString()+"/"+(Number(p.s[d.att])||0).toLocaleString());}});return out;}` +
+    `function tiles(p){var pr=Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;});var ks=ord(DS.concat(pr).filter(function(k,i,a){return a.indexOf(k)===i;}));var out="";ks.forEach(function(stat){var raw=p.s[stat];var has=raw!=null&&Number(raw)>0;var val=Number(raw)||0;var r=has?rankOf(stat,val):null;var rs=r===1?"🥇 All-time leader":r===2?"🥈 #2 all-time":r===3?"🥉 #3 all-time":(r?("#"+r+" all-time"):"");out+=tile(stat.toUpperCase(),has?val.toLocaleString():"—",rs);var d=null,i;for(i=0;i<PC.length;i++){if(PC[i].att===stat){d=PC[i];break;}}if(d){var dv=pcv(p.s,d.made,d.att);if(dv!=null)out+=tile(d.n.toUpperCase(),dv+"%",(Number(p.s[d.made])||0).toLocaleString()+"/"+(Number(p.s[d.att])||0).toLocaleString());}});return out;}` +
     `function seas(p){if(!p.ss||!p.ss.length)return "";var cols=ord(Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;}));var head="<th>Season</th>"+cols.map(function(c){return '<th class="num">'+e(c)+"</th>";}).join("");var rs=p.ss.slice().sort(function(a,b){return String(b.season)<String(a.season)?-1:1;}).map(function(r){return "<tr><td>"+e(r.season)+"</td>"+cols.map(function(c){var v=r.s[c];return '<td class="num">'+(v!=null&&v!==""?Number(v).toLocaleString():"—")+"</td>";}).join("")+"</tr>";}).join("");var tot='<tr style="font-weight:700;background:#fafaf8"><td>Career</td>'+cols.map(function(c){return '<td class="num">'+(Number(p.s[c])||0).toLocaleString()+"</td>";}).join("")+"</tr>";return '<h3 style="margin:18px 0 8px;font-size:14px">Season by season</h3><div style="overflow-x:auto"><table><thead><tr>'+head+"</tr></thead><tbody>"+rs+tot+"</tbody></table></div>";}` +
     `function recl(p){if(!p.rec||!p.rec.length)return "";return '<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>'+p.rec.map(function(r){return '<div style="font-size:13px;color:#374151;padding:3px 0">🏅 <b>'+e(r.n)+"</b> "+(r.v?'<span style="color:#9ca3af">('+e(r.v)+")</span> ":"")+"— "+e(String(r.val))+"</div>";}).join("")+"</div>";}` +
     `function openP(k){var p=PROF[k];if(!p)return;var ini=p.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var bdg=(p.a?'<span class="hbadge">Active</span> ':"")+(p.sh?"🏛️ ":"")+(p.st?"⭐":"");var chips="";if(p.sh)chips+='<div class="hofchip" style="background:#fef9c3;border-color:#fde68a;color:#92400e">🏛️ School Hall of Fame</div>';if(p.st)chips+='<div class="hofchip" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">⭐ State Hall of Fame</div>';var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(p.n)+" "+bdg+'</div><div class="pmsub">'+(p.y?e(p.y):"")+(p.pos?" · "+e(p.pos):"")+"</div></div></div></div>"+'<div class="pmbody">'+(chips?'<div class="hofchips">'+chips+"</div>":"")+'<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank</h3><div class="ptiles">'+tiles(p)+"</div>"+seas(p)+recl(p)+"</div>";document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
