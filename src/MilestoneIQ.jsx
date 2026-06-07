@@ -465,6 +465,13 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
   { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
+  // Football — per-game over a season AND over a career
+  { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
+  { stat: "Rushes" }, { stat: "Rushing Yards" }, { stat: "Rushing TDs" },
+  { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
+  { stat: "Total Yards" }, { stat: "Total TDs" },
+  { stat: "Tackles" }, { stat: "Sacks" }, { stat: "Interceptions" }, { stat: "Pass Break Ups" },
+  { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Kick Returns" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
@@ -477,17 +484,20 @@ function perGame(stats, statKey) {
 // (career stat ÷ career games). Returned as variants of the parent stat.
 function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
+  // football seasons are short (~9 games), so qualify per-game records at lower game counts
+  const minSeasonGP = sport === "football" ? 4 : PERGAME_MIN_SEASON_GP;
+  const minCareerGP = sport === "football" ? 10 : PERGAME_MIN_CAREER_GP;
   for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.["Games Played"]) < PERGAME_MIN_SEASON_GP) continue;
+      if (Number(r.stats?.["Games Played"]) < minSeasonGP) continue;
       const v = perGame(r.stats, d.stat);
       if (v != null && (!ss || v > ss.value)) ss = { value: v, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-pg-ss-${d.stat}`, statName: d.stat, variant: "Per game avg (season)", sport, auto: true, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.["Games Played"]) < PERGAME_MIN_CAREER_GP) continue;
+      if (Number(pl.stats?.["Games Played"]) < minCareerGP) continue;
       const v = perGame(pl.stats, d.stat);
       if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
