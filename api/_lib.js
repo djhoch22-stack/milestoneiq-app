@@ -169,30 +169,31 @@ export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   }
   return out;
 }
-// Wins is a TEAM stat — the win record is almost always a tie. Auto-compute from loaded
-// data, one row per tied holder, so the Records tile lists the whole team.
-export function winsRecordsFrom(seasonRows, careerPlayers, sport) {
+// Auto-compute records from data so they always match the all-time roster (Wins, Goals,
+// Assists, Saves, Points, …). career = most over the roster; single-season = best season row.
+// One row per tied holder so the tile lists everyone sharing the value.
+export function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   const out = [];
-  let maxSS = 0;
-  for (const r of (seasonRows || [])) { const w = Number(r.stats?.["Wins"]); if (w > maxSS) maxSS = w; }
-  if (maxSS > 0) {
-    const seen = new Set();
-    for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.["Wins"]) !== maxSS) continue;
-      const k = (r.player_name || "").toLowerCase().trim();
-      if (seen.has(k)) continue; seen.add(k);
-      out.push({ id: `auto-wins-ss-${k}`, statName: "Wins", variant: "Single season", value: maxSS, holderName: r.player_name, holderYear: r.season || "", sport });
+  for (const stat of (statNames || [])) {
+    let mc = 0;
+    for (const p of (careerPlayers || [])) { const v = Number(p.stats?.[stat]); if (v > mc) mc = v; }
+    if (mc > 0) {
+      const seen = new Set();
+      for (const p of (careerPlayers || [])) {
+        if (Number(p.stats?.[stat]) !== mc) continue;
+        const k = (p.name || "").toLowerCase().trim(); if (seen.has(k)) continue; seen.add(k);
+        out.push({ id: `auto-c-${stat}-${k}`, statName: stat, variant: "Career total", value: mc, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport });
+      }
     }
-  }
-  let maxC = 0;
-  for (const p of (careerPlayers || [])) { const w = Number(p.stats?.["Wins"]); if (w > maxC) maxC = w; }
-  if (maxC > 0) {
-    const seen = new Set();
-    for (const p of (careerPlayers || [])) {
-      if (Number(p.stats?.["Wins"]) !== maxC) continue;
-      const k = (p.name || "").toLowerCase().trim();
-      if (seen.has(k)) continue; seen.add(k);
-      out.push({ id: `auto-wins-c-${k}`, statName: "Wins", variant: "Career total", value: maxC, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport });
+    let ms = 0;
+    for (const r of (seasonRows || [])) { const v = Number(r.stats?.[stat]); if (v > ms) ms = v; }
+    if (ms > 0) {
+      const seen = new Set();
+      for (const r of (seasonRows || [])) {
+        if (Number(r.stats?.[stat]) !== ms) continue;
+        const k = (r.player_name || "").toLowerCase().trim(); if (seen.has(k)) continue; seen.add(k);
+        out.push({ id: `auto-ss-${stat}-${k}`, statName: stat, variant: "Single season", value: ms, holderName: r.player_name, holderYear: r.season || "", sport });
+      }
     }
   }
   return out;
