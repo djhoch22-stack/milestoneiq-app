@@ -133,15 +133,9 @@ export function pctRecordsFrom(seasonRows, careerPlayers, sport) {
 }
 
 // ── Per-game averages (ported) ────────────────────────────────────────────────
-export const PERGAME_DEFS = [
-  { name: "Points Per Game",             short: "PPG",  stat: "Points" },
-  { name: "Assists Per Game",            short: "APG",  stat: "Assists" },
-  { name: "Rebounds Per Game",           short: "RPG",  stat: "Total Rebounds" },
-  { name: "Offensive Rebounds Per Game", short: "ORPG", stat: "Offensive Rebounds" },
-  { name: "Defensive Rebounds Per Game", short: "DRPG", stat: "Defensive Rebounds" },
-  { name: "Steals Per Game",             short: "SPG",  stat: "Steals" },
-  { name: "Blocks Per Game",             short: "BPG",  stat: "Blocks" },
-];
+// Per-game averages (PPG/APG/etc.) intentionally not shown on public profiles either —
+// kept empty so the public record book matches the app (no per-game tiles anywhere).
+export const PERGAME_DEFS = [];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
 export function perGame(stats, statKey) {
