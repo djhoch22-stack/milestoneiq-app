@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     statName: r.stat_name, variant: r.variant, holderName: r.holder_name, holderYear: r.holder_year, value: r.value,
   }));
   const seasonsList = (seasonsRaw || []).map((s) => ({
-    season: s.season, wins: s.wins, losses: s.losses, leagueWins: s.league_wins, leagueLosses: s.league_losses,
+    season: s.season, wins: s.wins, losses: s.losses, ties: s.ties, leagueWins: s.league_wins, leagueLosses: s.league_losses, leagueTies: s.league_ties,
     coach: s.coach, winPct: s.win_pct, notes: s.notes,
   }));
 
@@ -287,25 +287,32 @@ export default async function handler(req, res) {
   // Combine each coach's record across EVERY public program in the school (cross-sport),
   // mirroring the app's "Combine all teams" — so e.g. a coach who led soccer + basketball
   // shows one aggregated HOF record. Falls back to this program if the org lookup is empty.
-  const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof`);
+  const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof,sport`);
   const orgIds = orgTeams.map((p) => p.id).filter(Boolean);
+  const sportById = {}; orgTeams.forEach((p) => { sportById[p.id] = prettySport(p.sport); });
   // A coach inducted in ANY program at the school counts as inducted everywhere (cross-sport).
   const inducted = new Set();
   orgTeams.forEach((p) => Object.keys(p.coach_hof || {}).forEach((n) => { if ((p.coach_hof || {})[n]) inducted.add(normName(n)); }));
   const orgSeasonsRaw = orgIds.length
-    ? await sb(`seasons?program_id=in.(${orgIds.join(",")})&select=season,wins,losses,league_wins,league_losses,coach,notes`)
+    ? await sb(`seasons?program_id=in.(${orgIds.join(",")})&select=program_id,season,wins,losses,ties,league_wins,league_losses,league_ties,coach,notes`)
     : [];
   const orgSeasons = (orgSeasonsRaw.length ? orgSeasonsRaw : seasonsRaw).map((s) => ({
-    season: s.season, wins: s.wins, losses: s.losses, leagueWins: s.league_wins, leagueLosses: s.league_losses, coach: s.coach, notes: s.notes,
+    season: s.season, wins: s.wins, losses: s.losses, ties: s.ties, leagueWins: s.league_wins, leagueLosses: s.league_losses, leagueTies: s.league_ties,
+    coach: s.coach, notes: s.notes, _team: sportById[s.program_id] || prettySport(team.sport),
   }));
   const coaches = buildCoachStats(orgSeasons);
   const inductedCoaches = coaches.filter((c) => inducted.has(normName(c.name))).sort((a, b) => b.wins - a.wins);
   const coachCards2 = inductedCoaches.length ? inductedCoaches.map((c) => {
-    const games = c.wins + c.losses; const pct = games > 0 ? Math.round((c.wins / games) * 1000) / 10 : null;
+    const tot = c.wins + c.losses + (c.ties || 0); const pct = tot > 0 ? Math.round((c.wins / tot) * 1000) / 10 : null;
     const yr = String(c.firstYear) === String(c.lastYear) ? esc(String(c.firstYear)) : esc(String(c.firstYear)) + "–" + esc(String(c.lastYear));
     const coy = awardsForHolder(c.name, "coach", awards);
     const ch = coy.length ? `<div style="font-size:11px;color:#6b7280;margin-top:6px">${coy.map((a) => esc(awardLabel(a))).join(" · ")}</div>` : "";
-    return `<div class="hcard"><div style="font-weight:700">${esc(c.name)} <span class="badge school">Inducted</span></div><div style="font-size:12px;color:#6b7280">${yr} · ${c.seasons} season${c.seasons !== 1 ? "s" : ""}</div><div style="font-size:14px;font-weight:600;color:#111;margin:6px 0 2px">${c.wins}–${c.losses}${pct != null ? ` (${pct}%)` : ""}</div>${c.titles ? `<div style="font-size:11px;color:#92400e">🏆 ${c.titles} league title${c.titles !== 1 ? "s" : ""}</div>` : ""}${ch}</div>`;
+    // Per-sport breakdown (e.g. Boys Basketball vs Girls Soccer) when a coach led multiple teams.
+    const byTeam = c.byTeam || {}; const teams = Object.keys(byTeam);
+    const breakdown = teams.length > 1
+      ? `<div style="margin-top:8px;border-top:1px solid #f3f0ea;padding-top:6px">${teams.sort().map((tm) => { const b = byTeam[tm]; return `<div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px"><span>${esc(tm)}</span><span style="color:#111;font-weight:600">${b.wins}-${b.losses}${b.ties ? `-${b.ties}` : ""}</span></div>`; }).join("")}</div>`
+      : "";
+    return `<div class="hcard"><div style="font-weight:700">${esc(c.name)} <span class="badge school">Inducted</span></div><div style="font-size:12px;color:#6b7280">${yr} · ${c.seasons} season${c.seasons !== 1 ? "s" : ""}</div><div style="font-size:14px;font-weight:600;color:#111;margin:6px 0 2px">${c.wins}–${c.losses}${c.ties ? `–${c.ties}` : ""}${pct != null ? ` (${pct}%)` : ""}</div>${c.titles ? `<div style="font-size:11px;color:#92400e">🏆 ${c.titles} league title${c.titles !== 1 ? "s" : ""}</div>` : ""}${breakdown}${ch}</div>`;
   }).join("") : `<div class="empty">No coaches have been inducted into the Hall of Fame yet.</div>`;
 
   const hofSection = `
