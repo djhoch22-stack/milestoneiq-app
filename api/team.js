@@ -92,7 +92,8 @@ export default async function handler(req, res) {
           }
           const holderList = [...g.filter((r) => r.holderName).map((r) => ({ name: r.holderName, year: r.holderYear })), ...tied];
           const holders = holderList.map((h) => `<div class="holder">🏅 ${esc(h.name)}${h.year ? ` · ${esc(String(h.year))}` : ""}</div>`).join("");
-          return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? "Best %" : esc(rec.variant)}</span><span class="val">${isPct ? esc(String(rec.value)) + "%" : fmtNum(rec.value)}</span></div>${holders}</div>`;
+          const pctLabel = rec.variant === "Career total" ? "Career best %" : rec.variant === "Single season" ? "Season best %" : "Best % (" + esc(rec.variant) + ")";
+          return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? pctLabel : esc(rec.variant)}</span><span class="val">${isPct ? esc(String(rec.value)) + "%" : fmtNum(rec.value)}</span></div>${holders}</div>`;
         }).join("");
         return `<div class="statcard"><div class="hd">${esc(sn)}</div><div class="tiles">${tiles}</div></div>`;
       }).join("");
