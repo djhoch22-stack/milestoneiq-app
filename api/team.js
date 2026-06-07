@@ -247,8 +247,8 @@ export default async function handler(req, res) {
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:700;font-size:15px;color:#111">${esc(coach)}</div>${cur ? '<span style="background:#1a56db;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">Current</span>' : ""}</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:8px">${yr} · ${rec.seasons} season${rec.seasons !== 1 ? "s" : ""}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">Overall</div><div style="font-weight:700;font-size:16px;color:#111">${rec.wins}-${rec.losses}</div><div style="font-size:11px;color:#6b7280">${pct}%</div></div>
-          <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">League</div><div style="font-weight:700;font-size:16px;color:#111">${rec.leagueWins}-${rec.leagueLosses}</div><div style="font-size:11px;color:#6b7280">${lpct}%</div></div>
+          <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">Overall</div><div style="font-weight:700;font-size:16px;color:#111">${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ""}</div><div style="font-size:11px;color:#6b7280">${pct}%</div></div>
+          <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">League</div><div style="font-weight:700;font-size:16px;color:#111">${rec.leagueWins}-${rec.leagueLosses}${rec.leagueTies ? `-${rec.leagueTies}` : ""}</div><div style="font-size:11px;color:#6b7280">${lpct}%</div></div>
         </div>
         ${rec.titles > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:8px">🏆 ${rec.titles} league title${rec.titles !== 1 ? "s" : ""}</div>` : ""}
       </div>`;
@@ -256,8 +256,8 @@ export default async function handler(req, res) {
 
     const yr = (s) => (String(s.season || "").match(/\d{4}/) || ["0"])[0];
     const tableRows = seasonsList.slice().sort((a, b) => Number(yr(b)) - Number(yr(a))).map((s, i) => {
-      const rec = (s.wins != null) ? `${s.wins}-${s.losses ?? "?"}` : "—";
-      const lrec = (s.leagueWins != null) ? `${s.leagueWins}-${s.leagueLosses ?? "?"}` : "—";
+      const rec = (s.wins != null) ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
+      const lrec = (s.leagueWins != null) ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
       const wp = s.winPct != null ? s.winPct + "%" : "—";
       const isChamp = s.notes && /league champion/i.test(s.notes);
       const note = s.notes ? `<span style="background:${isChamp ? "#fef3c7" : "#eff6ff"};color:${isChamp ? "#92400e" : "#1e40af"};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${isChamp ? "🏆 " : ""}${esc(s.notes)}</span>` : "";
