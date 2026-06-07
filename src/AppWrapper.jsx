@@ -290,41 +290,57 @@ export default function AppWrapper() {
       await supabase.from('records').upsert(rows, { onConflict: 'id' });
     }
 
-    // Seasons — replace wholesale (app season objects carry no stable id)
+    // Seasons — replace SAFELY: insert the new set first, then delete the OLD rows only
+    // after the insert succeeds. Never blanket-delete first (a failed insert would wipe
+    // every season — which is exactly what happened when the ties column was missing).
     if (updated.seasons) {
-      await supabase.from('seasons').delete().eq('program_id', updated.id);
-      if (updated.seasons.length) {
-        await supabase.from('seasons').insert(
-          updated.seasons.map((s) => ({
-            program_id: updated.id,
-            season: s.season,
-            wins: s.wins,
-            losses: s.losses,
-            ties: s.ties ?? 0,
-            league_wins: s.leagueWins ?? null,
-            league_losses: s.leagueLosses ?? null,
-            league_ties: s.leagueTies ?? 0,
-            coach: s.coach || null,
-            notes: s.notes || null,
-            win_pct: s.winPct ?? null,
-          }))
-        );
+      const { data: existingS } = await supabase.from('seasons').select('id').eq('program_id', updated.id);
+      const oldIds = (existingS || []).map((r) => r.id);
+      const rows = updated.seasons.map((s) => ({
+        program_id: updated.id,
+        season: s.season,
+        wins: s.wins,
+        losses: s.losses,
+        ties: s.ties ?? 0,
+        league_wins: s.leagueWins ?? null,
+        league_losses: s.leagueLosses ?? null,
+        league_ties: s.leagueTies ?? 0,
+        coach: s.coach || null,
+        notes: s.notes || null,
+        win_pct: s.winPct ?? null,
+      }));
+      if (rows.length) {
+        const { error: insErr } = await supabase.from('seasons').insert(rows);
+        if (insErr) {
+          console.error('Season save failed — keeping existing seasons to avoid data loss:', insErr);
+        } else if (oldIds.length) {
+          await supabase.from('seasons').delete().in('id', oldIds);
+        }
+      } else if (oldIds.length) {
+        await supabase.from('seasons').delete().in('id', oldIds); // intentional clear of all seasons
       }
     }
 
-    // Milestones — replace wholesale (handles reordering)
+    // Milestones — same safe replace (insert new, then delete old only on success)
     if (updated.milestones) {
-      await supabase.from('milestones').delete().eq('program_id', updated.id);
-      if (updated.milestones.length) {
-        await supabase.from('milestones').insert(
-          updated.milestones.map((m, i) => ({
-            program_id: updated.id,
-            stat_name: m.statName,
-            values: m.values,
-            alert_pct: m.alertPct || 90,
-            sort_order: i,
-          }))
-        );
+      const { data: existingM } = await supabase.from('milestones').select('id').eq('program_id', updated.id);
+      const oldIds = (existingM || []).map((r) => r.id);
+      const rows = updated.milestones.map((m, i) => ({
+        program_id: updated.id,
+        stat_name: m.statName,
+        values: m.values,
+        alert_pct: m.alertPct || 90,
+        sort_order: i,
+      }));
+      if (rows.length) {
+        const { error: insErr } = await supabase.from('milestones').insert(rows);
+        if (insErr) {
+          console.error('Milestone save failed — keeping existing to avoid data loss:', insErr);
+        } else if (oldIds.length) {
+          await supabase.from('milestones').delete().in('id', oldIds);
+        }
+      } else if (oldIds.length) {
+        await supabase.from('milestones').delete().in('id', oldIds);
       }
     }
   };
