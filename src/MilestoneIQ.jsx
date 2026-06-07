@@ -13,6 +13,27 @@ const STAT_VARIANTS_AVG_ONLY = ["Career total","Single season","Single game","Pe
 const STAT_VARIANTS_RATE = ["Single season","Career total"];
 const STAT_VARIANTS_LONGEST = ["Single game","Single season","Career total"];
 
+// ONE basketball record-category list shared by boys, girls, AND the legacy generic "basketball"
+// key — so all three expose IDENTICAL records (no drift between boys & girls).
+const BASKETBALL_STAT_CATEGORIES = [
+  { name: "Games Played", variants: ["Career total","Single season"] },
+  { name: "Wins", variants: ["Career total","Single season"] },
+  { name: "Points", variants: STAT_VARIANTS_WITH_AVG },
+  { name: "Assists", variants: STAT_VARIANTS_AVG_ONLY },
+  { name: "Total Rebounds", variants: STAT_VARIANTS_AVG_ONLY },
+  { name: "Offensive Rebounds", variants: STAT_VARIANTS_STANDARD },
+  { name: "Defensive Rebounds", variants: STAT_VARIANTS_STANDARD },
+  { name: "Steals", variants: STAT_VARIANTS_STANDARD },
+  { name: "Blocks", variants: STAT_VARIANTS_STANDARD },
+  { name: "Field Goals Made", variants: STAT_VARIANTS_STANDARD },
+  { name: "Field Goals Attempted", variants: STAT_VARIANTS_STANDARD },
+  { name: "Three Pointers Made", variants: STAT_VARIANTS_STANDARD },
+  { name: "Three Pointers Attempted", variants: STAT_VARIANTS_STANDARD },
+  { name: "Free Throws Made", variants: STAT_VARIANTS_STANDARD },
+  { name: "Free Throws Attempted", variants: STAT_VARIANTS_STANDARD },
+  { name: "Coach Wins", variants: ["Career total","Single season"] },
+];
+
 const SPORTS = {
   football: {
     label: "Football", icon: "🏈",
@@ -137,24 +158,7 @@ const SPORTS = {
   },
   basketball: {
     label: "Boys Basketball", icon: "🏀",
-    statCategories: [
-      { name: "Games Played", variants: ["Career total","Single season"] },
-      { name: "Wins", variants: ["Career total","Single season"] },
-      { name: "Points", variants: ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Total Rebounds", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Offensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Defensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Steals", variants: ["Career total","Single season","Single game"] },
-      { name: "Blocks", variants: ["Career total","Single season","Single game"] },
-      { name: "Field Goals Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Field Goals Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: BASKETBALL_STAT_CATEGORIES,
   },
   baseball: {
     label: "Baseball", icon: "⚾",
@@ -187,45 +191,11 @@ const SPORTS = {
   },
   basketball_boys: {
     label: "Boys Basketball", icon: "🏀",
-    statCategories: [
-      { name: "Games Played", variants: ["Career total","Single season"] },
-      { name: "Wins", variants: ["Career total","Single season"] },
-      { name: "Points", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game"] },
-      { name: "Total Rebounds", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Offensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Defensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Steals", variants: ["Career total","Single season"] },
-      { name: "Blocks", variants: ["Career total","Single season"] },
-      { name: "Field Goals Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Field Goals Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: BASKETBALL_STAT_CATEGORIES,
   },
   basketball_girls: {
     label: "Girls Basketball", icon: "🏀",
-    statCategories: [
-      { name: "Games Played", variants: ["Career total","Single season"] },
-      { name: "Wins", variants: ["Career total","Single season"] },
-      { name: "Points", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game"] },
-      { name: "Total Rebounds", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Offensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Defensive Rebounds", variants: ["Career total","Single season","Single game"] },
-      { name: "Steals", variants: ["Career total","Single season"] },
-      { name: "Blocks", variants: ["Career total","Single season"] },
-      { name: "Field Goals Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Field Goals Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Three Pointers Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Made", variants: ["Career total","Single season","Single game"] },
-      { name: "Free Throws Attempted", variants: ["Career total","Single season","Single game"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: BASKETBALL_STAT_CATEGORIES,
   },
   soccer: {
     label: "Boys Soccer", icon: "⚽",
