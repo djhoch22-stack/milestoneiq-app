@@ -233,7 +233,7 @@ const SPORTS = {
       { name: "Goals", variants: ["Career total","Single season","Single game"] },
       { name: "Assists", variants: ["Career total","Single season","Single game"] },
       { name: "Saves", variants: ["Career total","Single season","Single game"] },
-      { name: "Clean Sheets", variants: ["Career total","Single season"] },
+      { name: "Shutouts", variants: ["Career total","Single season"] },
       { name: "Coach Wins", variants: ["Career total","Single season"] },
     ]
   },
@@ -243,7 +243,7 @@ const SPORTS = {
       { name: "Goals", variants: ["Career total","Single season","Single game"] },
       { name: "Assists", variants: ["Career total","Single season","Single game"] },
       { name: "Saves", variants: ["Career total","Single season","Single game"] },
-      { name: "Clean Sheets", variants: ["Career total","Single season"] },
+      { name: "Shutouts", variants: ["Career total","Single season"] },
       { name: "Coach Wins", variants: ["Career total","Single season"] },
     ]
   },
@@ -290,7 +290,7 @@ function getSportStatNames(sport) {
 
 // Canonical stat order — used by AllTimeTab dropdown and MilestoneSettings dropdown
 const STAT_ORDER = [
-  "Games Played","Wins","Points","Goals","Assists","Shots","Saves","Clean Sheets","Goals Against","Shots on Goal",
+  "Games Played","Wins","Points","Goals","Assists","Shots","Saves","Shutouts","Goals Against","Shots on Goal",
   "Total Rebounds","Offensive Rebounds","Defensive Rebounds",
   "Steals","Blocks",
   "Field Goals Made","Field Goals Attempted",
@@ -1057,11 +1057,11 @@ function ImportModal({ school, onClose, onImport }) {
       example:  "Quinn Barkema,QB,2025,22,18,1847,142,248,18,243,38,4,0,0,0,0,0,0,0"
     },
     soccer_girls: {
-      headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Clean Sheets",
+      headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Shutouts",
       example:  "Emma Schoenwald,2026,22,18,12,0,0"
     },
     soccer: {
-      headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Clean Sheets",
+      headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Shutouts",
       example:  "Emma Schoenwald,2026,22,18,12,0,0"
     },
   };
@@ -2932,7 +2932,7 @@ const HOF_STAT_WEIGHTS = {
   // Soccer
   "Goals":                    10,
   "Saves":                     8,
-  "Clean Sheets":              7,
+  "Shutouts":              7,
   // Generic
   "Coach Wins":                0,  // excluded from player scoring
 };
