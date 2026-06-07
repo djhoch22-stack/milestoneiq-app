@@ -1145,3 +1145,66 @@ do $$ declare pid uuid; begin
   if pid is not null then perform public.recompute_career_from_seasons(pid); end if;
 end $$;
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.8 — Ties on seasons (soccer). Tie columns + win % that counts ties: W/(W+L+T).
+-- ════════════════════════════════════════════════════════════════════════════
+alter table public.seasons add column if not exists ties int default 0;
+alter table public.seasons add column if not exists league_ties int default 0;
+-- strip the legacy "(N tie)" suffix the first soccer load wrote into notes
+update public.seasons set notes = nullif(trim(regexp_replace(notes, '\s*\(\d+\s*ties?\)', '', 'g')), '') where notes ~ '\(\d+\s*ties?\)';
+-- authoritative tie backfill for girls soccer (from the Seasons CSV)
+do $$ declare pid uuid; begin
+  select id into pid from public.programs where slug='denver-christian-soccer-girls';
+  if pid is null then return; end if;
+  update public.seasons set ties=1, league_ties=1, win_pct=62.5 where program_id=pid and season='2025-2026';
+  update public.seasons set ties=1, league_ties=1, win_pct=58.8 where program_id=pid and season='2024-2025';
+  update public.seasons set ties=1, league_ties=0, win_pct=80.0 where program_id=pid and season='2023-2024';
+  update public.seasons set ties=1, league_ties=0, win_pct=77.8 where program_id=pid and season='2022-2023';
+  update public.seasons set ties=0, league_ties=0, win_pct=70.6 where program_id=pid and season='2021-2022';
+  update public.seasons set ties=0, league_ties=0, win_pct=83.3 where program_id=pid and season='2020-2021';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2019-2020';
+  update public.seasons set ties=0, league_ties=0, win_pct=88.9 where program_id=pid and season='2018-2019';
+  update public.seasons set ties=0, league_ties=0, win_pct=66.7 where program_id=pid and season='2017-2018';
+  update public.seasons set ties=0, league_ties=0, win_pct=88.9 where program_id=pid and season='2016-2017';
+  update public.seasons set ties=1, league_ties=0, win_pct=46.2 where program_id=pid and season='2015-2016';
+  update public.seasons set ties=1, league_ties=0, win_pct=58.8 where program_id=pid and season='2014-2015';
+  update public.seasons set ties=0, league_ties=0, win_pct=56.2 where program_id=pid and season='2013-2014';
+  update public.seasons set ties=0, league_ties=0, win_pct=30.8 where program_id=pid and season='2012-2013';
+  update public.seasons set ties=3, league_ties=2, win_pct=41.2 where program_id=pid and season='2011-2012';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2010-2011';
+  update public.seasons set ties=1, league_ties=1, win_pct=28.6 where program_id=pid and season='2009-2010';
+  update public.seasons set ties=2, league_ties=2, win_pct=55.6 where program_id=pid and season='2008-2009';
+  update public.seasons set ties=0, league_ties=0, win_pct=72.2 where program_id=pid and season='2007-2008';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2006-2007';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2005-2006';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2004-2005';
+  update public.seasons set ties=0, league_ties=0, win_pct=71.4 where program_id=pid and season='2003-2004';
+  update public.seasons set ties=2, league_ties=2, win_pct=76.5 where program_id=pid and season='2002-2003';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='2001-2002';
+  update public.seasons set ties=1, league_ties=0, win_pct=94.4 where program_id=pid and season='2000-2001';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1999-2000';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1998-1999';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1997-1998';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1996-1997';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1995-1996';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1994-1995';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1993-1994';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1992-1993';
+  update public.seasons set ties=0, league_ties=0, win_pct=88.9 where program_id=pid and season='1991-1992';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1990-1991';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1989-1990';
+  update public.seasons set ties=0, league_ties=0, win_pct=null where program_id=pid and season='1988-1989';
+  update public.seasons set ties=0, league_ties=0, win_pct=78.6 where program_id=pid and season='1987-1988';
+  update public.seasons set ties=0, league_ties=0, win_pct=69.2 where program_id=pid and season='1986-1987';
+  update public.seasons set ties=1, league_ties=0, win_pct=64.3 where program_id=pid and season='1985-1986';
+  update public.seasons set ties=1, league_ties=1, win_pct=71.4 where program_id=pid and season='1984-1985';
+  update public.seasons set ties=1, league_ties=0, win_pct=42.9 where program_id=pid and season='1983-1984';
+  update public.seasons set ties=2, league_ties=0, win_pct=30.8 where program_id=pid and season='1982-1983';
+  update public.seasons set ties=1, league_ties=0, win_pct=0.0 where program_id=pid and season='1981-1982';
+end $$;
+-- general: recompute win % to include ties for every season that has a W-L record
+update public.seasons set win_pct = case when coalesce(wins,0)+coalesce(losses,0)+coalesce(ties,0) > 0
+  then round(wins::numeric/(coalesce(wins,0)+coalesce(losses,0)+coalesce(ties,0))*1000)/10 else null end
+  where wins is not null and (ties is null or ties = 0) and win_pct is not null;
+NOTIFY pgrst, 'reload schema';
