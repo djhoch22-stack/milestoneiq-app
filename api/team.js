@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER,
   byStatOrder, allStatsFor, PCT_DEFS, shootingPct, pctRecordsFrom,
-  PERGAME_DEFS, perGame, pergameRecordsFrom,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, winsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName,
 } from "./_lib.js";
 
@@ -58,9 +58,10 @@ export default async function handler(req, res) {
   const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)"];
   const vIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i === -1 ? 999 : i; };
   const allRecords = [
-    ...storedRecords.filter((r) => !PCT_PARENT[r.statName] && !String(r.variant || "").startsWith("Per game avg")),
+    ...storedRecords.filter((r) => !PCT_PARENT[r.statName] && r.statName !== "Wins" && !String(r.variant || "").startsWith("Per game avg")),
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
+    ...winsRecordsFrom(seasonRows, careerPool, team.sport),
   ];
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
