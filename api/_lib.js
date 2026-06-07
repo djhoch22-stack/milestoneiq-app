@@ -60,7 +60,7 @@ export function fmtNum(v) {
 
 // ── Stat ordering (ported from MilestoneIQ.jsx STAT_ORDER / byStatOrder) ──────
 export const STAT_ORDER = [
-  "Games Played","Wins","Points","Goals","Assists","Shots","Saves","Clean Sheets","Goals Against","Shots on Goal",
+  "Games Played","Wins","Points","Goals","Assists","Shots","Saves","Shutouts","Goals Against","Shots on Goal",
   "Total Rebounds","Offensive Rebounds","Defensive Rebounds",
   "Steals","Blocks",
   "Field Goals Made","Field Goals Attempted",
@@ -205,7 +205,7 @@ const HOF_STAT_WEIGHTS = {
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
   "Total Tackles": 8, "Sacks": 8, "Interceptions": 7, "Total TDs": 9,
-  "Goals": 10, "Saves": 8, "Clean Sheets": 7, "Coach Wins": 0,
+  "Goals": 10, "Saves": 8, "Shutouts": 7, "Coach Wins": 0,
 };
 function getSeasonSuccessScore(notes) {
   if (!notes) return 0;
