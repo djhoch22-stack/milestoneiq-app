@@ -46,123 +46,67 @@ const SPORTS = {
   football: {
     label: "Football", icon: "🏈",
     groups: [
-      {
-        group: "General",
-        stats: [
-          { name: "Games Played",      variants: ["Career total","Single season"] },
-          { name: "Wins",              variants: ["Career total","Single season"] },
-        ]
-      },
-      {
-        group: "Passing",
-        stats: [
-          { name: "Passing Yards",                  variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Pass Completions",               variants: STAT_VARIANTS_STANDARD },
-          { name: "Pass Attempts",                  variants: STAT_VARIANTS_STANDARD },
-          { name: "Passing TDs",                    variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Pass",                   variants: STAT_VARIANTS_LONGEST },
-          { name: "Passing Yards Per Game",         variants: STAT_VARIANTS_RATE },
-          { name: "Passing Yards Per Attempt",      variants: STAT_VARIANTS_RATE },
-          { name: "Passing Yards Per Season",       variants: STAT_VARIANTS_RATE },
-          { name: "Passing Yards Per Completion",   variants: STAT_VARIANTS_RATE },
-          { name: "Completions Per Game",           variants: STAT_VARIANTS_RATE },
-          { name: "Completion %",                   variants: STAT_VARIANTS_RATE },
-          { name: "Passing TD %",                   variants: STAT_VARIANTS_RATE },
-        ]
-      },
-      {
-        group: "Rushing",
-        stats: [
-          { name: "Rushing Yards",          variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Rushing Attempts",       variants: STAT_VARIANTS_STANDARD },
-          { name: "Rushing TDs",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Rush",           variants: STAT_VARIANTS_LONGEST },
-          { name: "Yards Per Rush Attempt", variants: STAT_VARIANTS_RATE },
-          { name: "Rushing Yards Per Game", variants: STAT_VARIANTS_RATE },
-          { name: "Rushing Yards Per Season", variants: STAT_VARIANTS_RATE },
-        ]
-      },
-      {
-        group: "Receiving",
-        stats: [
-          { name: "Receiving Yards",          variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Receptions",               variants: STAT_VARIANTS_STANDARD },
-          { name: "Receiving TDs",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Reception",        variants: STAT_VARIANTS_LONGEST },
-          { name: "Targets",                  variants: STAT_VARIANTS_STANDARD },
-          { name: "Yards Per Reception",      variants: STAT_VARIANTS_RATE },
-          { name: "Yards Per Target",         variants: STAT_VARIANTS_RATE },
-          { name: "Receiving Yards Per Game", variants: STAT_VARIANTS_RATE },
-          { name: "Receiving Yards Per Season", variants: STAT_VARIANTS_RATE },
-        ]
-      },
-      {
-        group: "Other Offense",
-        stats: [
-          { name: "Total TDs",             variants: STAT_VARIANTS_STANDARD },
-          { name: "2 Pt Conversions Made", variants: STAT_VARIANTS_STANDARD },
-          { name: "Yards From Scrimmage",  variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "All-Purpose Yards",     variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Total Offense",         variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Touches",               variants: STAT_VARIANTS_STANDARD },
-          { name: "Yards Per Touch",       variants: STAT_VARIANTS_RATE },
-        ]
-      },
-      {
-        group: "Defense",
-        stats: [
-          { name: "Total Tackles",                variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Combined Tackles",             variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Solo Tackles",                 variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Tackles For Loss",             variants: STAT_VARIANTS_STANDARD },
-          { name: "Sacks",                        variants: STAT_VARIANTS_STANDARD },
-          { name: "Interceptions",                variants: STAT_VARIANTS_STANDARD },
-          { name: "Interception Return Yards",    variants: STAT_VARIANTS_STANDARD },
-          { name: "Interception Return TDs",      variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Interception Return",  variants: STAT_VARIANTS_LONGEST },
-          { name: "Passes Defended",              variants: STAT_VARIANTS_STANDARD },
-          { name: "Fumbles Forced",               variants: STAT_VARIANTS_STANDARD },
-          { name: "Fumbles Recovered",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Fumble Return Yards",          variants: STAT_VARIANTS_STANDARD },
-          { name: "Fumble Return TDs",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Safeties",                     variants: STAT_VARIANTS_STANDARD },
-        ]
-      },
-      {
-        group: "Special Teams",
-        stats: [
-          { name: "Kick Returns",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Kick Return Yards",       variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Kick Return TDs",         variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Kick Return",     variants: STAT_VARIANTS_LONGEST },
-          { name: "Yards Per Kick Return",   variants: STAT_VARIANTS_RATE },
-          { name: "Punt Returns",            variants: STAT_VARIANTS_STANDARD },
-          { name: "Punt Return Yards",       variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Punt Return TDs",         variants: STAT_VARIANTS_STANDARD },
-          { name: "Longest Punt Return",     variants: STAT_VARIANTS_LONGEST },
-          { name: "Yards Per Punt Return",   variants: STAT_VARIANTS_RATE },
-          { name: "Kick & Punt Returns",     variants: STAT_VARIANTS_STANDARD },
-          { name: "Kick & Punt Return Yards",variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Kick & Punt Return TDs",  variants: STAT_VARIANTS_STANDARD },
-          { name: "Extra Points Made",       variants: STAT_VARIANTS_STANDARD },
-          { name: "Extra Points Attempted",  variants: STAT_VARIANTS_STANDARD },
-          { name: "Extra Point %",           variants: STAT_VARIANTS_RATE },
-          { name: "Field Goals Made",        variants: STAT_VARIANTS_STANDARD },
-          { name: "Field Goals Attempted",   variants: STAT_VARIANTS_STANDARD },
-          { name: "Field Goal %",            variants: STAT_VARIANTS_RATE },
-          { name: "Longest Field Goal Made", variants: STAT_VARIANTS_LONGEST },
-          { name: "Punts",                   variants: STAT_VARIANTS_STANDARD },
-          { name: "Punting Yards",           variants: STAT_VARIANTS_AVG_ONLY },
-          { name: "Longest Punt",            variants: STAT_VARIANTS_LONGEST },
-          { name: "Yards Per Punt",          variants: STAT_VARIANTS_RATE },
-          { name: "Coach Wins",              variants: ["Career total","Single season"] },
-        ]
-      },
+      { group: "General", stats: [
+        { name: "Games Played", variants: ["Career total","Single season"] },
+        { name: "Wins", variants: ["Career total","Single season"] },
+      ]},
+      { group: "Passing", stats: [
+        { name: "Completetions", variants: STAT_VARIANTS_STANDARD },
+        { name: "Passing Attempts", variants: STAT_VARIANTS_STANDARD },
+        { name: "Passing Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Passing TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Rushing", stats: [
+        { name: "Rushes", variants: STAT_VARIANTS_STANDARD },
+        { name: "Rushing Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Rushing TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Receiving", stats: [
+        { name: "Receptions", variants: STAT_VARIANTS_STANDARD },
+        { name: "Receiving Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Receiving TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Offense", stats: [
+        { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Total TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Defense", stats: [
+        { name: "Tackles", variants: STAT_VARIANTS_STANDARD },
+        { name: "Sacks", variants: STAT_VARIANTS_STANDARD },
+        { name: "Interceptions", variants: STAT_VARIANTS_STANDARD },
+        { name: "Pass Break Ups", variants: STAT_VARIANTS_STANDARD },
+        { name: "Forced Fumbles", variants: STAT_VARIANTS_STANDARD },
+        { name: "Fumble Recoveries", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Kicking", stats: [
+        { name: "Field Goals Made", variants: STAT_VARIANTS_STANDARD },
+        { name: "Field Goals Attempts", variants: STAT_VARIANTS_STANDARD },
+        { name: "PAT Mades", variants: STAT_VARIANTS_STANDARD },
+        { name: "PAT Attempts", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Punting", stats: [
+        { name: "Punts", variants: STAT_VARIANTS_STANDARD },
+        { name: "Punt Yards", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Punt Returns", stats: [
+        { name: "Punt Returns", variants: STAT_VARIANTS_STANDARD },
+        { name: "Punt Return Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Punt Return TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Kickoffs", stats: [
+        { name: "Kick Offs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Kick Off Yards", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Kickoff Returns", stats: [
+        { name: "Kick Off Returns", variants: STAT_VARIANTS_STANDARD },
+        { name: "Kick Off Return Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Kick Off Return TDs", variants: STAT_VARIANTS_STANDARD },
+      ]},
+      { group: "Coaching", stats: [
+        { name: "Coach Wins", variants: ["Career total","Single season"] },
+      ]},
     ],
-    // Flat statCategories for backwards compatibility
-    get statCategories() {
-      return this.groups.flatMap(g => g.stats);
-    }
+    get statCategories() { return this.groups.flatMap(g => g.stats); }
   },
   basketball: {
     label: "Boys Basketball", icon: "🏀",
@@ -262,33 +206,32 @@ const STAT_ORDER = [
   "Field Goals Made","Field Goals Attempted",
   "Three Pointers Made","Three Pointers Attempted",
   "Free Throws Made","Free Throws Attempted",
-  // Football offense
-  "Passing Yards","Pass Completions","Pass Attempts","Passing TDs","Longest Pass",
-  "Passing Yards Per Game","Passing Yards Per Attempt","Passing Yards Per Season",
-  "Passing Yards Per Completion","Completions Per Game","Completion %","Passing TD %",
-  "Rushing Yards","Rushing Attempts","Rushing TDs","Longest Rush",
-  "Yards Per Rush Attempt","Rushing Yards Per Game","Rushing Yards Per Season",
-  "Receiving Yards","Receptions","Receiving TDs","Longest Reception","Targets",
-  "Yards Per Reception","Yards Per Target","Receiving Yards Per Game","Receiving Yards Per Season",
-  "Total TDs","2 Pt Conversions Made","Yards From Scrimmage","All-Purpose Yards",
-  "Total Offense","Touches","Yards Per Touch",
-  // Football defense
-  "Total Tackles","Combined Tackles","Solo Tackles","Tackles For Loss","Sacks",
-  "Interceptions","Interception Return Yards","Interception Return TDs","Longest Interception Return",
-  "Passes Defended","Fumbles Forced","Fumbles Recovered","Fumble Return Yards","Fumble Return TDs","Safeties",
-  // Football special teams
-  "Kick Returns","Kick Return Yards","Kick Return TDs","Longest Kick Return","Yards Per Kick Return",
-  "Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Yards Per Punt Return",
-  "Kick & Punt Returns","Kick & Punt Return Yards","Kick & Punt Return TDs",
-  "Extra Points Made","Extra Points Attempted","Extra Point %",
-  "Field Goals Made","Field Goals Attempted","Field Goal %","Longest Field Goal Made",
-  "Punts","Punting Yards","Longest Punt","Yards Per Punt",
+  // Football (canonical order; "Field Goals Made" is shared with basketball above, so it is not repeated)
+  "Completetions","Passing Attempts","Passing Yards","Passing TDs",
+  "Rushes","Rushing Yards","Rushing TDs",
+  "Receptions","Receiving Yards","Receiving TDs",
+  "Total Yards","Total TDs",
+  "Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries",
+  "Field Goals Attempts","PAT Mades","PAT Attempts",
+  "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
+  "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
   "Coach Wins",
 ];
 
+// Football: the exact stat set + order to surface on every tab (always shown, even with no data).
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs"];
+// Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
+// at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
+
 // Sort stat names into the canonical STAT_ORDER (unknown stats last, alphabetically). Shared so the
 // all-time grid, the player profile, AND the athletes-tab cards all display stats in identical order.
-function byStatOrder(a, b) {
+function byStatOrder(a, b, sport) {
+  const so = SPORT_ORDER[sport];
+  if (so) {
+    const fa = so.indexOf(a), fb = so.indexOf(b);
+    if (fa !== -1 || fb !== -1) return (fa === -1 ? 1e9 : fa) - (fb === -1 ? 1e9 : fb);
+  }
   const ai = STAT_ORDER.indexOf(a), bi = STAT_ORDER.indexOf(b);
   if (ai !== -1 && bi !== -1) return ai - bi;
   if (ai !== -1) return -1;
@@ -309,6 +252,7 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY,
 };
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
 // data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
@@ -316,7 +260,7 @@ function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap(p => Object.keys(p.stats || {})))]
     .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
-  return [...new Set([...base, ...present])].sort(byStatOrder);
+  return [...new Set([...base, ...present])].sort((a, b) => byStatOrder(a, b, sport));
 }
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
@@ -795,7 +739,7 @@ function RecordsModal({ school, onClose, onSave }) {
     ...sportDef.statCategories.map(s => s.name),
     // shooting %s (FG%/3P%/FT%) for sports that track the made/attempted stats, so they're editable
     ...PCT_DEFS.filter(d => sportDef.statCategories.some(s => s.name === d.made)).map(d => d.name),
-  ])].sort(byStatOrder);
+  ])].sort((a, b) => byStatOrder(a, b, school.sport));
   const [records, setRecords] = useState(school.records || []);
   const [editingId, setEditingId] = useState(null);
   const variantsForStat = (statName) => {
@@ -1083,8 +1027,8 @@ function ImportModal({ school, onClose, onImport }) {
       example:  "Natalie Bohannon,2026,82,72,986,118,586,194,392,104,12,358,798,42,128,228,310"
     },
     football: {
-      headers: "Name,Position,Grad Year,Games Played,Wins,Passing Yards,Pass Completions,Pass Attempts,Passing TDs,Rushing Yards,Rushing Attempts,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Tackles,Sacks,Interceptions,Coach Wins",
-      example:  "Quinn Barkema,QB,2025,22,18,1847,142,248,18,243,38,4,0,0,0,0,0,0,0"
+      headers: "Name,Position,Grad Year,Games Played,Wins,Completetions,Passing Attempts,Passing Yards,Passing TDs,Rushes,Rushing Yards,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Yards,Total TDs,Tackles,Sacks,Interceptions,Pass Break Ups,Forced Fumbles,Fumble Recoveries,Field Goals Made,Field Goals Attempts,PAT Mades,PAT Attempts,Punts,Punt Yards,Punt Returns,Punt Return Yards,Punt Return TDs,Kick Offs,Kick Off Yards,Kick Off Returns,Kick Off Return Yards,Kick Off Return TDs,Coach Wins",
+      example:  "Trenton Steeves,QB,2025,5,2,43,106,574,3,14,52,3,0,0,0,626,3,12,0,1,4,1,1,0,0,0,0,17,508,0,0,0,11,258,0,0,0,0"
     },
     soccer_girls: {
       headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Shutouts",
@@ -3959,7 +3903,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
       return { stat, val, rank, total: sorted.length };
     })
     .filter(r => r.rank > 0)
-    .sort((a, b) => byStatOrder(a.stat, b.stat));   // canonical order, matching every other tab
+    .sort((a, b) => byStatOrder(a.stat, b.stat, school.sport));   // canonical order, matching every other tab
   const playerHeldRecords = (sch, pl) => {
     const nameLower = (pl.name || "").toLowerCase().trim();
     return (sch.records || []).filter(r => {
@@ -4659,7 +4603,11 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   };
 
                   const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
-                  const recStatIdx = (n) => { const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i; };
+                  const recStatIdx = (n) => {
+                    const so = SPORT_ORDER[school.sport];
+                    if (so) { const fi = so.indexOf(n); if (fi !== -1) return fi; }
+                    const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i;
+                  };
                   const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
