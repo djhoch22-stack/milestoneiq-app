@@ -285,7 +285,11 @@ export default async function handler(req, res) {
   // Combine each coach's record across EVERY public program in the school (cross-sport),
   // mirroring the app's "Combine all teams" — so e.g. a coach who led soccer + basketball
   // shows one aggregated HOF record. Falls back to this program if the org lookup is empty.
-  const orgIds = (await sb(`public_teams?org_id=eq.${team.org_id}&select=id`)).map((p) => p.id).filter(Boolean);
+  const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof`);
+  const orgIds = orgTeams.map((p) => p.id).filter(Boolean);
+  // A coach inducted in ANY program at the school counts as inducted everywhere (cross-sport).
+  const inducted = new Set();
+  orgTeams.forEach((p) => Object.keys(p.coach_hof || {}).forEach((n) => { if ((p.coach_hof || {})[n]) inducted.add(normName(n)); }));
   const orgSeasonsRaw = orgIds.length
     ? await sb(`seasons?program_id=in.(${orgIds.join(",")})&select=season,wins,losses,league_wins,league_losses,coach,notes`)
     : [];
@@ -293,7 +297,7 @@ export default async function handler(req, res) {
     season: s.season, wins: s.wins, losses: s.losses, leagueWins: s.league_wins, leagueLosses: s.league_losses, coach: s.coach, notes: s.notes,
   }));
   const coaches = buildCoachStats(orgSeasons);
-  const inductedCoaches = coaches.filter((c) => team.coach_hof && team.coach_hof[c.name]).sort((a, b) => b.wins - a.wins);
+  const inductedCoaches = coaches.filter((c) => inducted.has(normName(c.name))).sort((a, b) => b.wins - a.wins);
   const coachCards2 = inductedCoaches.length ? inductedCoaches.map((c) => {
     const games = c.wins + c.losses; const pct = games > 0 ? Math.round((c.wins / games) * 1000) / 10 : null;
     const yr = String(c.firstYear) === String(c.lastYear) ? esc(String(c.firstYear)) : esc(String(c.firstYear)) + "–" + esc(String(c.lastYear));
