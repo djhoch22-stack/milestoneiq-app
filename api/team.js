@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, PCT_DEFS, shootingPct, pctRecordsFrom,
-  PERGAME_DEFS, perGame, pergameRecordsFrom, autoStatRecords,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName,
 } from "./_lib.js";
 
@@ -62,6 +62,7 @@ export default async function handler(req, res) {
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
+    ...coachWinsRecordsFrom(seasonsList, team.sport),
   ];
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
