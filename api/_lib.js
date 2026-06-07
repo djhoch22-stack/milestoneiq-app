@@ -216,7 +216,7 @@ export function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
 }
 // Coach Wins records: career total (a coach's total wins in this program) + single season
 // (most wins by a coach in one season). All tied holders included. Per program.
-export function coachWinsRecordsFrom(seasons, sport) {
+export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
   const out = [];
   const byCoach = {};
   let ssMax = 0;
@@ -226,6 +226,8 @@ export function coachWinsRecordsFrom(seasons, sport) {
     byCoach[s.coach] = (byCoach[s.coach] || 0) + w;
     if (w > ssMax) ssMax = w;
   }
+  // wins a coach brought from PRIOR schools count toward their career total
+  Object.entries(prior || {}).forEach(([coach, pr]) => { if (pr && pr.wins) byCoach[coach] = (byCoach[coach] || 0) + Number(pr.wins || 0); });
   const careerMax = Object.keys(byCoach).length ? Math.max(...Object.values(byCoach)) : 0;
   if (careerMax > 0)
     for (const coach in byCoach) if (byCoach[coach] === careerMax)
