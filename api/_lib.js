@@ -80,7 +80,7 @@ export const STAT_ORDER = [
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
