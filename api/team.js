@@ -73,7 +73,7 @@ export default async function handler(req, res) {
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
   const recordsSection = !allRecords.length
     ? `<div class="empty">No school records published yet.</div>`
-    : Object.keys(byStat).sort(byStatOrder).map((sn) => {
+    : Object.keys(byStat).sort((a, b) => byStatOrder(a, b, team.sport)).map((sn) => {
         const recs = byStat[sn].slice().sort((a, b) => ((PCT_PARENT[a.statName] ? 100 : 0) + vIdx(a.variant)) - ((PCT_PARENT[b.statName] ? 100 : 0) + vIdx(b.variant)));
         const groups = []; const seen = {};
         for (const r of recs) { const k = r.statName + "|" + r.variant + "|" + r.value; if (seen[k] != null) groups[seen[k]].push(r); else { seen[k] = groups.length; groups.push([r]); } }
