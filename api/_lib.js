@@ -115,9 +115,9 @@ export function statsToDisplay(roster, sport) {
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
 export const PCT_DEFS = [
-  { name: "Field Goal Percentage",  short: "FG%", made: "Field Goals Made",   att: "Field Goals Attempted",   minSeasonAtt: 30, minCareerAtt: 100 },
-  { name: "Three Point Percentage", short: "3P%", made: "Three Pointers Made", att: "Three Pointers Attempted", minSeasonAtt: 15, minCareerAtt: 40 },
-  { name: "Free Throw Percentage",  short: "FT%", made: "Free Throws Made",    att: "Free Throws Attempted",    minSeasonAtt: 20, minCareerAtt: 50 },
+  { name: "Field Goal Percentage",  short: "FG%", made: "Field Goals Made",   att: "Field Goals Attempted",   minSeasonAtt: 25, minCareerAtt: 100 },
+  { name: "Three Point Percentage", short: "3P%", made: "Three Pointers Made", att: "Three Pointers Attempted", minSeasonAtt: 25, minCareerAtt: 100 },
+  { name: "Free Throw Percentage",  short: "FT%", made: "Free Throws Made",    att: "Free Throws Attempted",    minSeasonAtt: 25, minCareerAtt: 100 },
 ];
 export function shootingPct(stats, made, att) {
   const m = Number(stats?.[made]); const a = Number(stats?.[att]);
@@ -151,7 +151,7 @@ export const PERGAME_DEFS = [];
 // Per-game RECORDS appear on the Records tab (nested in each stat's tile). Stats we compute them for:
 const PERGAME_RECORD_DEFS = [
   { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
-  { stat: "Total Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+  { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
