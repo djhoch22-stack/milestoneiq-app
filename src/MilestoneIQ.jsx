@@ -2497,6 +2497,47 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   );
 }
 
+// Add/edit-season form. MUST be a top-level component (NOT nested inside SeasonsTab),
+// otherwise it's recreated on every render and the number inputs lose focus after one digit.
+function SeasonForm({ form, setForm, noteSuggestions = [], onSubmit, submitLabel, onCancel }) {
+  const fld = { width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box" };
+  const lbl = { display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3 };
+  return (
+    <div style={{background:"#f9fafb",borderRadius:12,border:"1px solid #e5e7eb",padding:16,marginBottom:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+        <div><label style={lbl}>Season *</label>
+          <input value={form.season} onChange={e=>setForm(f=>({...f,season:e.target.value}))} placeholder="e.g. 2025-2026" style={fld} /></div>
+        <div><label style={lbl}>Wins</label>
+          <input type="number" min="0" value={form.wins} onChange={e=>setForm(f=>({...f,wins:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>Losses</label>
+          <input type="number" min="0" value={form.losses} onChange={e=>setForm(f=>({...f,losses:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>League wins</label>
+          <input type="number" min="0" value={form.leagueWins} onChange={e=>setForm(f=>({...f,leagueWins:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>League losses</label>
+          <input type="number" min="0" value={form.leagueLosses} onChange={e=>setForm(f=>({...f,leagueLosses:e.target.value}))} placeholder="0" style={fld} /></div>
+        <div><label style={lbl}>Head coach</label>
+          <input value={form.coach} onChange={e=>setForm(f=>({...f,coach:e.target.value}))} placeholder="Coach name" style={fld} /></div>
+      </div>
+      <div style={{marginBottom:10}}>
+        <label style={lbl}>Notes / postseason</label>
+        <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="e.g. League Champions / Final Four" style={fld} />
+        <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
+          {noteSuggestions.map(s => (
+            <button key={s} onClick={()=>setForm(f=>({...f,notes:f.notes ? f.notes+"/"+s : s}))}
+              style={{background:"#eff6ff",color:"#1e40af",border:"1px solid #bfdbfe",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",fontWeight:500}}>
+              + {s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button onClick={onCancel} style={{padding:"7px 16px",fontSize:13,border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",background:"#fff",color:"#374151"}}>Cancel</button>
+        <button onClick={onSubmit} style={{padding:"7px 18px",fontSize:13,fontWeight:600,border:"none",borderRadius:8,cursor:"pointer",background:"#1a56db",color:"#fff"}}>{submitLabel}</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Season History Tab ────────────────────────────────────────────────────────
 function SeasonsTab({ seasons = [], onSave }) {
   const isMobile = useIsMobile();
@@ -2562,73 +2603,7 @@ function SeasonsTab({ seasons = [], onSave }) {
     "Playoff Appearance", "District Champions", "Regional Champions"
   ];
 
-  const SeasonForm = ({ onSubmit, submitLabel }) => (
-    <div style={{background:"#f9fafb",borderRadius:12,border:"1px solid #e5e7eb",padding:16,marginBottom:16}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>Season *</label>
-          <input value={form.season} onChange={e=>setForm(f=>({...f,season:e.target.value}))}
-            placeholder="e.g. 2025-2026"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>Wins</label>
-          <input type="number" min="0" value={form.wins} onChange={e=>setForm(f=>({...f,wins:e.target.value}))}
-            placeholder="0"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>Losses</label>
-          <input type="number" min="0" value={form.losses} onChange={e=>setForm(f=>({...f,losses:e.target.value}))}
-            placeholder="0"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>League wins</label>
-          <input type="number" min="0" value={form.leagueWins} onChange={e=>setForm(f=>({...f,leagueWins:e.target.value}))}
-            placeholder="0"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>League losses</label>
-          <input type="number" min="0" value={form.leagueLosses} onChange={e=>setForm(f=>({...f,leagueLosses:e.target.value}))}
-            placeholder="0"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-        <div>
-          <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>Head coach</label>
-          <input value={form.coach} onChange={e=>setForm(f=>({...f,coach:e.target.value}))}
-            placeholder="Coach name"
-            style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        </div>
-      </div>
-      <div style={{marginBottom:10}}>
-        <label style={{display:"block",fontSize:11,fontWeight:600,color:"#6b7280",marginBottom:3}}>Notes / postseason</label>
-        <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
-          placeholder="e.g. League Champions / Final Four"
-          style={{width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"7px 10px",fontSize:13,boxSizing:"border-box"}} />
-        <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
-          {NOTE_SUGGESTIONS.map(s => (
-            <button key={s} onClick={()=>setForm(f=>({...f,notes:f.notes ? f.notes+"/"+s : s}))}
-              style={{background:"#eff6ff",color:"#1e40af",border:"1px solid #bfdbfe",borderRadius:6,
-                padding:"2px 8px",fontSize:11,cursor:"pointer",fontWeight:500}}>
-              + {s}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <button onClick={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}}
-          style={{padding:"7px 16px",fontSize:13,border:"1px solid #e5e7eb",borderRadius:8,cursor:"pointer",background:"#fff",color:"#374151"}}>
-          Cancel
-        </button>
-        <button onClick={onSubmit}
-          style={{padding:"7px 18px",fontSize:13,fontWeight:600,border:"none",borderRadius:8,cursor:"pointer",background:"#1a56db",color:"#fff"}}>
-          {submitLabel}
-        </button>
-      </div>
-    </div>
-  );
+  // SeasonForm is now a top-level component (above) — passed form/setForm as props.
 
   // Empty program: still allow adding the FIRST season/coach (uses SeasonForm defined above).
   if (!seasons.length) return (
@@ -2641,7 +2616,7 @@ function SeasonsTab({ seasons = [], onSave }) {
           </button>
         )}
       </div>
-      {showAddForm && <SeasonForm onSubmit={handleAdd} submitLabel="Add season" />}
+      {showAddForm && <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleAdd} submitLabel="Add season" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />}
       {!showAddForm && (
         <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb"}}>
           <div style={{fontSize:32,marginBottom:8}}>📅</div>
@@ -2737,7 +2712,7 @@ function SeasonsTab({ seasons = [], onSave }) {
           </button>
         )}
       </div>
-      {showAddForm && <SeasonForm onSubmit={handleAdd} submitLabel="Add season" />}
+      {showAddForm && <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleAdd} submitLabel="Add season" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />}
 
       {/* Summary stats — top row */}
       <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gap:12,marginBottom:12}}>
@@ -2858,7 +2833,7 @@ function SeasonsTab({ seasons = [], onSave }) {
               if (isEditing) return (
                 <tr key={s.season} style={{borderBottom:"1px solid #e5e7eb",background:"#fffbeb"}}>
                   <td colSpan={7} style={{padding:"12px 16px"}}>
-                    <SeasonForm onSubmit={handleSaveEdit} submitLabel="Save changes" />
+                    <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleSaveEdit} submitLabel="Save changes" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />
                   </td>
                 </tr>
               );
