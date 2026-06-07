@@ -1082,3 +1082,45 @@ NOTIFY pgrst, 'reload schema';
 
 -- Done (v3.5). Public record book: programs.slug + is_public, public_teams view,
 -- anon read of record-book tables for opted-in (public-by-default) programs.
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.6 — Career totals from season uploads. Season-stat imports write player_seasons
+-- but the career totals shown on Overview/Athletes/All-Time/Records/Milestones live in
+-- all_time_players (+ athletes). This RPC recomputes a program's career = SUM of each
+-- player's season rows (every numeric stat key), and mirrors it onto the active roster.
+-- Called by the season importer after each upload, and runnable manually to backfill.
+-- ════════════════════════════════════════════════════════════════════════════
+create or replace function public.recompute_career_from_seasons(p_program uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  with kv as (
+    select lower(ps.player_name) lname, e.key, sum((e.value)::numeric) val
+    from public.player_seasons ps, jsonb_each_text(ps.stats) e
+    where ps.program_id = p_program and e.value ~ '^-?[0-9]+(\.[0-9]+)?$'
+    group by lower(ps.player_name), e.key
+  ),
+  agg as (select lname, jsonb_object_agg(key, val) stats from kv group by lname),
+  yrs as (select lower(player_name) lname, min(season) fy, max(season) ly
+          from public.player_seasons where program_id = p_program group by lower(player_name))
+  update public.all_time_players t
+     set stats      = coalesce(agg.stats, t.stats),
+         first_year = coalesce(yrs.fy, t.first_year),
+         last_year  = coalesce(yrs.ly, t.last_year)
+  from agg join yrs on yrs.lname = agg.lname
+  where t.program_id = p_program and lower(t.name) = agg.lname;
+
+  -- mirror career totals onto the active athletes roster (so Athletes/Overview match)
+  update public.athletes ath
+     set stats = t.stats
+  from public.all_time_players t
+  where ath.program_id = p_program and t.program_id = p_program
+    and lower(ath.name) = lower(t.name);
+end $$;
+grant execute on function public.recompute_career_from_seasons(uuid) to anon, authenticated, service_role;
+
+-- One-time backfill: fix the already-uploaded girls-soccer totals from its season rows.
+do $$ declare pid uuid; begin
+  select id into pid from public.programs where slug = 'denver-christian-soccer-girls';
+  if pid is not null then perform public.recompute_career_from_seasons(pid); end if;
+end $$;
+NOTIFY pgrst, 'reload schema';
