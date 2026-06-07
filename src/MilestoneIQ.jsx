@@ -215,6 +215,7 @@ const STAT_ORDER = [
   "Field Goals Attempts","PAT Mades","PAT Attempts",
   "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
   "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
+  "All-Purpose Yards",
   "Coach Wins",
 ];
 
@@ -325,12 +326,28 @@ const MILESTONE_THRESHOLDS = {
   "Goals": [10,25,50,75,100], "Assists": [10,25,50,75], "Shots": [50,100,200,300],
   "Saves": [50,100,250,500], "Shutouts": [5,10,15,25],
 };
+// Football milestone thresholds for EVERY one of the 34 stats, so the milestones tab lists them all.
+const FOOTBALL_THRESHOLDS = {
+  "Games Played":[10,20,30,40], "Wins":[10,20,30,40],
+  "Completetions":[50,100,200,400], "Passing Attempts":[100,200,400,700], "Passing Yards":[500,1000,2500,5000], "Passing TDs":[10,25,50,75],
+  "Rushes":[100,250,500,750], "Rushing Yards":[250,500,1000,2500], "Rushing TDs":[10,25,50],
+  "Receptions":[25,50,100,150], "Receiving Yards":[250,500,1000,2000], "Receiving TDs":[5,10,25,50],
+  "Total Yards":[500,1000,2500,5000], "Total TDs":[10,25,50,75],
+  "Tackles":[50,100,200,300], "Sacks":[5,10,20,30], "Interceptions":[3,5,10,15], "Pass Break Ups":[5,10,20,30],
+  "Forced Fumbles":[3,5,10,15], "Fumble Recoveries":[3,5,10,15],
+  "Field Goals Made":[5,10,25,50], "Field Goals Attempts":[10,25,50,75], "PAT Mades":[25,50,100,150], "PAT Attempts":[25,50,100,150],
+  "Punts":[25,50,100,150], "Punt Yards":[500,1000,2500,5000],
+  "Punt Returns":[10,25,50,75], "Punt Return Yards":[100,250,500,1000], "Punt Return TDs":[1,3,5,10],
+  "Kick Offs":[25,50,100,150], "Kick Off Yards":[500,1000,2500,5000],
+  "Kick Off Returns":[10,25,50,75], "Kick Off Return Yards":[100,250,500,1000], "Kick Off Return TDs":[1,3,5,10],
+};
 // Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
 // those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const ms = base.filter(s => MILESTONE_THRESHOLDS[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: MILESTONE_THRESHOLDS[s], alertPct: 90 }));
+  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
 
@@ -4615,7 +4632,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   };
                   // Render groups in the sport's declared group order (not record-insertion order).
                   const groupOrder = (sport.groups || []).map(g => g.group);
-                  const grpIdx = (name) => { const i = groupOrder.indexOf(name); return i === -1 ? 999 : i; };
+                  const grpIdx = (name) => { if (name === "Coaching") return 99999; const i = groupOrder.indexOf(name); return i === -1 ? 999 : i; };
 
                   const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
                   const recStatIdx = (n) => {
@@ -4746,8 +4763,13 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             </div>
 
             {(() => {
-              const userMilestones = ((school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport))
+              let userMilestones = ((school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport))
                 .map(m => ({ ...m, statName: fixFbStat(school.sport, m.statName) }));
+              // Football: surface ALL stat categories (even with no player data), keeping custom thresholds.
+              if (school.sport === "football") {
+                const have = new Set(userMilestones.map(m => m.statName));
+                for (const d of defaultMilestonesFor("football")) if (!have.has(d.statName)) userMilestones.push(d);
+              }
               // Coach Wins is always automatic and always last
               const COACH_WINS_MILESTONE = {
                 id: "__coach_wins__", statName: "Coach Wins", alertPct: 90,
