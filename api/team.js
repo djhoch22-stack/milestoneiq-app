@@ -413,7 +413,7 @@ export default async function handler(req, res) {
     <script>${script}</script>
   `;
 
-  res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   res.statusCode = 200;
   return res.end(htmlShell({ title, description, canonical, jsonld, body }));
 }
