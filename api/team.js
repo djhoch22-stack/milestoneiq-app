@@ -282,7 +282,17 @@ export default async function handler(req, res) {
     return `<div class="hcard" data-p="${esc(normName(p.name))}"><div style="font-weight:700">${esc(p.name)}</div>${yearsStr(p) ? `<div style="font-size:12px;color:#6b7280">${yearsStr(p)}</div>` : ""}<div style="margin-top:6px">${badges}</div>${pts ? `<div style="font-size:12px;color:#9ca3af;margin-top:6px">${fmtNum(pts)} career points</div>` : ""}${hs}</div>`;
   }).join("") : `<div class="empty">No athletes have been inducted into the Hall of Fame yet.</div>`;
 
-  const coaches = buildCoachStats(seasonsList);
+  // Combine each coach's record across EVERY public program in the school (cross-sport),
+  // mirroring the app's "Combine all teams" — so e.g. a coach who led soccer + basketball
+  // shows one aggregated HOF record. Falls back to this program if the org lookup is empty.
+  const orgIds = (await sb(`public_teams?org_id=eq.${team.org_id}&select=id`)).map((p) => p.id).filter(Boolean);
+  const orgSeasonsRaw = orgIds.length
+    ? await sb(`seasons?program_id=in.(${orgIds.join(",")})&select=season,wins,losses,league_wins,league_losses,coach,notes`)
+    : [];
+  const orgSeasons = (orgSeasonsRaw.length ? orgSeasonsRaw : seasonsRaw).map((s) => ({
+    season: s.season, wins: s.wins, losses: s.losses, leagueWins: s.league_wins, leagueLosses: s.league_losses, coach: s.coach, notes: s.notes,
+  }));
+  const coaches = buildCoachStats(orgSeasons);
   const inductedCoaches = coaches.filter((c) => team.coach_hof && team.coach_hof[c.name]).sort((a, b) => b.wins - a.wins);
   const coachCards2 = inductedCoaches.length ? inductedCoaches.map((c) => {
     const games = c.wins + c.losses; const pct = games > 0 ? Math.round((c.wins / games) * 1000) / 10 : null;
