@@ -63,11 +63,11 @@ export default async function handler(req, res) {
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
     ...coachWinsRecordsFrom(seasonsList, team.sport),
   ];
-  // Show a manually-entered record unless an auto-computed one exists for the same stat+variant.
-  const autoKeys = new Set(autoRecs.map((r) => r.statName + "|" + r.variant));
+  // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
+  const manualKeys = new Set(storedRecords.map((r) => r.statName + "|" + r.variant));
   const allRecords = [
-    ...storedRecords.filter((r) => !autoKeys.has(r.statName + "|" + r.variant)),
-    ...autoRecs,
+    ...storedRecords,
+    ...autoRecs.filter((r) => !manualKeys.has(r.statName + "|" + r.variant)),
   ];
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
