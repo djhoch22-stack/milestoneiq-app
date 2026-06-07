@@ -1092,9 +1092,13 @@ NOTIFY pgrst, 'reload schema';
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.recompute_career_from_seasons(p_program uuid)
 returns void language plpgsql security definer set search_path = public as $$
-declare maxseason text;
+declare cur_season text;
 begin
-  select max(season) into maxseason from public.player_seasons where program_id = p_program;
+  -- the CURRENT academic year (rolls over in July), e.g. '2025-2026'. A player is "active"/"current"
+  -- ONLY if their latest season is this year — so uploading a PAST season never marks players active.
+  cur_season := case when extract(month from now()) >= 7
+    then extract(year from now())::int || '-' || (extract(year from now())::int + 1)
+    else (extract(year from now())::int - 1) || '-' || extract(year from now())::int end;
 
   -- per-player career = SUM of every numeric stat across their season rows
   drop table if exists _pc;
@@ -1112,14 +1116,14 @@ begin
           from public.player_seasons where program_id = p_program group by lower(player_name))
   select y.lname, y.disp, y.fy, y.ly, a.stats from agg a join yrs y on y.lname = a.lname;
 
-  -- 1) update existing all-time players
+  -- 1) update existing all-time players (and refresh their current-season flag)
   update public.all_time_players t
-     set stats = p.stats, first_year = p.fy, last_year = p.ly
+     set stats = p.stats, first_year = p.fy, last_year = p.ly, is_current = (p.ly = cur_season)
   from _pc p where t.program_id = p_program and lower(t.name) = p.lname;
 
   -- 2) INSERT all-time players new from a season upload (e.g. a fresh roster)
   insert into public.all_time_players (program_id, name, first_year, last_year, is_current, school_hall_of_fame, state_hall_of_fame, stats)
-  select p_program, p.disp, p.fy, p.ly, (p.ly = maxseason), false, false, p.stats
+  select p_program, p.disp, p.fy, p.ly, (p.ly = cur_season), false, false, p.stats
   from _pc p
   where not exists (select 1 from public.all_time_players t where t.program_id = p_program and lower(t.name) = p.lname);
 
@@ -1128,12 +1132,23 @@ begin
   from public.all_time_players t
   where ath.program_id = p_program and t.program_id = p_program and lower(ath.name) = lower(t.name);
 
-  -- 4) add CURRENT-season players to the active roster if they aren't there yet
+  -- 4) add players from the CURRENT academic season to the active roster if they aren't there yet
   insert into public.athletes (program_id, name, is_active, stats)
   select p_program, p.disp, true, p.stats
   from _pc p
-  where p.ly = maxseason
+  where p.ly = cur_season
     and not exists (select 1 from public.athletes ath where ath.program_id = p_program and lower(ath.name) = p.lname);
+
+  -- 4b) activeness is CURRENT-season-only: an athlete is active IFF they have a season row in the
+  --     current academic year. So uploading a past season leaves its players inactive (alumni).
+  --     Guarded on the program having season rows so career-import programs are never touched.
+  if exists (select 1 from public.player_seasons where program_id = p_program) then
+    update public.athletes ath
+       set is_active = exists (
+         select 1 from public.player_seasons ps
+         where ps.program_id = p_program and lower(ps.player_name) = lower(ath.name) and ps.season = cur_season)
+     where ath.program_id = p_program;
+  end if;
 
   -- 5) collapse case-variant duplicates (e.g. "Van andel" vs "Van Andel"): keep the row whose
   --    exact name matches player_seasons, delete the mis-cased sibling. Prevents split careers.
