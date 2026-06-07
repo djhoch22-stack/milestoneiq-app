@@ -19,6 +19,7 @@ import {
   getRecords,
   getMilestones,
   getSeasons,
+  getAwards,
   createCheckout,
   openBillingPortal,
   redeemPromoCode,
@@ -35,7 +36,7 @@ const TIER_LIMITS = {
   school_plus: { maxPrograms: 999, maxUsers: 999, maxCoachesPerProgram: 999 },
 };
 
-function rowToSchool(prog, athletes, allTime, records, milestones, seasons) {
+function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awards) {
   return {
     id: prog.id,
     name: prog.name,
@@ -97,6 +98,7 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons) {
       notes: s.notes,
       winPct: s.win_pct,
     })),
+    awards: awards || [],
   };
 }
 
@@ -189,12 +191,14 @@ export default function AppWrapper() {
             { data: records },
             { data: milestones },
             { data: seasons },
+            { data: awards },
           ] = await Promise.all([
             getAthletes(prog.id),
             getAllTimePlayers(prog.id),
             getRecords(prog.id),
             getMilestones(prog.id),
             getSeasons(prog.id),
+            getAwards(prog.id),
           ]);
           return rowToSchool(
             prog,
@@ -202,7 +206,8 @@ export default function AppWrapper() {
             allTime,
             records,
             milestones,
-            seasons
+            seasons,
+            awards
           );
         })
       );
