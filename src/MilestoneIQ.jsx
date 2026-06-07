@@ -2097,7 +2097,7 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
 const SEASON_STAT_MAP = {
   "Games": "Games Played", "Wins": "Wins", "Points": "Points", "Assists": "Assists",
   // Soccer
-  "Goals": "Goals", "Shots": "Shots", "Saves": "Saves", "SOs": "Shutouts", "Shutouts": "Shutouts",
+  "Goals": "Goals", "Shots": "Shots", "Saves": "Saves", "SO": "Shutouts", "SOs": "Shutouts", "Shutouts": "Shutouts",
   // Basketball
   "Rebounds": "Total Rebounds", "O Rebounds": "Offensive Rebounds", "Def. Rebounds": "Defensive Rebounds",
   "Steals": "Steals", "Blocks": "Blocks", "FGM": "Field Goals Made", "FGA": "Field Goals Attempted",
@@ -2198,6 +2198,12 @@ const SEASON_STAT_ALIASES = {
   "3pFGA": "Three Pointers Attempted", "3FGA": "Three Pointers Attempted",
   "FTM": "Free Throws Made", "Free Throws Made": "Free Throws Made",
   "FTA": "Free Throws Attempted", "Free Throws Attempted": "Free Throws Attempted",
+  // Soccer (MaxPreps): field + goalie abbreviations. "SO" = Shutouts.
+  "G": "Goals", "Gls": "Goals", "GLS": "Goals", "Goals": "Goals",
+  "A": "Assists",
+  "Sh": "Shots", "SH": "Shots", "Sht": "Shots", "Shts": "Shots", "SHT": "Shots", "Shots": "Shots",
+  "Sv": "Saves", "SV": "Saves", "Svs": "Saves", "SVS": "Saves", "Saves": "Saves",
+  "SO": "Shutouts", "SHO": "Shutouts", "ShO": "Shutouts", "Sho": "Shutouts", "SOs": "Shutouts", "Shutout": "Shutouts", "Shutouts": "Shutouts",
 };
 function remapSeasonStats(stats, valid) {
   const useFilter = valid && valid.size > 0; // never filter against an empty set (would drop everything)
@@ -2279,7 +2285,9 @@ function ImportSeasons({ school, roster = [] }) {
       if (pdfFiles.length) {
         const seasonValid = new Set([
           ...(SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)),
-          ...(roster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
+          ...(SPORTS[school.sport]?.statCategories || []).map((s) => s.name), // sport record stats (soccer: Goals/Assists/Saves/Shutouts)
+          ...(DISPLAY_STATS[school.sport] || []),                             // canonical display stats (soccer: incl Shots & Shutouts)
+          ...(roster || []).flatMap((p) => Object.keys(p.stats || {})),       // the program's ACTUAL stat names
         ]);
         let shared = null;
         const rawBySeason = {}; // season -> [{ name, number, stats }]
