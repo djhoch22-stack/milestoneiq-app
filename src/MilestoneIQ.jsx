@@ -3729,6 +3729,17 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
 
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
+  // A player inducted (school OR state HOF) for ANY program is recognized as a HOF member across
+  // ALL their sports (mirrors coach cross-sport induction). Name-matched case-insensitively.
+  const hofSchoolNames = new Set();
+  const hofStateNames = new Set();
+  ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
+    (p.allTimeRoster || []).forEach(pl => {
+      const nm = normName(pl.name);
+      if (pl.schoolHallOfFame) hofSchoolNames.add(nm);
+      if (pl.stateHallOfFame) hofStateNames.add(nm);
+    });
+  });
 
   // Build scored athletes list — memoized so it only recalculates when roster changes
   const scored = useMemo(() => roster.map(player => {
@@ -3737,10 +3748,12 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
       const programScore = Math.min(calcProgramHofScore(player, school) + ab, 100);
       const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools) : null;
       const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
-      const confirmed = !!(player.schoolHallOfFame || player.stateHallOfFame);
-      return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed };
+      const nm = normName(player.name);
+      const xState = hofStateNames.has(nm);
+      const confirmed = hofSchoolNames.has(nm) || xState; // inducted in ANY of their sports
+      return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed, xState };
     } catch(e) {
-      return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false };
+      return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false, xState: false };
     }
   }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools, hofScope, awards]); // eslint-disable-line
 
@@ -3844,14 +3857,14 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
 
       {/* Player grid */}
       {view === "athletes" && <><div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-        {filtered.slice(0, hofPage * 25).map(({ player, programScore, crossSport, allScores, finalScore, confirmed }, i) => {
+        {filtered.slice(0, hofPage * 25).map(({ player, programScore, crossSport, allScores, finalScore, confirmed, xState }, i) => {
           const tier = hofTier(finalScore);
           return (
             <div key={player.id}
               style={{ background:"#fff", borderRadius:12, border:`1px solid ${confirmed ? "#c4b5fd" : "#e8e4dd"}`,
                 padding:"14px 18px", cursor:"pointer", transition:"box-shadow 0.1s",
                 boxShadow: confirmed ? "0 0 0 2px #7c3aed22" : "none" }}
-              onClick={() => setSelectedPlayer({ player, programScore, crossSport, allScores, finalScore, confirmed })}
+              onClick={() => setSelectedPlayer({ player, programScore, crossSport, allScores, finalScore, confirmed, xState })}
               onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow = confirmed ? "0 0 0 2px #7c3aed22" : "none"}>
 
@@ -3874,7 +3887,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
                   <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                     <span style={{ fontWeight:700, fontSize:15, color:"#111" }}>{player.name}</span>
                     {confirmed && <span style={{ fontSize:11 }}>🏛️</span>}
-                    {player.stateHallOfFame && <span style={{ fontSize:11 }}>⭐</span>}
+                    {xState && <span style={{ fontSize:11 }}>⭐</span>}
                     {crossSport && <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:4, padding:"1px 6px", fontSize:10, fontWeight:700 }}>Multi-sport</span>}
                   </div>
                   <div style={{ fontSize:12, color:"#9ca3af", marginTop:2 }}>
@@ -3958,7 +3971,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   );
 }
 
-function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, school, allSchools, awards = [], onClose, onToggle }) {
+function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, xState, school, allSchools, awards = [], onClose, onToggle }) {
   const tier = hofTier(finalScore);
   // Per-sport breakdown: multi-sport mode shows every sport the athlete played; otherwise just
   // this program. Each context carries that sport's program (school) + its roster entry (player).
@@ -4002,8 +4015,8 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
             <div>
               <div style={{ color:"#fff", fontWeight:700, fontSize:20 }}>
                 {player.name}
-                {player.schoolHallOfFame && " 🏛️"}
-                {player.stateHallOfFame && " ⭐"}
+                {confirmed && " 🏛️"}
+                {xState && " ⭐"}
               </div>
               <div style={{ color:"rgba(255,255,255,0.75)", fontSize:13, marginTop:3 }}>
                 {player.firstYear && player.lastYear
