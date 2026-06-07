@@ -275,10 +275,11 @@ export default function AppWrapper() {
       }
     }
 
-    // Records
+    // Records — update existing by id, INSERT new ones WITHOUT an id (let the DB generate the uuid).
+    // The old code sent a null id for new records mixed into the upsert, which silently failed the
+    // whole batch — so manual records never persisted. Then delete any the user removed.
     if (updated.records) {
-      const rows = updated.records.map((r) => ({
-        id: isUuid(r.id) ? r.id : undefined,
+      const toRow = (r) => ({
         program_id: updated.id,
         stat_name: r.statName,
         variant: r.variant,
@@ -286,8 +287,23 @@ export default function AppWrapper() {
         holder_year: r.holderYear || r.season || null,
         value: r.value,
         sport: updated.sport,
-      }));
-      await supabase.from('records').upsert(rows, { onConflict: 'id' });
+      });
+      const existing = updated.records.filter((r) => isUuid(r.id)).map((r) => ({ id: r.id, ...toRow(r) }));
+      const fresh = updated.records.filter((r) => !isUuid(r.id)).map(toRow);
+      const keepIds = existing.map((r) => r.id);
+      if (existing.length) {
+        const { error } = await supabase.from('records').upsert(existing, { onConflict: 'id' });
+        if (error) console.error('Record update failed:', error.message || error);
+      }
+      if (fresh.length) {
+        const { data, error } = await supabase.from('records').insert(fresh).select('id');
+        if (error) console.error('Record insert failed:', error.message || error);
+        else (data || []).forEach((d) => keepIds.push(d.id));
+      }
+      // Remove records the user deleted (everything for this program no longer in the kept set).
+      if (keepIds.length) {
+        await supabase.from('records').delete().eq('program_id', updated.id).not('id', 'in', `(${keepIds.join(',')})`);
+      }
     }
 
     // Seasons — replace SAFELY: insert the new set first, then delete the OLD rows only
