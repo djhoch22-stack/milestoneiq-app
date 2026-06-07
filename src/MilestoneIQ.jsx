@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -2298,9 +2298,11 @@ function ImportSeasons({ school, roster = [] }) {
       }
       setMsg("Importing…");
       const { data, error } = await replacePlayerSeasons(school.id, rows);
+      if (error) { setBusy(false); setMsg("Import failed: " + (error.message || error)); return; }
+      // Roll the uploaded seasons up into career totals (Overview/Athletes/All-Time/Records/Milestones).
+      await recomputeCareerFromSeasons(school.id);
       setBusy(false);
-      if (error) { setMsg("Import failed: " + (error.message || error)); return; }
-      setMsg(`✓ Imported ${data.inserted} rows — open a player to see their seasons.`);
+      setMsg(`✓ Imported ${data.inserted} rows & updated career totals — reload the page to see them.`);
     } catch (err) {
       setBusy(false); setMsg("Import error: " + (err && err.message ? err.message : String(err)));
     }
