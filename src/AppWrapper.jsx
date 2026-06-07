@@ -240,10 +240,11 @@ export default function AppWrapper() {
       })
       .eq('id', updated.id);
 
-    // Athletes
+    // Athletes — update existing by id, INSERT new ones WITHOUT an id (let the DB make the uuid).
+    // A null id mixed into the upsert silently fails the whole batch, so active/inactive toggles
+    // (and any athlete edit) never saved when even one unsaved athlete was present.
     if (updated.athletes?.length) {
-      const rows = updated.athletes.map((a) => ({
-        id: isUuid(a.id) ? a.id : undefined,
+      const toRow = (a) => ({
         program_id: updated.id,
         name: a.name,
         position: a.position,
@@ -251,8 +252,17 @@ export default function AppWrapper() {
         jersey: a.jersey,
         is_active: a.isActive !== false,
         stats: a.stats || {},
-      }));
-      await supabase.from('athletes').upsert(rows, { onConflict: 'id' });
+      });
+      const existing = updated.athletes.filter((a) => isUuid(a.id)).map((a) => ({ id: a.id, ...toRow(a) }));
+      const fresh = updated.athletes.filter((a) => !isUuid(a.id)).map(toRow);
+      if (existing.length) {
+        const { error } = await supabase.from('athletes').upsert(existing, { onConflict: 'id' });
+        if (error) console.error('Athlete save (update) failed:', error.message || error);
+      }
+      if (fresh.length) {
+        const { error } = await supabase.from('athletes').insert(fresh);
+        if (error) console.error('Athlete save (insert) failed:', error.message || error);
+      }
     }
 
     // All-time roster — full upsert so edited stats persist (not just HOF flags)
