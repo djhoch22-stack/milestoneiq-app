@@ -4479,7 +4479,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 const offStats = isFootball ? Object.entries(athlete.stats).filter(([k]) => OFFENSE_STATS.has(k) && k !== "Games Played") : [];
                 const defStats = isFootball ? Object.entries(athlete.stats).filter(([k]) => DEFENSE_STATS.has(k)) : [];
                 const stStats  = isFootball ? Object.entries(athlete.stats).filter(([k]) => SPECIAL_STATS.has(k)) : [];
-                const hasMultipleSides = isFootball && ((offStats.length > 0 && defStats.length > 0) || stStats.length > 0);
+                const hasMultipleSides = false; // football now uses the canonical statsToDisplay order (all stats, in the coach's order) like every other sport
 
                 const StatGroup = ({ label, color, textColor, entries }) => entries.length === 0 ? null : (
                   <div style={{ marginBottom:8 }}>
