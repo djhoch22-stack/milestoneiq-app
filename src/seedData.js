@@ -1731,7 +1731,7 @@ export const SEED_SCHOOLS = [
       { id:"p_sc7",  isActive:true, name:"Ella Forseth",      position:"D",  gradYear:2027, stats:{"Goals":1, "Assists":4, "Games Played":21} },
       { id:"p_sc8",  isActive:true, name:"Grace Kim",         position:"D",  gradYear:2028, stats:{"Goals":0, "Assists":2, "Games Played":19} },
       { id:"p_sc9",  isActive:true, name:"Nora Sullivan",     position:"D",  gradYear:2029, stats:{"Goals":0, "Assists":1, "Games Played":18} },
-      { id:"p_sc10", isActive:true, name:"Paige Hartman",     position:"GK", gradYear:2027, stats:{"Saves":74,"Clean Sheets":8,"Games Played":22} },
+      { id:"p_sc10", isActive:true, name:"Paige Hartman",     position:"GK", gradYear:2027, stats:{"Saves":74,"Shutouts":8,"Games Played":22} },
     ],
     records: [
       { id:"sr1", statName:"Goals",        variant:"Career total",   holderName:"",  holderYear:"", value:30,  sport:"soccer" },
@@ -1739,14 +1739,14 @@ export const SEED_SCHOOLS = [
       { id:"sr3", statName:"Assists",      variant:"Career total",   holderName:"",  holderYear:"", value:25,  sport:"soccer" },
       { id:"sr4", statName:"Assists",      variant:"Single season",  holderName:"",  holderYear:"", value:15,  sport:"soccer" },
       { id:"sr5", statName:"Saves",        variant:"Career total",   holderName:"",  holderYear:"", value:150, sport:"soccer" },
-      { id:"sr6", statName:"Clean Sheets", variant:"Career total",   holderName:"",  holderYear:"", value:20,  sport:"soccer" },
+      { id:"sr6", statName:"Shutouts", variant:"Career total",   holderName:"",  holderYear:"", value:20,  sport:"soccer" },
       { id:"sr7", statName:"Coach Wins",   variant:"Career total",   holderName:"",  holderYear:"", value:50,  sport:"soccer" },
     ],
     milestones: [
       { id:"sm1", statName:"Goals",         values:[5,10,15,20,25,30], alertPct:90 },
       { id:"sm2", statName:"Assists",       values:[5,10,15,20,25],    alertPct:90 },
       { id:"sm3", statName:"Saves",         values:[25,50,75,100,150], alertPct:90 },
-      { id:"sm4", statName:"Clean Sheets",  values:[5,10,15,20],       alertPct:90 },
+      { id:"sm4", statName:"Shutouts",  values:[5,10,15,20],       alertPct:90 },
       { id:"sm5", statName:"Games Played",  values:[25,50,75],         alertPct:90 },
     ]
   }
