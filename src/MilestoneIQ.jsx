@@ -523,6 +523,36 @@ function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   }
   return out;
 }
+// Wins is a TEAM stat shared by every player on a roster, so the win record is almost
+// always a tie. Auto-compute it from loaded data (like %/per-game): single-season =
+// the best season in player_seasons; career = the most career wins — returned once PER
+// tied holder so the Records tile lists the whole team. Reflects whatever seasons are loaded.
+function winsRecordsFrom(seasonRows, careerPlayers, sport) {
+  const out = [];
+  let maxSS = 0;
+  for (const r of (seasonRows || [])) { const w = Number(r.stats?.["Wins"]); if (w > maxSS) maxSS = w; }
+  if (maxSS > 0) {
+    const seen = new Set();
+    for (const r of (seasonRows || [])) {
+      if (Number(r.stats?.["Wins"]) !== maxSS) continue;
+      const k = (r.player_name || "").toLowerCase().trim();
+      if (seen.has(k)) continue; seen.add(k);
+      out.push({ id: `auto-wins-ss-${k}`, statName: "Wins", variant: "Single season", value: maxSS, holderName: r.player_name, holderYear: r.season || "", sport, auto: true });
+    }
+  }
+  let maxC = 0;
+  for (const p of (careerPlayers || [])) { const w = Number(p.stats?.["Wins"]); if (w > maxC) maxC = w; }
+  if (maxC > 0) {
+    const seen = new Set();
+    for (const p of (careerPlayers || [])) {
+      if (Number(p.stats?.["Wins"]) !== maxC) continue;
+      const k = (p.name || "").toLowerCase().trim();
+      if (seen.has(k)) continue; seen.add(k);
+      out.push({ id: `auto-wins-c-${k}`, statName: "Wins", variant: "Career total", value: maxC, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport, auto: true });
+    }
+  }
+  return out;
+}
 
 function pct(v, t) { return Math.min(100, Math.round((v / t) * 100)); }
 
@@ -4526,9 +4556,10 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const allRecords = [
-                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && !String(r.variant||"").startsWith("Per game avg")),
+                    ...(school.records||[]).filter(r => !PCT_PARENT[r.statName] && r.statName !== "Wins" && !String(r.variant||"").startsWith("Per game avg")),
                     ...pctRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
                     ...pergameRecordsFrom(allSeasonRows, [...(school.athletes||[]), ...(school.allTimeRoster||[])], school.sport),
+                    ...winsRecordsFrom(allSeasonRows, (school.allTimeRoster||[]), school.sport),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
