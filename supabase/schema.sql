@@ -1092,7 +1092,13 @@ NOTIFY pgrst, 'reload schema';
 -- ════════════════════════════════════════════════════════════════════════════
 create or replace function public.recompute_career_from_seasons(p_program uuid)
 returns void language plpgsql security definer set search_path = public as $$
+declare maxseason text;
 begin
+  select max(season) into maxseason from public.player_seasons where program_id = p_program;
+
+  -- per-player career = SUM of every numeric stat across their season rows
+  drop table if exists _pc;
+  create temp table _pc as
   with kv as (
     select lower(ps.player_name) lname, e.key, sum((e.value)::numeric) val
     from public.player_seasons ps, jsonb_each_text(ps.stats) e
@@ -1100,21 +1106,36 @@ begin
     group by lower(ps.player_name), e.key
   ),
   agg as (select lname, jsonb_object_agg(key, val) stats from kv group by lname),
-  yrs as (select lower(player_name) lname, min(season) fy, max(season) ly
+  yrs as (select lower(player_name) lname,
+                 (array_agg(player_name order by season desc))[1] disp,
+                 min(season) fy, max(season) ly
           from public.player_seasons where program_id = p_program group by lower(player_name))
-  update public.all_time_players t
-     set stats      = coalesce(agg.stats, t.stats),
-         first_year = coalesce(yrs.fy, t.first_year),
-         last_year  = coalesce(yrs.ly, t.last_year)
-  from agg join yrs on yrs.lname = agg.lname
-  where t.program_id = p_program and lower(t.name) = agg.lname;
+  select y.lname, y.disp, y.fy, y.ly, a.stats from agg a join yrs y on y.lname = a.lname;
 
-  -- mirror career totals onto the active athletes roster (so Athletes/Overview match)
-  update public.athletes ath
-     set stats = t.stats
+  -- 1) update existing all-time players
+  update public.all_time_players t
+     set stats = p.stats, first_year = p.fy, last_year = p.ly
+  from _pc p where t.program_id = p_program and lower(t.name) = p.lname;
+
+  -- 2) INSERT all-time players new from a season upload (e.g. a fresh roster)
+  insert into public.all_time_players (program_id, name, first_year, last_year, is_current, school_hall_of_fame, state_hall_of_fame, stats)
+  select p_program, p.disp, p.fy, p.ly, (p.ly = maxseason), false, false, p.stats
+  from _pc p
+  where not exists (select 1 from public.all_time_players t where t.program_id = p_program and lower(t.name) = p.lname);
+
+  -- 3) update existing active athletes' stats to match career
+  update public.athletes ath set stats = t.stats
   from public.all_time_players t
-  where ath.program_id = p_program and t.program_id = p_program
-    and lower(ath.name) = lower(t.name);
+  where ath.program_id = p_program and t.program_id = p_program and lower(ath.name) = lower(t.name);
+
+  -- 4) add CURRENT-season players to the active roster if they aren't there yet
+  insert into public.athletes (program_id, name, is_active, stats)
+  select p_program, p.disp, true, p.stats
+  from _pc p
+  where p.ly = maxseason
+    and not exists (select 1 from public.athletes ath where ath.program_id = p_program and lower(ath.name) = p.lname);
+
+  drop table if exists _pc;
 end $$;
 grant execute on function public.recompute_career_from_seasons(uuid) to anon, authenticated, service_role;
 
