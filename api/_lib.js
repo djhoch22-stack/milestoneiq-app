@@ -101,9 +101,11 @@ export function allStatsFor(roster) {
 }
 // Stats a program should ALWAYS surface (even before data exists). Mirrors MilestoneIQ.jsx.
 // Sports not listed fall back to "stats present in the data" (no behavior change).
+const BBALL_DISPLAY = ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"];
 export const DISPLAY_STATS = {
   soccer:       ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
   soccer_girls: ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
 };
 // Canonical display stats UNION any stat with data, in canonical order.
 export function statsToDisplay(roster, sport) {
@@ -152,6 +154,7 @@ export const PERGAME_DEFS = [];
 const PERGAME_RECORD_DEFS = [
   { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+  { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
