@@ -66,27 +66,27 @@ export const STAT_ORDER = [
   "Field Goals Made","Field Goals Attempted",
   "Three Pointers Made","Three Pointers Attempted",
   "Free Throws Made","Free Throws Attempted",
-  "Passing Yards","Pass Completions","Pass Attempts","Passing TDs","Longest Pass",
-  "Passing Yards Per Game","Passing Yards Per Attempt","Passing Yards Per Season",
-  "Passing Yards Per Completion","Completions Per Game","Completion %","Passing TD %",
-  "Rushing Yards","Rushing Attempts","Rushing TDs","Longest Rush",
-  "Yards Per Rush Attempt","Rushing Yards Per Game","Rushing Yards Per Season",
-  "Receiving Yards","Receptions","Receiving TDs","Longest Reception","Targets",
-  "Yards Per Reception","Yards Per Target","Receiving Yards Per Game","Receiving Yards Per Season",
-  "Total TDs","2 Pt Conversions Made","Yards From Scrimmage","All-Purpose Yards",
-  "Total Offense","Touches","Yards Per Touch",
-  "Total Tackles","Combined Tackles","Solo Tackles","Tackles For Loss","Sacks",
-  "Interceptions","Interception Return Yards","Interception Return TDs","Longest Interception Return",
-  "Passes Defended","Fumbles Forced","Fumbles Recovered","Fumble Return Yards","Fumble Return TDs","Safeties",
-  "Kick Returns","Kick Return Yards","Kick Return TDs","Longest Kick Return","Yards Per Kick Return",
-  "Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Yards Per Punt Return",
-  "Kick & Punt Returns","Kick & Punt Return Yards","Kick & Punt Return TDs",
-  "Extra Points Made","Extra Points Attempted","Extra Point %",
-  "Field Goals Made","Field Goals Attempted","Field Goal %","Longest Field Goal Made",
-  "Punts","Punting Yards","Longest Punt","Yards Per Punt",
+  // Football (canonical order; "Field Goals Made" is shared with basketball above, not repeated)
+  "Completetions","Passing Attempts","Passing Yards","Passing TDs",
+  "Rushes","Rushing Yards","Rushing TDs",
+  "Receptions","Receiving Yards","Receiving TDs",
+  "Total Yards","Total TDs",
+  "Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries",
+  "Field Goals Attempts","PAT Mades","PAT Attempts",
+  "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
+  "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
   "Coach Wins",
 ];
-export function byStatOrder(a, b) {
+
+// Football: exact stat set + order to surface on every tab (always shown, even with no data).
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs"];
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
+export function byStatOrder(a, b, sport) {
+  const so = SPORT_ORDER[sport];
+  if (so) {
+    const fa = so.indexOf(a), fb = so.indexOf(b);
+    if (fa !== -1 || fb !== -1) return (fa === -1 ? 1e9 : fa) - (fb === -1 ? 1e9 : fb);
+  }
   const ai = STAT_ORDER.indexOf(a), bi = STAT_ORDER.indexOf(b);
   if (ai !== -1 && bi !== -1) return ai - bi;
   if (ai !== -1) return -1;
@@ -106,13 +106,14 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 export const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY,
 };
 // Canonical display stats UNION any stat with data, in canonical order.
 export function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap((p) => Object.keys(p.stats || {})))]
     .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
-  return [...new Set([...base, ...present])].sort(byStatOrder);
+  return [...new Set([...base, ...present])].sort((a, b) => byStatOrder(a, b, sport));
 }
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
