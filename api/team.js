@@ -300,6 +300,10 @@ export default async function handler(req, res) {
     season: s.season, wins: s.wins, losses: s.losses, ties: s.ties, leagueWins: s.league_wins, leagueLosses: s.league_losses, leagueTies: s.league_ties,
     coach: s.coach, notes: s.notes, _team: sportById[s.program_id] || prettySport(team.sport),
   }));
+  // Coach awards across every program, grouped by coach + sport, for the per-sport breakdown.
+  const orgAwardsRaw = orgIds.length ? await sb(`awards?program_id=in.(${orgIds.join(",")})&scope=eq.coach&select=program_id,kind,level,holder_name,season`) : [];
+  const awBySport = {};
+  orgAwardsRaw.forEach((a) => { const k = normName(a.holder_name) + "|" + (sportById[a.program_id] || ""); (awBySport[k] = awBySport[k] || []).push(a); });
   const coaches = buildCoachStats(orgSeasons);
   const inductedCoaches = coaches.filter((c) => inducted.has(normName(c.name))).sort((a, b) => b.wins - a.wins);
   const coachCards2 = inductedCoaches.length ? inductedCoaches.map((c) => {
@@ -310,7 +314,12 @@ export default async function handler(req, res) {
     // Per-sport breakdown (e.g. Boys Basketball vs Girls Soccer) when a coach led multiple teams.
     const byTeam = c.byTeam || {}; const teams = Object.keys(byTeam);
     const breakdown = teams.length > 1
-      ? `<div style="margin-top:8px;border-top:1px solid #f3f0ea;padding-top:6px">${teams.sort().map((tm) => { const b = byTeam[tm]; return `<div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px"><span>${esc(tm)}</span><span style="color:#111;font-weight:600">${b.wins}-${b.losses}${b.ties ? `-${b.ties}` : ""}</span></div>`; }).join("")}</div>`
+      ? `<div style="margin-top:8px;border-top:1px solid #f3f0ea;padding-top:6px">${teams.sort().map((tm) => {
+          const b = byTeam[tm];
+          const aw = awBySport[normName(c.name) + "|" + tm] || [];
+          const awStr = aw.length ? `<div style="font-size:10px;color:#7c3aed;margin-top:1px">🏅 ${aw.map((a) => esc(awardLabel(a))).join(" · ")}</div>` : "";
+          return `<div style="padding:3px 0"><div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px"><span>${esc(tm)}</span><span style="color:#111;font-weight:600">${b.wins}-${b.losses}${b.ties ? `-${b.ties}` : ""}</span></div>${awStr}</div>`;
+        }).join("")}</div>`
       : "";
     return `<div class="hcard"><div style="font-weight:700">${esc(c.name)} <span class="badge school">Inducted</span></div><div style="font-size:12px;color:#6b7280">${yr} · ${c.seasons} season${c.seasons !== 1 ? "s" : ""}</div><div style="font-size:14px;font-weight:600;color:#111;margin:6px 0 2px">${c.wins}–${c.losses}${c.ties ? `–${c.ties}` : ""}${pct != null ? ` (${pct}%)` : ""}</div>${c.titles ? `<div style="font-size:11px;color:#92400e">🏆 ${c.titles} league title${c.titles !== 1 ? "s" : ""}</div>` : ""}${breakdown}${ch}</div>`;
   }).join("") : `<div class="empty">No coaches have been inducted into the Hall of Fame yet.</div>`;
