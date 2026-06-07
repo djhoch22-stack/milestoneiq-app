@@ -485,15 +485,10 @@ function sameSeason(a, b) {
 // Per-game = counting stat ÷ Games Played. Like shooting %, NEVER stored — computed
 // wherever shown, and their record-holders auto-computed. Records attach to the PARENT
 // stat as variants ("Per game avg (season)"/"(career)") so the Records tab nests them.
-const PERGAME_DEFS = [
-  { name: "Points Per Game",             short: "PPG",  stat: "Points" },
-  { name: "Assists Per Game",            short: "APG",  stat: "Assists" },
-  { name: "Rebounds Per Game",           short: "RPG",  stat: "Total Rebounds" },
-  { name: "Offensive Rebounds Per Game", short: "ORPG", stat: "Offensive Rebounds" },
-  { name: "Defensive Rebounds Per Game", short: "DRPG", stat: "Defensive Rebounds" },
-  { name: "Steals Per Game",             short: "SPG",  stat: "Steals" },
-  { name: "Blocks Per Game",             short: "BPG",  stat: "Blocks" },
-];
+// Per-game averages (PPG/APG/RPG/etc.) are intentionally NOT displayed anywhere — not on
+// player cards, profiles, the all-time grid, milestones, the season table, or records.
+// Emptying this list removes them from every view at once (all call sites are guarded).
+const PERGAME_DEFS = [];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
 function perGame(stats, statKey) {
@@ -2879,7 +2874,7 @@ function SeasonsTab({ seasons = [], onSave }) {
         </table>
         </div>
         <div style={{padding:"10px 20px",fontSize:12,color:"#9ca3af",borderTop:"1px solid #f3f0ea",background:"#fafaf8"}}>
-          Overall: {totalWins}-{totalLosses} ({totalPct}%) · League: {totalLeagueWins}-{totalLeagueLosses} ({leaguePct}%)
+          Overall: {totalWins}-{totalLosses}{totalTies?`-${totalTies}`:""} ({totalPct}%) · League: {totalLeagueWins}-{totalLeagueLosses}{totalLeagueTies?`-${totalLeagueTies}`:""} ({leaguePct}%)
         </div>
       </div>
     </div>
