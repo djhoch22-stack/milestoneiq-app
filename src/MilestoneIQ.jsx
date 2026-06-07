@@ -223,6 +223,18 @@ const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempt
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
+// Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
+// the previous names are normalized on read so they sort + match the renamed data.
+const FB_STAT_RENAME = {
+  "Combined Tackles": "Tackles", "Total Tackles": "Tackles", "Solo Tackles": "Tackles",
+  "Extra Points Made": "PAT Mades", "Extra Points Attempted": "PAT Attempts",
+  "Fumbles Forced": "Forced Fumbles", "Fumbles Recovered": "Fumble Recoveries",
+  "Kick Return Yards": "Kick Off Return Yards", "Kick Returns": "Kick Off Returns",
+  "Kick Return TDs": "Kick Off Return TDs", "Pass Attempts": "Passing Attempts",
+  "Pass Completions": "Completetions", "Passes Defended": "Pass Break Ups",
+  "Punting Yards": "Punt Yards", "Rushing Attempts": "Rushes", "Field Goals Attempted": "Field Goals Attempts",
+};
+const fixFbStat = (sport, n) => (sport === "football" ? (FB_STAT_RENAME[n] || n) : n);
 
 // Sort stat names into the canonical STAT_ORDER (unknown stats last, alphabetically). Shared so the
 // all-time grid, the player profile, AND the athletes-tab cards all display stats in identical order.
@@ -4734,7 +4746,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             </div>
 
             {(() => {
-              const userMilestones = (school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport);
+              const userMilestones = ((school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport))
+                .map(m => ({ ...m, statName: fixFbStat(school.sport, m.statName) }));
               // Coach Wins is always automatic and always last
               const COACH_WINS_MILESTONE = {
                 id: "__coach_wins__", statName: "Coach Wins", alertPct: 90,
