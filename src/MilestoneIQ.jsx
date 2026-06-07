@@ -2096,9 +2096,27 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
 // SheetJS is loaded from CDN on demand (no build dependency / bundle bloat).
 const SEASON_STAT_MAP = {
   "Games": "Games Played", "Wins": "Wins", "Points": "Points", "Assists": "Assists",
+  // Soccer
+  "Goals": "Goals", "Shots": "Shots", "Saves": "Saves", "SOs": "Shutouts", "Shutouts": "Shutouts",
+  // Basketball
   "Rebounds": "Total Rebounds", "O Rebounds": "Offensive Rebounds", "Def. Rebounds": "Defensive Rebounds",
   "Steals": "Steals", "Blocks": "Blocks", "FGM": "Field Goals Made", "FGA": "Field Goals Attempted",
   "3pFGM": "Three Pointers Made", "3pFGA": "Three Pointers Attempted", "FTM": "Free Throws Made", "FTA": "Free Throws Attempted",
+};
+// Reverse map: stat name → the tab name to use when WRITING the season template.
+const SHEET_FOR_STAT = {
+  "Games Played": "Games", "Wins": "Wins", "Points": "Points", "Goals": "Goals", "Assists": "Assists",
+  "Shots": "Shots", "Saves": "Saves", "Shutouts": "SOs",
+  "Total Rebounds": "Rebounds", "Offensive Rebounds": "O Rebounds", "Defensive Rebounds": "Def. Rebounds",
+  "Steals": "Steals", "Blocks": "Blocks", "Field Goals Made": "FGM", "Field Goals Attempted": "FGA",
+  "Three Pointers Made": "3pFGM", "Three Pointers Attempted": "3pFGA", "Free Throws Made": "FTM", "Free Throws Attempted": "FTA",
+};
+// Stats (in canonical order) to include as tabs when generating a season template per sport.
+const TEMPLATE_STATS = {
+  soccer:        ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  soccer_girls:  ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  basketball_boys:  ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"],
+  basketball_girls: ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"],
 };
 function loadSheetJS() {
   return new Promise((resolve, reject) => {
@@ -2352,28 +2370,25 @@ function ImportSeasons({ school, roster = [] }) {
   const downloadTemplate = async () => {
     setBusy(true); setMsg("Building template…");
     try {
-      // ExcelJS (not SheetJS) so we can FREEZE row 1 + column A. No pre-filled names; the
-      // "Total Career" column auto-sums each player's seasons on every stat tab.
+      // One tab per stat (matches the import format). A1 = stat name, every season across the top,
+      // player names go down column A. Row 1 + column A stay frozen. No pre-filled names.
       const ExcelJS = await loadExcelJS();
-      const seasonHeaders = [...new Set((school.seasons || []).map((s) => s.season).filter(Boolean))];
-      const cols = seasonHeaders.length ? seasonHeaders : ["2023-2024", "2024-2025"];
-      const ROWS = 40;
-      const colLetter = (n) => { let out = ""; while (n > 0) { const m = (n - 1) % 26; out = String.fromCharCode(65 + m) + out; n = Math.floor((n - 1) / 26); } return out; };
-      const firstSeasonCol = 2;               // B (col A = Player)
-      const lastSeasonCol = 1 + cols.length;  // last season column (1-based)
-      const totalCol = 2 + cols.length;       // "Total Career" column (1-based)
+      // Seasons: every academic year from 1964-1965 through the current (or latest recorded) season.
+      const now = new Date();
+      const curAcadStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+      const seasonStarts = (school.seasons || []).map((s) => parseInt(String(s.season).slice(0, 4), 10)).filter((n) => !isNaN(n));
+      const endStart = Math.max(curAcadStart, ...(seasonStarts.length ? seasonStarts : [curAcadStart]));
+      const cols = [];
+      for (let y = 1964; y <= endStart; y++) cols.push(`${y}-${y + 1}`);
+      // Stats/tabs for this sport (soccer → Games/Wins/Points/Goals/Assists/Shots/Saves/SOs).
+      const stats = TEMPLATE_STATS[school.sport] || [...new Set(Object.values(SEASON_STAT_MAP))];
       const wb = new ExcelJS.Workbook();
-      for (const sheet of Object.keys(SEASON_STAT_MAP)) {
-        const ws = wb.addWorksheet(sheet, { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] }); // freeze col A + row 1
-        const header = ws.addRow(["Player", ...cols, "Total Career"]);
+      for (const stat of stats) {
+        const sheetName = SHEET_FOR_STAT[stat] || stat;
+        const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] }); // freeze col A + row 1
+        const header = ws.addRow([stat, ...cols]); // A1 = stat label; B1.. = seasons; names go in A2+
         header.font = { bold: true };
-        for (let i = 0; i < ROWS; i++) {
-          const rowNum = i + 2;
-          ws.getRow(rowNum).getCell(totalCol).value = {
-            formula: `SUM(${colLetter(firstSeasonCol)}${rowNum}:${colLetter(lastSeasonCol)}${rowNum})`,
-            result: 0,
-          };
-        }
+        ws.getColumn(1).width = 22;
       }
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -2383,7 +2398,7 @@ function ImportSeasons({ school, roster = [] }) {
       a.download = `${String(school.name || "program").replace(/[^a-z0-9]+/gi, "_")}_season_stats_template.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      setBusy(false); setMsg("✓ Template downloaded — header row & name column stay frozen as you scroll; Total Career auto-sums.");
+      setBusy(false); setMsg(`✓ Template downloaded — one tab per stat, seasons 1964-1965 to ${cols[cols.length - 1]}. Type player names down column A.`);
     } catch (err) { setBusy(false); setMsg("Template error: " + (err && err.message ? err.message : String(err))); }
   };
   return (
