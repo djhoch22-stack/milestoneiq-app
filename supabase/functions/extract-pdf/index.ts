@@ -28,9 +28,10 @@ CRITICAL:
 - ONE object per athlete. A player appears in several tables; COMBINE all of their stats into that single object, matching the same athlete across tables by jersey number AND last name (e.g. "3 T. Steeves" in every table is the same player).
 - SKIP "Season Totals"/team-total rows. SKIP every rate/average/percentage column (Y/G, C/G, Avg, C%, T/G, S/G, Int/G, TD/G, QB Rate, "100+", "Lng", "In 20", "TB", "FC") — keep only cumulative counting totals.
 - Numeric values only. "number" = jersey number (integer) if shown, else null. Unknown grad year → ${new Date().getFullYear() + 2}.
+- ROSTER pages: some files are a team ROSTER (jersey #, FULL name, position, grade — NO game stats). Still return EVERY player on it: their FULL name exactly as written, their "number", "position", and an empty "stats":{}. The app uses these full names to replace abbreviated names ("T. Steeves") on the stat sheets — so ALWAYS extract a roster even though it has no stats.
 
 FOOTBALL — use these EXACT stat names (the coach's set), mapping the column within each section:
-- Games Played (GP), Wins
+- Games Played (GP). Wins: read the team's OVERALL win total from the "Overall W-L" line near the top of the stat sheet (e.g. "Overall 4-5" → 4) and set "Wins" to that number for EVERY athlete on the sheet — there is no per-player wins column, so never leave Wins blank or guess.
 - Passing section: C→"Completetions", Att→"Passing Attempts", Yds→"Passing Yards", TD→"Passing TDs" (ignore the passing Int column)
 - Rushing section: Car→"Rushes", Yds→"Rushing Yards", TD→"Rushing TDs"
 - Receiving section: Rec→"Receptions", Yds→"Receiving Yards", TD→"Receiving TDs"
@@ -87,7 +88,10 @@ Deno.serve(async (req) => {
     const text = (data.content || []).map((c: { text?: string }) => c.text || "").join("");
     let parsed: { athletes?: unknown[] };
     try {
-      parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+      let t = text.replace(/```json|```/g, "").trim();
+      const a = t.indexOf("{"), b = t.lastIndexOf("}"); // tolerate any preamble/notes around the JSON
+      if (a >= 0 && b > a) t = t.slice(a, b + 1);
+      parsed = JSON.parse(t);
     } catch {
       return json({ error: "Could not parse the model's output as JSON" }, 502);
     }
