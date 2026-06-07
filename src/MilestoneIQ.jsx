@@ -3239,6 +3239,16 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
   // aggregated record) or just this program. Each season tagged with its team for the breakdown.
   const programs = (crossProgram && multiProgram) ? allSchools : [school];
   const combinedSeasons = programs.flatMap(p => (p.seasons || []).map(s => ({ ...s, _team: SPORTS[p.sport]?.label || p.name || "Team" })));
+  // Coach awards grouped by coach + sport, so the per-sport breakdown can show honors per team.
+  const awardsBySport = {};
+  programs.forEach(p => {
+    const tm = SPORTS[p.sport]?.label || p.name || "Team";
+    (p.awards || []).forEach(a => {
+      if (a.scope !== "coach") return;
+      const k = normName(a.holder_name) + "|" + tm;
+      (awardsBySport[k] = awardsBySport[k] || []).push(a);
+    });
+  });
   const allCoaches = useMemo(
     () => buildCoachStats(combinedSeasons, { includePrior }),
     [school.id, crossProgram, includePrior, (allSchools||[]).length, combinedSeasons.length] // eslint-disable-line
@@ -3345,6 +3355,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
           school={school}
           allCoaches={scored}
           awards={awards}
+          awardsBySport={awardsBySport}
           confirmed={!!confirmedHof[selectedCoach.name]}
           onClose={() => setSelectedCoach(null)}
           onToggle={() => { toggleCoachHof(selectedCoach.name); setSelectedCoach(null); }}
@@ -3354,7 +3365,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
   );
 }
 
-function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onClose, onToggle }) {
+function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport = {}, confirmed, onClose, onToggle }) {
   const tier = coachHofTier(coach.score);
   const winPct = coach.wins+coach.losses+(coach.ties||0)>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
   const seasons = (school.seasons||[]).filter(s=>(s.coach||s["coach"]||"").trim()===coach.name);
@@ -3402,10 +3413,14 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], confirmed, onCl
               {Object.keys(coach.byTeam).sort().map(tm => {
                 const b = coach.byTeam[tm];
                 const p = b.wins+b.losses+(b.ties||0)>0 ? Math.round(b.wins/(b.wins+b.losses+(b.ties||0))*100) : 0;
+                const aw = awardsBySport[normName(coach.name) + "|" + tm] || [];
                 return (
-                  <div key={tm} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #f3f0ea" }}>
-                    <span style={{ fontSize:13,color:"#111",fontWeight:600 }}>{tm}</span>
-                    <span style={{ fontSize:13,color:"#6b7280" }}>{b.wins}-{b.losses}{b.ties?`-${b.ties}`:""} ({p}%) · {b.seasons} szn</span>
+                  <div key={tm} style={{ padding:"6px 0",borderBottom:"1px solid #f3f0ea" }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                      <span style={{ fontSize:13,color:"#111",fontWeight:600 }}>{tm}</span>
+                      <span style={{ fontSize:13,color:"#6b7280" }}>{b.wins}-{b.losses}{b.ties?`-${b.ties}`:""} ({p}%) · {b.seasons} szn</span>
+                    </div>
+                    {aw.length>0 && <div style={{ fontSize:11,color:"#7c3aed",marginTop:2 }}>🏅 {aw.map(a=>awardLabel(a)).join(" · ")}</div>}
                   </div>
                 );
               })}
