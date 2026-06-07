@@ -251,6 +251,14 @@ export const replacePlayerSeasons = async (programId, rows) => {
   return { data: { inserted } };
 };
 
+// Recompute a program's CAREER totals (all_time_players + active athletes) as the sum
+// of every player's season rows. Run after a season import so the totals shown on
+// Overview/Athletes/All-Time/Records/Milestones reflect the upload.
+export const recomputeCareerFromSeasons = async (programId) => {
+  const { error } = await supabase.rpc('recompute_career_from_seasons', { p_program: programId });
+  return { error };
+};
+
 // Replace just ONE season's rows for a program (PDF season imports — additive, leaves
 // every other season untouched).
 export const replacePlayerSeasonRowsForSeason = async (programId, season, rows) => {
