@@ -205,6 +205,27 @@ export function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   }
   return out;
 }
+// Coach Wins records: career total (a coach's total wins in this program) + single season
+// (most wins by a coach in one season). All tied holders included. Per program.
+export function coachWinsRecordsFrom(seasons, sport) {
+  const out = [];
+  const byCoach = {};
+  let ssMax = 0;
+  for (const s of (seasons || [])) {
+    if (!s.coach || s.wins == null) continue;
+    const w = Number(s.wins) || 0;
+    byCoach[s.coach] = (byCoach[s.coach] || 0) + w;
+    if (w > ssMax) ssMax = w;
+  }
+  const careerMax = Object.keys(byCoach).length ? Math.max(...Object.values(byCoach)) : 0;
+  if (careerMax > 0)
+    for (const coach in byCoach) if (byCoach[coach] === careerMax)
+      out.push({ id: `auto-cw-c-${coach.replace(/\s+/g, "")}`, statName: "Coach Wins", variant: "Career total", value: careerMax, holderName: coach, holderYear: "", sport });
+  if (ssMax > 0)
+    for (const s of (seasons || [])) if (s.coach && (Number(s.wins) || 0) === ssMax)
+      out.push({ id: `auto-cw-ss-${(s.coach || "").replace(/\s+/g, "")}-${s.season}`, statName: "Coach Wins", variant: "Single season", value: ssMax, holderName: s.coach, holderYear: s.season || "", sport });
+  return out;
+}
 
 // ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
 const HOF_STAT_WEIGHTS = {
