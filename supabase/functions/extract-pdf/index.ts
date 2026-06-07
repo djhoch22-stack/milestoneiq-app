@@ -20,9 +20,29 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
-const PROMPT = `Extract all athlete stats from this document. Return ONLY valid JSON, no markdown, no commentary:
+const PROMPT = `You are extracting per-athlete season stats from a sports stat sheet (often a MaxPreps printout). Return ONLY valid JSON, no markdown, no commentary:
 {"athletes":[{"name":"Full Name","position":"Position or empty string","gradYear":2025,"number":12,"stats":{"Stat Name":numericValue}}]}
-Rules: numeric stat values only; use the exact stat names shown in the document; if a grad year is unknown use ${new Date().getFullYear() + 2}; "number" is the player's jersey/uniform number if shown (as an integer), otherwise null; include every athlete and every stat you find.`;
+
+CRITICAL:
+- A document may contain MANY stat tables (especially football: Passing, Rushing, Receiving, Total Yards, Tackles, Sacks, Defensive, Returns, Kicking). The SAME column header ("Yds","TD","Att","Int","Yards") means DIFFERENT stats in different tables — you MUST qualify each value by the section it came from. Never merge two different "Yds" columns into one stat.
+- ONE object per athlete. A player appears in several tables; COMBINE all of their stats into that single object, matching the same athlete across tables by jersey number AND last name (e.g. "3 T. Steeves" in every table is the same player).
+- SKIP "Season Totals"/team-total rows. SKIP every rate/average/percentage column (Y/G, C/G, Avg, C%, T/G, S/G, Int/G, TD/G, QB Rate, "100+", "Lng", "In 20", "TB", "FC") — keep only cumulative counting totals.
+- Numeric values only. "number" = jersey number (integer) if shown, else null. Unknown grad year → ${new Date().getFullYear() + 2}.
+
+FOOTBALL — use these EXACT stat names, mapping the column within each section:
+- Games Played (GP)
+- Passing section: Yds→"Passing Yards", C→"Pass Completions", Att→"Pass Attempts", TD→"Passing TDs", Int→"Interceptions Thrown"
+- Rushing section: Yds→"Rushing Yards", Car→"Rushing Attempts", TD→"Rushing TDs"
+- Receiving section: Yds→"Receiving Yards", Rec→"Receptions", TD→"Receiving TDs"
+- Total Yards section: Total→"Total Yards"
+- Tackles section: "Tot Tckls"→"Combined Tackles", Solo→"Solo Tackles", Asst→"Assisted Tackles", TFL→"Tackles for Loss"
+- Sacks section: Sacks→"Sacks" (it is a decimal like 1.0/3.0; ignore Ydl/Hurs)
+- Defensive section: Int→"Interceptions", PD→"Passes Defended", "Fmb Rec"→"Fumbles Recovered"
+- Returns: "KR Yds"→"Kick Return Yards", punt-return Yds→"Punt Return Yards"
+- Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
+
+For non-football sports (basketball, soccer, etc.) there is usually one table — use the exact stat names shown.
+Include every athlete and every stat you find. Omit zero/blank stats.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -48,7 +68,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-opus-4-8",
-        max_tokens: 16000,
+        max_tokens: 32000,
+        thinking: { type: "adaptive" }, // multi-table stat sheets need real reasoning to map columns correctly
         messages: [{
           role: "user",
           content: [
