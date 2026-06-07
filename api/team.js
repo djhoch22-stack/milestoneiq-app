@@ -205,10 +205,12 @@ export default async function handler(req, res) {
     const swr = seasonsList.filter((s) => s.wins != null && s.losses != null);
     const tW = swr.reduce((a, s) => a + (s.wins || 0), 0);
     const tL = swr.reduce((a, s) => a + (s.losses || 0), 0);
-    const tPct = tW + tL > 0 ? ((tW / (tW + tL)) * 100).toFixed(1) : "—";
+    const tT = seasonsList.reduce((a, s) => a + (s.ties || 0), 0);
+    const tPct = tW + tL + tT > 0 ? ((tW / (tW + tL + tT)) * 100).toFixed(1) : "—";
     const lW = seasonsList.reduce((a, s) => a + (s.leagueWins || 0), 0);
     const lL = seasonsList.reduce((a, s) => a + (s.leagueLosses || 0), 0);
-    const lPct = lW + lL > 0 ? ((lW / (lW + lL)) * 100).toFixed(1) : "—";
+    const lT = seasonsList.reduce((a, s) => a + (s.leagueTies || 0), 0);
+    const lPct = lW + lL + lT > 0 ? ((lW / (lW + lL + lT)) * 100).toFixed(1) : "—";
     const rx = (s, re) => s.notes && re.test(s.notes);
     const champ = seasonsList.filter((s) => rx(s, /league champion|league champ/i)).length;
     const stChamp = seasonsList.filter((s) => rx(s, /state champ|state champion/i)).length;
@@ -221,25 +223,25 @@ export default async function handler(req, res) {
     const finalFours = ff0 + stChamp + stRU + third;
     const eliteE = ee0 + finalFours; const sweet16 = ss0 + eliteE; const playoffs = po0 + sweet16;
     const card = (ic, v, l, bg, tc, bd) => `<div class="ovcard" style="${bg ? `background:${bg};border-color:${bd}` : ""}"><div class="ic">${ic}</div><div class="v"${tc ? ` style="color:${tc}"` : ""}>${v}</div><div class="l"${tc ? ` style="color:${tc};opacity:.85"` : ""}>${l}</div></div>`;
-    const row1 = [["📊", `${tW}-${tL}`, "Program record"], ["📈", `${tPct}%`, "Win %"], ["🏅", `${lW}-${lL}`, "League record"], ["📉", `${lPct}%`, "League win %"], ["📅", swr.length, "Seasons"], ["🏆", champ, "League titles"]].map(([i, v, l]) => card(i, v, l)).join("");
+    const row1 = [["📊", `${tW}-${tL}${tT ? `-${tT}` : ""}`, "Program record"], ["📈", `${tPct}%`, "Win %"], ["🏅", `${lW}-${lL}${lT ? `-${lT}` : ""}`, "League record"], ["📉", `${lPct}%`, "League win %"], ["📅", swr.length, "Seasons"], ["🏆", champ, "League titles"]].map(([i, v, l]) => card(i, v, l)).join("");
     const row2 = [["🏟️", playoffs, "Playoff apps", "#eff6ff", "#1e40af", "#bfdbfe"], ["⭐", sweet16, "Sweet 16s", "#fdf4ff", "#7e22ce", "#e9d5ff"], ["🎖️", eliteE, "Elite 8s", "#f5f3ff", "#5b21b6", "#ddd6fe"], ["🎯", finalFours, "Final Fours", "#f0fdf4", "#166534", "#86efac"], ["🥈", stRU, "Runner-up", "#f8fafc", "#374151", "#e2e8f0"], ["🏅", stChamp, "State titles", "#fef3c7", "#92400e", "#fde68a"]].map(([i, v, l, bg, tc, bd]) => card(i, v, l, bg, tc, bd)).join("");
 
     const mostRecent = seasonsList.filter((s) => s.coach).slice().sort((a, b) => String(b.season).localeCompare(String(a.season)))[0]?.coach || null;
     const cmap = {};
     seasonsList.forEach((s) => {
       if (!s.coach) return;
-      if (!cmap[s.coach]) cmap[s.coach] = { wins: 0, losses: 0, leagueWins: 0, leagueLosses: 0, seasons: 0, titles: 0, firstYear: s.season, lastYear: s.season };
+      if (!cmap[s.coach]) cmap[s.coach] = { wins: 0, losses: 0, ties: 0, leagueWins: 0, leagueLosses: 0, leagueTies: 0, seasons: 0, titles: 0, firstYear: s.season, lastYear: s.season };
       const r = cmap[s.coach]; r.seasons++;
-      if (s.wins != null) r.wins += s.wins; if (s.losses != null) r.losses += s.losses;
-      if (s.leagueWins != null) r.leagueWins += s.leagueWins; if (s.leagueLosses != null) r.leagueLosses += s.leagueLosses;
+      if (s.wins != null) r.wins += s.wins; if (s.losses != null) r.losses += s.losses; if (s.ties != null) r.ties += s.ties;
+      if (s.leagueWins != null) r.leagueWins += s.leagueWins; if (s.leagueLosses != null) r.leagueLosses += s.leagueLosses; if (s.leagueTies != null) r.leagueTies += s.leagueTies;
       if (s.notes && /champion/i.test(s.notes)) r.titles++;
       if (String(s.season) < String(r.firstYear)) r.firstYear = s.season;
       if (String(s.season) > String(r.lastYear)) r.lastYear = s.season;
     });
     const coachCards = Object.entries(cmap).sort((a, b) => b[1].wins - a[1].wins).map(([coach, rec]) => {
       const cur = coach === mostRecent;
-      const pct = rec.wins + rec.losses > 0 ? ((rec.wins / (rec.wins + rec.losses)) * 100).toFixed(1) : "—";
-      const lpct = rec.leagueWins + rec.leagueLosses > 0 ? ((rec.leagueWins / (rec.leagueWins + rec.leagueLosses)) * 100).toFixed(1) : "—";
+      const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? ((rec.wins / (rec.wins + rec.losses + (rec.ties||0))) * 100).toFixed(1) : "—";
+      const lpct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins / (rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0))) * 100).toFixed(1) : "—";
       const yr = String(rec.firstYear) === String(rec.lastYear) ? esc(String(rec.firstYear)) : esc(String(rec.firstYear)) + " – " + esc(String(rec.lastYear));
       return `<div style="padding:16px 20px;border-bottom:1px solid #f3f0ea;${cur ? "background:#eff6ff;border-left:4px solid #1a56db" : "border-left:4px solid transparent"}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:700;font-size:15px;color:#111">${esc(coach)}</div>${cur ? '<span style="background:#1a56db;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">Current</span>' : ""}</div>
