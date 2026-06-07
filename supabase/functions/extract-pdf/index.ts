@@ -29,16 +29,19 @@ CRITICAL:
 - SKIP "Season Totals"/team-total rows. SKIP every rate/average/percentage column (Y/G, C/G, Avg, C%, T/G, S/G, Int/G, TD/G, QB Rate, "100+", "Lng", "In 20", "TB", "FC") — keep only cumulative counting totals.
 - Numeric values only. "number" = jersey number (integer) if shown, else null. Unknown grad year → ${new Date().getFullYear() + 2}.
 
-FOOTBALL — use these EXACT stat names, mapping the column within each section:
-- Games Played (GP)
-- Passing section: Yds→"Passing Yards", C→"Pass Completions", Att→"Pass Attempts", TD→"Passing TDs", Int→"Interceptions Thrown"
-- Rushing section: Yds→"Rushing Yards", Car→"Rushing Attempts", TD→"Rushing TDs"
-- Receiving section: Yds→"Receiving Yards", Rec→"Receptions", TD→"Receiving TDs"
+FOOTBALL — use these EXACT stat names (the coach's set), mapping the column within each section:
+- Games Played (GP), Wins
+- Passing section: C→"Completetions", Att→"Passing Attempts", Yds→"Passing Yards", TD→"Passing TDs" (ignore the passing Int column)
+- Rushing section: Car→"Rushes", Yds→"Rushing Yards", TD→"Rushing TDs"
+- Receiving section: Rec→"Receptions", Yds→"Receiving Yards", TD→"Receiving TDs"
 - Total Yards section: Total→"Total Yards"
-- Tackles section: "Tot Tckls"→"Combined Tackles", Solo→"Solo Tackles", Asst→"Assisted Tackles", TFL→"Tackles for Loss"
-- Sacks section: Sacks→"Sacks" (it is a decimal like 1.0/3.0; ignore Ydl/Hurs)
-- Defensive section: Int→"Interceptions", PD→"Passes Defended", "Fmb Rec"→"Fumbles Recovered", Caus→"Forced Fumbles" (ignore Int Yds, FR Yds, Blk Pnts, Blk FGs)
-- "Kickoff and Punt Returns" section: "KO Rets"→"Kick Returns", the Yds column right after KO Rets→"Kick Return Yards", "P Rets"→"Punt Returns", the Yds column right after P Rets→"Punt Return Yards" (ignore Avg/Lng/FC and the combined "KR Yds" total)
+- Tackles section: "Tot Tckls"→"Tackles" (ignore Solo, Asst, TFL)
+- Sacks section: Sacks→"Sacks" (a decimal like 1.0/3.0; ignore Ydl/Hurs)
+- Defensive section: Int→"Interceptions", PD→"Pass Break Ups", "Fmb Rec"→"Fumble Recoveries", Caus→"Forced Fumbles" (ignore Int Yds, FR Yds, Blk Pnts, Blk FGs)
+- "PATs and Field Goals" section: PAT→"PAT Mades", the Att right after PAT→"PAT Attempts", FG→"Field Goals Made", the Att right after FG→"Field Goals Attempts"
+- "Punts" section: P→"Punts", Yds→"Punt Yards"
+- "Kickoffs" section: KO→"Kick Offs", Yds→"Kick Off Yards"
+- "Kickoff and Punt Returns" section: "KO Rets"→"Kick Off Returns", the Yds right after KO Rets→"Kick Off Return Yards", any TD there→"Kick Off Return TDs"; "P Rets"→"Punt Returns", the Yds right after P Rets→"Punt Return Yards", any TD there→"Punt Return TDs" (ignore Avg/Lng/FC and the combined "KR Yds" total)
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
 For non-football sports (basketball, soccer, etc.) there is usually one table — use the exact stat names shown.
