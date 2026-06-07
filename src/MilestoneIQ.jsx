@@ -220,7 +220,7 @@ const STAT_ORDER = [
 ];
 
 // Football: the exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
@@ -340,6 +340,7 @@ const FOOTBALL_THRESHOLDS = {
   "Punt Returns":[10,25,50,75], "Punt Return Yards":[100,250,500,1000], "Punt Return TDs":[1,3,5,10],
   "Kick Offs":[25,50,100,150], "Kick Off Yards":[500,1000,2500,5000],
   "Kick Off Returns":[10,25,50,75], "Kick Off Return Yards":[100,250,500,1000], "Kick Off Return TDs":[1,3,5,10],
+  "All-Purpose Yards":[500,1000,2500,5000],
 };
 // Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
 // those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
