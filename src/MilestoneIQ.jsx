@@ -797,6 +797,8 @@ function RecordsModal({ school, onClose, onSave }) {
   const statOptions = [...new Set([
     ...(DISPLAY_STATS[school.sport] || []),
     ...sportDef.statCategories.map(s => s.name),
+    // shooting %s (FG%/3P%/FT%) for sports that track the made/attempted stats, so they're editable
+    ...PCT_DEFS.filter(d => sportDef.statCategories.some(s => s.name === d.made)).map(d => d.name),
   ])].sort(byStatOrder);
   const [records, setRecords] = useState(school.records || []);
   const [editingId, setEditingId] = useState(null);
@@ -4673,13 +4675,13 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
                     ...coachWinsRecordsFrom(school.seasons || [], school.sport),
                   ];
-                  // Show a manually-entered record UNLESS an auto-computed one exists for the same
-                  // stat+variant. So manual entries (incl. ones the data can't yet derive) persist &
-                  // appear in their tile, while data-derived records stay authoritative where present.
-                  const autoKeys = new Set(autoRecs.map(r => r.statName + "|" + r.variant));
+                  // Manual records are AUTHORITATIVE: a manually entered/edited record overrides the
+                  // auto-computed one for the same stat+variant (e.g. an edited best FG%/3P%/FT%).
+                  // Auto-computed records fill in only where there's no manual entry.
+                  const manualKeys = new Set((school.records||[]).map(r => r.statName + "|" + r.variant));
                   const allRecords = [
-                    ...(school.records||[]).filter(r => !autoKeys.has(r.statName + "|" + r.variant)),
-                    ...autoRecs,
+                    ...(school.records||[]),
+                    ...autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)),
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
