@@ -72,7 +72,19 @@ export default async function handler(req, res) {
         for (const r of recs) { const k = r.statName + "|" + r.variant + "|" + r.value; if (seen[k] != null) groups[seen[k]].push(r); else { seen[k] = groups.length; groups.push([r]); } }
         const tiles = groups.map((g) => {
           const rec = g[0]; const isPct = !!PCT_PARENT[rec.statName];
-          const holders = g.filter((r) => r.holderName).map((r) => `<div class="holder">🏅 ${esc(r.holderName)}${r.holderYear ? ` · ${esc(String(r.holderYear))}` : ""}</div>`).join("");
+          // Show ALL players tied at this record's value (team stats like Wins are shared), not just one.
+          const seen = new Set(g.filter((r) => r.holderName).map((r) => r.holderName.toLowerCase().trim()));
+          let tied = [];
+          if (!isPct && rec.variant === "Career total") {
+            tied = careerPool.filter((p) => (p.stats?.[rec.statName] ?? null) === rec.value && !seen.has((p.name || "").toLowerCase().trim()))
+              .map((p) => ({ name: p.name, year: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? p.firstYear : p.firstYear + "-" + p.lastYear) : (p.gradYear ? "Class of " + p.gradYear : "") }));
+          } else if (!isPct && rec.variant === "Single season") {
+            const ns = new Set();
+            tied = (seasonRows || []).filter((r) => (r.stats?.[rec.statName] ?? null) === rec.value && r.player_name && !seen.has(r.player_name.toLowerCase().trim()) && !ns.has(r.player_name.toLowerCase().trim()) && (ns.add(r.player_name.toLowerCase().trim()) || true))
+              .map((r) => ({ name: r.player_name, year: r.season }));
+          }
+          const holderList = [...g.filter((r) => r.holderName).map((r) => ({ name: r.holderName, year: r.holderYear })), ...tied];
+          const holders = holderList.map((h) => `<div class="holder">🏅 ${esc(h.name)}${h.year ? ` · ${esc(String(h.year))}` : ""}</div>`).join("");
           return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? "Best %" : esc(rec.variant)}</span><span class="val">${isPct ? esc(String(rec.value)) + "%" : fmtNum(rec.value)}</span></div>${holders}</div>`;
         }).join("");
         return `<div class="statcard"><div class="hd">${esc(sn)}</div><div class="tiles">${tiles}</div></div>`;
