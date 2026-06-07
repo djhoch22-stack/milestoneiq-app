@@ -260,12 +260,16 @@ export function buildCoachStats(seasons) {
   const coaches = {};
   (seasons || []).forEach((s) => {
     const name = (s.coach || "").trim(); if (!name) return;
-    if (!coaches[name]) coaches[name] = { name, wins: 0, losses: 0, leagueWins: 0, leagueLosses: 0, seasons: 0,
+    if (!coaches[name]) coaches[name] = { name, wins: 0, losses: 0, ties: 0, leagueWins: 0, leagueLosses: 0, leagueTies: 0, seasons: 0,
       stateChamps: 0, stateRunnerUp: 0, finalFours: 0, eliteEights: 0, sweetSixteens: 0, playoffs: 0, leagueChamps: 0,
-      titles: 0, firstYear: s.season, lastYear: s.season };
+      titles: 0, firstYear: s.season, lastYear: s.season, byTeam: {} };
     const co = coaches[name];
-    co.seasons += 1; co.wins += (s.wins || 0); co.losses += (s.losses || 0);
-    co.leagueWins += (s.leagueWins || 0); co.leagueLosses += (s.leagueLosses || 0);
+    co.seasons += 1; co.wins += (s.wins || 0); co.losses += (s.losses || 0); co.ties += (s.ties || 0);
+    co.leagueWins += (s.leagueWins || 0); co.leagueLosses += (s.leagueLosses || 0); co.leagueTies += (s.leagueTies || 0);
+    // per-sport/team breakdown (e.g. Boys Basketball vs Girls Soccer)
+    const tm = s._team || "Team";
+    if (!co.byTeam[tm]) co.byTeam[tm] = { wins: 0, losses: 0, ties: 0, seasons: 0 };
+    const bt = co.byTeam[tm]; bt.wins += (s.wins || 0); bt.losses += (s.losses || 0); bt.ties += (s.ties || 0); bt.seasons += 1;
     const notes = (s.notes || "").toLowerCase();
     if (/state champ/.test(notes)) co.stateChamps += 1;
     if (/runner.?up|runner-up/.test(notes)) co.stateRunnerUp += 1;
