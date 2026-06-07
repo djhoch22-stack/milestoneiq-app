@@ -2310,11 +2310,13 @@ function ImportSeasons({ school, roster = [] }) {
           // roster, not just whoever appeared in the most games. Use the largest Wins we
           // saw for the season (a full-season player = the team total), falling back to
           // the team's recorded win count for that season if the sheet had no per-player wins.
-          const teamWins = Math.max(
-            0,
-            ...bySeason[s].map((p) => Number(p.stats?.Wins) || 0),
-            Number(((school.seasons || []).find((x) => sameSeason(x.season, s)) || {}).wins) || 0,
-          );
+          // The PDF's "Overall W-L" (the extractor assigns it as each player's Wins) is AUTHORITATIVE.
+          // The seasons table is only a fallback for when the sheet showed no wins — a stale/old
+          // seasons-table value must never override what the uploaded PDF actually says.
+          const extractedWins = Math.max(0, ...bySeason[s].map((p) => Number(p.stats?.Wins) || 0));
+          const teamWins = extractedWins > 0
+            ? extractedWins
+            : (Number(((school.seasons || []).find((x) => sameSeason(x.season, s)) || {}).wins) || 0);
           if (teamWins > 0) for (const p of bySeason[s]) p.stats.Wins = teamWins;
         }
         const summary = seasons.map((s) => `${bySeason[s].length} players for ${s}`).join(", ");
