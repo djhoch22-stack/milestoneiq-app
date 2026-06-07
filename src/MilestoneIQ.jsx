@@ -33,6 +33,14 @@ const BASKETBALL_STAT_CATEGORIES = [
   { name: "Free Throws Attempted", variants: STAT_VARIANTS_WITH_AVG },
   { name: "Coach Wins", variants: ["Career total","Single season"] },
 ];
+// ONE soccer record-category list shared by boys & girls soccer — so both are IDENTICAL (no drift).
+const SOCCER_STAT_CATEGORIES = [
+  { name: "Goals", variants: STAT_VARIANTS_STANDARD },
+  { name: "Assists", variants: STAT_VARIANTS_STANDARD },
+  { name: "Saves", variants: STAT_VARIANTS_STANDARD },
+  { name: "Shutouts", variants: ["Career total","Single season"] },
+  { name: "Coach Wins", variants: ["Career total","Single season"] },
+];
 
 const SPORTS = {
   football: {
@@ -199,23 +207,11 @@ const SPORTS = {
   },
   soccer: {
     label: "Boys Soccer", icon: "⚽",
-    statCategories: [
-      { name: "Goals", variants: ["Career total","Single season","Single game"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game"] },
-      { name: "Saves", variants: ["Career total","Single season","Single game"] },
-      { name: "Shutouts", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: SOCCER_STAT_CATEGORIES,
   },
   soccer_girls: {
     label: "Girls Soccer", icon: "⚽",
-    statCategories: [
-      { name: "Goals", variants: ["Career total","Single season","Single game"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game"] },
-      { name: "Saves", variants: ["Career total","Single season","Single game"] },
-      { name: "Shutouts", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: SOCCER_STAT_CATEGORIES,
   },
   wrestling: {
     label: "Wrestling", icon: "🤼",
@@ -309,9 +305,9 @@ function allStatsFor(roster) {
 // Stats a program should ALWAYS surface on its tabs — even before any data is entered.
 // Sports NOT listed here fall back to "stats present in the data" (no behavior change).
 const BBALL_DISPLAY = ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"];
+const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"];
 const DISPLAY_STATS = {
-  soccer:       ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
-  soccer_girls: ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
 };
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
@@ -2120,8 +2116,7 @@ const SHEET_FOR_STAT = {
 };
 // Stats (in canonical order) to include as tabs when generating a season template per sport.
 const TEMPLATE_STATS = {
-  soccer:        ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
-  soccer_girls:  ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball_boys:  ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"],
   basketball_girls: ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"],
 };
