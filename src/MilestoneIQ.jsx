@@ -227,7 +227,7 @@ const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
-  "Combined Tackles": "Tackles", "Total Tackles": "Tackles", "Solo Tackles": "Tackles",
+  "Combined Tackles": "Tackles", "Total Tackles": "Tackles",
   "Extra Points Made": "PAT Mades", "Extra Points Attempted": "PAT Attempts",
   "Fumbles Forced": "Forced Fumbles", "Fumbles Recovered": "Fumble Recoveries",
   "Kick Return Yards": "Kick Off Return Yards", "Kick Returns": "Kick Off Returns",
@@ -2292,7 +2292,11 @@ function ImportSeasons({ school, roster = [] }) {
             const name = String(a.name || "").trim();
             if (!name) continue;
             const number = (a.number != null && String(a.number).trim() !== "") ? String(a.number).trim() : null;
-            arr.push({ name, number, stats: remapSeasonStats(a.stats || {}, seasonValid) });
+            // Map legacy football stat names from the extractor (e.g. "Combined Tackles" -> "Tackles")
+            // to the coach's stat set BEFORE the valid-set filter, so they aren't dropped.
+            const _raw = a.stats || {}; const _norm = {};
+            for (const _k in _raw) _norm[fixFbStat(school.sport, _k)] = _raw[_k];
+            arr.push({ name, number, stats: remapSeasonStats(_norm, seasonValid) });
           }
         }
         const seasons = Object.keys(rawBySeason);
