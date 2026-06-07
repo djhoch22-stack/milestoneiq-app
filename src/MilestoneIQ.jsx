@@ -308,9 +308,11 @@ function allStatsFor(roster) {
 }
 // Stats a program should ALWAYS surface on its tabs — even before any data is entered.
 // Sports NOT listed here fall back to "stats present in the data" (no behavior change).
+const BBALL_DISPLAY = ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"];
 const DISPLAY_STATS = {
   soccer:       ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
   soccer_girls: ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"],
+  basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
 };
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
 // data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
@@ -492,6 +494,7 @@ const PERGAME_DEFS = [];
 const PERGAME_RECORD_DEFS = [
   { stat: "Points" }, { stat: "Assists" }, { stat: "Goals" }, { stat: "Shots" }, { stat: "Saves" },
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
+  { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
