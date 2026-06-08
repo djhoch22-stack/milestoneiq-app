@@ -55,7 +55,9 @@ export default async function handler(req, res) {
 
   // ── RECORDS (stored + auto %/per-game) ──────────────────────────────────────
   const PCT_PARENT = { "Field Goal Percentage": "Field Goals Made", "Three Point Percentage": "Three Pointers Made", "Free Throw Percentage": "Free Throws Made" };
-  const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)"];
+  // "Longest …" records render INSIDE their parent stat's tile (Longest Completion under Completetions, etc.).
+  const LONGEST_PARENT = { "Longest Completion": "Completetions", "Longest Rush": "Rushes", "Longest Reception": "Receptions", "Longest Field Goal": "Field Goals Made", "Longest Punt": "Punts", "Longest Punt Return": "Punt Returns", "Longest Kick Off Return": "Kick Off Returns", "Longest Kick Off": "Kick Offs" };
+  const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)", "Longest"];
   const vIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i === -1 ? 999 : i; };
   const autoRecs = [
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
@@ -71,7 +73,7 @@ export default async function handler(req, res) {
     ...autoRecs.filter((r) => !manualKeys.has(r.statName + "|" + r.variant)),
   ];
   const byStat = {};
-  for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
+  for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
   const recordsSection = !allRecords.length
     ? `<div class="empty">No school records published yet.</div>`
     : Object.keys(byStat).sort((a, b) => byStatOrder(a, b, team.sport)).map((sn) => {
