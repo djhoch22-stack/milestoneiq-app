@@ -7,11 +7,28 @@
 -- the all-time + active rosters from the season rows. Works for season-based AND career-import programs.
 
 -- Sum two stat maps: ADD numeric values, MAX the "Longest …" single-play maxes (same rule as recompute).
+-- Used to combine two distinct CAREERS (career-import programs with no season rows).
 create or replace function public._merge_stats(a jsonb, b jsonb)
 returns jsonb language sql immutable as $$
   select coalesce(jsonb_object_agg(key, val), '{}'::jsonb)
   from (
     select key, case when key like 'Longest %' then max(v) else sum(v) end as val
+    from (
+      select key, (value)::numeric v from jsonb_each_text(coalesce(a, '{}'::jsonb)) where value ~ '^-?[0-9]+(\.[0-9]+)?$'
+      union all
+      select key, (value)::numeric v from jsonb_each_text(coalesce(b, '{}'::jsonb)) where value ~ '^-?[0-9]+(\.[0-9]+)?$'
+    ) u group by key
+  ) m;
+$$;
+
+-- Combine two stat maps for the SAME season (a merge/duplicate, never additive): take the MAX of each
+-- stat, so re-uploading the same player under two names never DOUBLES their numbers, and an empty roster
+-- row (0) just yields the real value. Career totals across DIFFERENT seasons are still summed by recompute.
+create or replace function public._max_stats(a jsonb, b jsonb)
+returns jsonb language sql immutable as $$
+  select coalesce(jsonb_object_agg(key, val), '{}'::jsonb)
+  from (
+    select key, max(v) as val
     from (
       select key, (value)::numeric v from jsonb_each_text(coalesce(a, '{}'::jsonb)) where value ~ '^-?[0-9]+(\.[0-9]+)?$'
       union all
@@ -32,7 +49,7 @@ begin
   -- A) Season rows: per season, merge into the new name if it already has that season, else rename.
   for s in select season, stats from public.player_seasons where program_id = p_program and lower(player_name) = lower(p_old) loop
     if exists (select 1 from public.player_seasons where program_id = p_program and lower(player_name) = lower(p_new) and season = s.season) then
-      update public.player_seasons set stats = public._merge_stats(stats, s.stats)
+      update public.player_seasons set stats = public._max_stats(stats, s.stats)  -- same season = merge, never double
        where program_id = p_program and lower(player_name) = lower(p_new) and season = s.season;
       delete from public.player_seasons where program_id = p_program and lower(player_name) = lower(p_old) and season = s.season;
     else
@@ -84,6 +101,7 @@ begin
 end $$;
 
 grant execute on function public._merge_stats(jsonb, jsonb)        to anon, authenticated, service_role;
+grant execute on function public._max_stats(jsonb, jsonb)          to anon, authenticated, service_role;
 grant execute on function public.rename_player(uuid, text, text)   to anon, authenticated, service_role;
 grant execute on function public.delete_player(uuid, text)         to anon, authenticated, service_role;
 
