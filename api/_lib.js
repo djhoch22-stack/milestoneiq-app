@@ -197,7 +197,7 @@ export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
 }
 // Football "Longest …" records (longest rush/reception/FG/punt/punt-return/kick-return) —
 // single-PLAY maxes, so the program record = MAX over every player-season (never summed).
-const LONGEST_STATS = ["Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
+const LONGEST_STATS = ["Longest Completion","Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
 export function longestRecordsFrom(seasonRows, sport) {
   if (sport !== "football") return [];
   const out = [];
