@@ -2372,6 +2372,18 @@ function ImportSeasons({ school, roster = [] }) {
             : (Number(((school.seasons || []).find((x) => sameSeason(x.season, s)) || {}).wins) || 0);
           if (teamWins > 0) for (const p of bySeason[s]) p.stats.Wins = teamWins;
         }
+        // SAFETY GUARD — never let a roster-only or failed-extract upload ERASE a season's stats.
+        // Importing REPLACES the season (delete + re-insert), so if the reconciled rows carry no real
+        // stats (just player names + the team Wins), replacing would wipe that season. That happens when
+        // a roster PDF is uploaded WITHOUT its stat sheet, or the stat sheet failed to read. Abort instead.
+        const hasRealStats = (rowsForSeason) =>
+          (rowsForSeason || []).some((p) => Object.entries(p.stats || {}).some(([k, v]) => k !== "Wins" && Number(v) > 0));
+        const statlessSeason = seasons.find((s) => !hasRealStats(bySeason[s]));
+        if (statlessSeason) {
+          setBusy(false);
+          setMsg(`Import cancelled to protect your data: no stats were read for ${statlessSeason} — only player names${errs.length ? ` (a file failed to read: ${errs[0]})` : ""}. Replacing would ERASE that season's stats. Upload the ROSTER and the STAT SHEET together in one import (and make sure the stat PDF actually reads).`);
+          return;
+        }
         const summary = seasons.map((s) => `${bySeason[s].length} players for ${s}`).join(", ");
         if (!window.confirm(`Import ${summary}?\n\nThis replaces those season(s) for ${school.name || "this program"} — every other season is left alone.`)) {
           setBusy(false); setMsg(""); return;
