@@ -3889,7 +3889,7 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
   );
 }
 
-function HallOfFameTab({ school, allSchools, onUpdate }) {
+function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   const [view, setView] = useState("athletes"); // athletes | coaches
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -4131,6 +4131,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
           school={school}
           allSchools={allSchools}
           awards={awards}
+          allSeasonRows={allSeasonRows}
           onClose={() => setSelectedPlayer(null)}
           onToggle={toggleConfirmed}
         />
@@ -4147,7 +4148,7 @@ function HallOfFameTab({ school, allSchools, onUpdate }) {
   );
 }
 
-function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, xState, school, allSchools, awards = [], onClose, onToggle }) {
+function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, xState, school, allSchools, awards = [], allSeasonRows = [], onClose, onToggle }) {
   const tier = hofTier(finalScore);
   // Per-sport breakdown: multi-sport mode shows every sport the athlete played; otherwise just
   // this program. Each context carries that sport's program (school) + its roster entry (player).
@@ -4164,8 +4165,24 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
     .filter(r => r.rank > 0)
     .sort((a, b) => byStatOrder(a.stat, b.stat, school.sport));   // canonical order, matching every other tab
   const playerHeldRecords = (sch, pl) => {
+    // Use the SAME records the Records tab shows — stored PLUS auto-computed — so a player's auto
+    // records (career totals, per-game, longest, %, coach wins) appear on their HOF card too, aligned
+    // with the Records tab. Season-based auto records need that program's season rows; we only have them
+    // for the program in view, so other sports fall back to career-total + coach-wins (still aligned for
+    // the headline records).
+    const seasonRows = sch.id === school.id ? (allSeasonRows || []) : [];
+    const recPool = [...(sch.athletes || []), ...(sch.allTimeRoster || [])];
+    const auto = [
+      ...pctRecordsFrom(seasonRows, recPool, sch.sport),
+      ...pergameRecordsFrom(seasonRows, recPool, sch.sport),
+      ...longestRecordsFrom(seasonRows, sch.sport),
+      ...autoStatRecords(seasonRows, (sch.allTimeRoster || []), statsToDisplay(recPool, sch.sport).filter(s => !/^Longest /.test(s)), sch.sport),
+      ...coachWinsRecordsFrom(sch.seasons || [], sch.sport, sch.coachPrior || {}),
+    ];
+    const manualKeys = new Set((sch.records || []).map(r => r.statName + "|" + r.variant));
+    const all = [...(sch.records || []), ...auto.filter(r => !manualKeys.has(r.statName + "|" + r.variant))];
     const nameLower = (pl.name || "").toLowerCase().trim();
-    return (sch.records || []).filter(r => {
+    return all.filter(r => {
       const h = (r.holderName || "").toLowerCase().trim();
       return h && h !== "multiple players" && h === nameLower;
     });
@@ -4315,7 +4332,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                   {honors.map(a => (
                     <span key={a.id} style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", color:"#6b21a8", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:600 }}>
-                      🏅 {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
+                      {SPORTS[school.sport]?.icon || "🏅"} {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
                     </span>
                   ))}
                 </div>
@@ -5192,7 +5209,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         )}
 
         {activeTab==="hof" && (
-          <HallOfFameTab school={school} allSchools={allSchools.length ? allSchools : [school]} onUpdate={onUpdate} />
+          <HallOfFameTab school={school} allSchools={allSchools.length ? allSchools : [school]} allSeasonRows={allSeasonRows} onUpdate={onUpdate} />
         )}
 
         {activeTab==="export" && (
