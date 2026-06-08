@@ -1164,6 +1164,20 @@ begin
                   and exists (select 1 from public.player_seasons ps
                               where ps.program_id = p_program and ps.player_name = b.name));
 
+  -- 6) remove abbreviated all-time entries left orphaned by a roster RENAME (e.g. "A. Terpstra" once a
+  --    roster upload renamed the season rows to "Alex Terpstra"): abbreviated first name (single letter),
+  --    no season rows, and a full-name sibling sharing the last name + first initial. So uploading a roster
+  --    to fix names ALSO clears the old abbreviated duplicate automatically.
+  delete from public.all_time_players a
+  where a.program_id = p_program
+    and a.name ~ '^[A-Za-z]\.? '
+    and not exists (select 1 from public.player_seasons ps
+                    where ps.program_id = p_program and lower(ps.player_name) = lower(a.name))
+    and exists (select 1 from public.all_time_players f
+                where f.program_id = p_program and f.id <> a.id and f.name !~ '^[A-Za-z]\.? '
+                  and lower(split_part(f.name, ' ', -1)) = lower(split_part(a.name, ' ', -1))
+                  and lower(left(f.name, 1)) = lower(left(a.name, 1)));
+
   drop table if exists _pc;
 end $$;
 grant execute on function public.recompute_career_from_seasons(uuid) to anon, authenticated, service_role;
