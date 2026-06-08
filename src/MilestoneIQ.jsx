@@ -3463,6 +3463,22 @@ function calcProgramHofScore(player, school) {
 }
 
 // Cross-sport compound score for a player name across all schools
+// Conservative "same person" test for linking a player ACROSS programs/sports (render-time only — changes
+// no data). Beyond an exact spelling, it links when the LAST name matches AND the first names are: equal,
+// an initial of the other (J ↔ John), or one a prefix of the other with ≥3 letters (Jon ↔ Jonathan). It does
+// NOT guess loose nicknames (Mike↔Michael), so two genuinely different athletes are never linked. Callers
+// also require the match to be UNAMBIGUOUS (exactly one candidate) before using it.
+function crossSportNameMatch(a, b) {
+  const toks = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const A = toks(a), B = toks(b);
+  if (A.length < 2 || B.length < 2) return false;
+  if (A[A.length - 1] !== B[B.length - 1]) return false;              // last name must match
+  const fa = A[0], fb = B[0];
+  if (fa === fb) return true;                                         // same first name
+  if (fa.length === 1 || fb.length === 1) return fa[0] === fb[0];     // initial vs full first name
+  const [short, long] = fa.length <= fb.length ? [fa, fb] : [fb, fa];
+  return short.length >= 3 && long.startsWith(short);                // Jon ↔ Jonathan
+}
 function calcCrossSportScore(playerName, allSchools) {
   const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
   const nameLower = norm(playerName);
@@ -3470,7 +3486,13 @@ function calcCrossSportScore(playerName, allSchools) {
 
   allSchools.forEach(school => {
     const roster = school.allTimeRoster || [];
-    const match = roster.find(p => norm(p.name) === nameLower);
+    // Exact (normalized) match first; otherwise a conservative fuzzy match, but ONLY when it is unambiguous
+    // (exactly one candidate) so "J. Smith" never links when both "John" and "James Smith" exist.
+    let match = roster.find(p => norm(p.name) === nameLower);
+    if (!match) {
+      const fuzzy = roster.filter(p => crossSportNameMatch(p.name, playerName));
+      if (fuzzy.length === 1) match = fuzzy[0];
+    }
     if (match) {
       const score = calcProgramHofScore(match, school);
       if (score > 0) programScores.push({ school, player: match, score });
