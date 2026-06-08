@@ -259,6 +259,19 @@ export const recomputeCareerFromSeasons = async (programId) => {
   return { error };
 };
 
+// Rename a player across all of a program's data (season rows, rosters, records, awards). Renaming to a
+// name that already exists MERGES the two into one. Recompute happens server-side inside the function.
+export const renamePlayer = async (programId, oldName, newName) => {
+  const { error } = await supabase.rpc('rename_player', { p_program: programId, p_old: oldName, p_new: newName });
+  return { error };
+};
+
+// Permanently delete a player from a program (season rows, roster entries, records, awards) + recompute.
+export const deletePlayer = async (programId, name) => {
+  const { error } = await supabase.rpc('delete_player', { p_program: programId, p_name: name });
+  return { error };
+};
+
 // Replace just ONE season's rows for a program (PDF season imports — additive, leaves
 // every other season untouched).
 export const replacePlayerSeasonRowsForSeason = async (programId, season, rows) => {
