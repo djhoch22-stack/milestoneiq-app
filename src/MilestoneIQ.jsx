@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -1948,6 +1948,28 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
 
 function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effectiveIsActive, rankFor }) {
   const isActive = effectiveIsActive(player);
+  const canManage = !!(school && school.id);
+  const [editName, setEditName] = useState(player.name);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editErr, setEditErr] = useState("");
+
+  // Rename the player everywhere (season rows, rosters, records, awards). Renaming to an existing name
+  // MERGES the two into one. Reload so the leaderboard/rank/active flag all reflect the rebuilt career.
+  const handleRename = async () => {
+    const next = editName.trim();
+    if (!next || next === player.name) return;
+    setEditBusy(true); setEditErr("");
+    const { error } = await renamePlayer(school.id, player.name, next);
+    if (error) { setEditBusy(false); setEditErr(error.message || String(error)); return; }
+    window.location.reload();
+  };
+  const handleDeletePlayer = async () => {
+    if (!window.confirm(`Delete ${player.name} permanently?\n\nThis removes all of their seasons, stats, records, and awards for this program. This cannot be undone.`)) return;
+    setEditBusy(true); setEditErr("");
+    const { error } = await deletePlayer(school.id, player.name);
+    if (error) { setEditBusy(false); setEditErr(error.message || String(error)); return; }
+    window.location.reload();
+  };
 
   const handleToggleActive = () => {
     const nameLower = player.name.toLowerCase();
@@ -2105,6 +2127,32 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
               onUpdate({ ...school, allTimeRoster: merge(school.allTimeRoster), athletes: merge(school.athletes) });
             }}
           />
+
+          {/* Edit / delete player (coach tools) */}
+          {canManage && (
+            <div style={{borderTop:"1px solid #f0eeea",paddingTop:18,marginTop:18}}>
+              <h3 style={{margin:"0 0 10px",fontSize:14,fontWeight:700,color:"#374151"}}>Edit player</h3>
+              <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                <input value={editName} onChange={e=>setEditName(e.target.value)} placeholder="Player name"
+                  style={{flex:1,minWidth:200,padding:"9px 11px",border:"1px solid #d1d5db",borderRadius:8,fontSize:14,boxSizing:"border-box"}} />
+                <button onClick={handleRename} disabled={editBusy || !editName.trim() || editName.trim()===player.name}
+                  style={{padding:"9px 18px",borderRadius:8,border:"none",background:"#1a56db",color:"#fff",fontWeight:600,fontSize:13,whiteSpace:"nowrap",
+                    cursor:(editBusy||!editName.trim()||editName.trim()===player.name)?"default":"pointer",
+                    opacity:(editBusy||!editName.trim()||editName.trim()===player.name)?0.5:1}}>
+                  {editBusy ? "Saving…" : "Rename"}
+                </button>
+              </div>
+              <div style={{fontSize:11.5,color:"#6b7280",marginBottom:14}}>
+                Edit their seasons &amp; stats above. Renaming to a name that already exists merges the two players into one.
+              </div>
+              {editErr && <div style={{fontSize:12,color:"#991b1b",marginBottom:12}}>⚠️ {editErr}</div>}
+              <button onClick={handleDeletePlayer} disabled={editBusy}
+                style={{padding:"9px 16px",borderRadius:8,border:"1px solid #fecaca",background:"#fef2f2",color:"#991b1b",fontWeight:600,fontSize:13,
+                  cursor:editBusy?"default":"pointer"}}>
+                🗑 Delete this player
+              </button>
+            </div>
+          )}
 
           {/* Active toggle */}
           <div style={{borderTop:"1px solid #f0eeea",paddingTop:18,display:"flex",gap:10}}>
