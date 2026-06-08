@@ -2290,6 +2290,37 @@ function reconcileSeasonAthletes(athletes) {
   }
   return Object.values(groups).map((g) => ({ player_name: g.player_name, stats: g.stats }));
 }
+// Merge freshly-extracted season rows INTO the rows already stored for that season. New stats win on
+// conflict; any stored stat the upload didn't include is KEPT, and players only in storage are KEPT —
+// so a re-upload (even a roster-only or failed-stat one) can NEVER erase a season. Match a new player
+// to a stored one by exact (normalized) name, else by last-name+first-initial when unambiguous, so
+// "Tommy Steeves" updates a stored "T. Steeves" instead of duplicating it.
+function mergeSeasonIntoExisting(fresh, existing) {
+  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const exactKey = (n) => norm(n).join(" ");
+  const lastInit = (n) => { const p = norm(n); return p.length >= 2 ? `${p[p.length - 1]}|${p[0][0]}` : p.join(" "); };
+  const byExact = new Map(), byInit = new Map();
+  for (const e of (existing || [])) {
+    byExact.set(exactKey(e.player_name), e);
+    const li = lastInit(e.player_name);
+    if (!byInit.has(li)) byInit.set(li, []);
+    byInit.get(li).push(e);
+  }
+  const used = new Set(), out = [];
+  for (const f of (fresh || [])) {
+    let match = byExact.get(exactKey(f.player_name));
+    if (!match) { const arr = byInit.get(lastInit(f.player_name)); if (arr && arr.length === 1) match = arr[0]; }
+    if (match && !used.has(match)) {
+      used.add(match);
+      const name = fullerSeasonName(f.player_name, match.player_name) ? f.player_name : match.player_name;
+      out.push({ player_name: name, stats: { ...(match.stats || {}), ...(f.stats || {}) } }); // stored = base, new wins
+    } else {
+      out.push({ player_name: f.player_name, stats: { ...(f.stats || {}) } });
+    }
+  }
+  for (const e of (existing || [])) if (!used.has(e)) out.push({ player_name: e.player_name, stats: { ...(e.stats || {}) } });
+  return out;
+}
 function mergeSeasonRows(all) {
   const byPS = {};
   for (const r of all) {
@@ -2357,35 +2388,27 @@ function ImportSeasons({ school, roster = [] }) {
         // Reconcile each season: merge roster (full names) + stat sheet (abbreviated) into one
         // row per player, using jersey number to keep same-name players (siblings) separate.
         const bySeason = {};
+        const noNewStats = []; // seasons this upload added no new stats to (just names) — for the notice
         for (const s of seasons) {
-          bySeason[s] = reconcileSeasonAthletes(rawBySeason[s]);
-          // Wins are a TEAM stat — the team's win total belongs to every player on the
-          // roster, not just whoever appeared in the most games. Use the largest Wins we
-          // saw for the season (a full-season player = the team total), falling back to
-          // the team's recorded win count for that season if the sheet had no per-player wins.
-          // The PDF's "Overall W-L" (the extractor assigns it as each player's Wins) is AUTHORITATIVE.
-          // The seasons table is only a fallback for when the sheet showed no wins — a stale/old
-          // seasons-table value must never override what the uploaded PDF actually says.
-          const extractedWins = Math.max(0, ...bySeason[s].map((p) => Number(p.stats?.Wins) || 0));
+          const fresh = reconcileSeasonAthletes(rawBySeason[s]);
+          // MERGE into what's already stored for the season (never blind-replace). New stats win on
+          // conflict; any stored stat or player the upload didn't include is KEPT — so a roster-only or
+          // failed-stat upload can't erase a season; empty new stats just leave the stored ones intact.
+          const existingRes = await getPlayerSeasonsForSeason(school.id, s);
+          const merged = mergeSeasonIntoExisting(fresh, existingRes.data || []);
+          if (!fresh.some((p) => Object.entries(p.stats || {}).some(([k, v]) => k !== "Wins" && Number(v) > 0))) noNewStats.push(s);
+          // Wins are a TEAM stat — the team's win total belongs to every player on the season. Use the
+          // largest Wins seen, falling back to the team's recorded win count for that season. The PDF's
+          // "Overall W-L" is AUTHORITATIVE; the seasons-table value is only a fallback when no wins showed.
+          const extractedWins = Math.max(0, ...merged.map((p) => Number(p.stats?.Wins) || 0));
           const teamWins = extractedWins > 0
             ? extractedWins
             : (Number(((school.seasons || []).find((x) => sameSeason(x.season, s)) || {}).wins) || 0);
-          if (teamWins > 0) for (const p of bySeason[s]) p.stats.Wins = teamWins;
-        }
-        // SAFETY GUARD — never let a roster-only or failed-extract upload ERASE a season's stats.
-        // Importing REPLACES the season (delete + re-insert), so if the reconciled rows carry no real
-        // stats (just player names + the team Wins), replacing would wipe that season. That happens when
-        // a roster PDF is uploaded WITHOUT its stat sheet, or the stat sheet failed to read. Abort instead.
-        const hasRealStats = (rowsForSeason) =>
-          (rowsForSeason || []).some((p) => Object.entries(p.stats || {}).some(([k, v]) => k !== "Wins" && Number(v) > 0));
-        const statlessSeason = seasons.find((s) => !hasRealStats(bySeason[s]));
-        if (statlessSeason) {
-          setBusy(false);
-          setMsg(`Import cancelled to protect your data: no stats were read for ${statlessSeason} — only player names${errs.length ? ` (a file failed to read: ${errs[0]})` : ""}. Replacing would ERASE that season's stats. Upload the ROSTER and the STAT SHEET together in one import (and make sure the stat PDF actually reads).`);
-          return;
+          if (teamWins > 0) for (const p of merged) p.stats.Wins = teamWins;
+          bySeason[s] = merged;
         }
         const summary = seasons.map((s) => `${bySeason[s].length} players for ${s}`).join(", ");
-        if (!window.confirm(`Import ${summary}?\n\nThis replaces those season(s) for ${school.name || "this program"} — every other season is left alone.`)) {
+        if (!window.confirm(`Import ${summary}?\n\nThis MERGES into those season(s) for ${school.name || "this program"} — new stats update existing ones, nothing is dropped, and every other season is left alone.`)) {
           setBusy(false); setMsg(""); return;
         }
         let total = 0;
@@ -2398,7 +2421,7 @@ function ImportSeasons({ school, roster = [] }) {
         // Overview / Athletes / All-Time / Records / Milestones tabs (the .xlsx path already did this).
         await recomputeCareerFromSeasons(school.id);
         setBusy(false);
-        setMsg(`✓ Imported ${total} player-season rows & updated career totals${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — reload to see them.`);
+        setMsg(`✓ Imported ${total} player-season rows & updated career totals${noNewStats.length ? ` (no new stats read for ${noNewStats.join(", ")} — existing stats kept)` : ""}${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — reload to see them.`);
         return;
       }
       // Spreadsheet matrix (one workbook = the WHOLE history) → replace all season data.
