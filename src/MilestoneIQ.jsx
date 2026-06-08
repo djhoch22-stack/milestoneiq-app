@@ -2755,11 +2755,13 @@ function SeasonForm({ form, setForm, noteSuggestions = [], onSubmit, submitLabel
 // Edit a coach's wins + accomplishments earned at PRIOR schools (any sport). Counts toward their
 // career Coach Wins record and Hall of Fame résumé. Stored per-program in school.coachPrior.
 function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
-  const FIELDS = [
-    ["wins", "Wins"], ["losses", "Losses"],
+  const OVERALL = [["wins", "Wins"], ["losses", "Losses"], ["ties", "Ties"]];
+  const LEAGUE = [["leagueWins", "League Wins"], ["leagueLosses", "League Losses"], ["leagueTies", "League Ties"]];
+  const ACCOLADES = [
     ["leagueChamps", "League Championships"], ["stateChamps", "State Championships"],
     ["stateRunnerUp", "State Runner-Ups"], ["finalFours", "Final Fours"], ["eliteEights", "Elite Eights"],
   ];
+  const FIELDS = [...OVERALL, ...LEAGUE, ...ACCOLADES];
   const [vals, setVals] = useState(() => {
     const o = {}; FIELDS.forEach(([k]) => { o[k] = prior[k] != null ? String(prior[k]) : ""; });
     o.note = prior.note || ""; return o;
@@ -2771,19 +2773,28 @@ function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
     if ((vals.note || "").trim()) out.note = vals.note.trim();
     onSave(out);
   };
+  const fieldLabel = { fontSize: 12, color: "#374151", fontWeight: 600 };
+  const sectionLabel = { fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0 2px" };
+  const numInput = (k) => (
+    <input type="number" min="0" value={vals[k]} onChange={e => setV(k, e.target.value)}
+      style={{ display: "block", width: "100%", marginTop: 4, padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }} />
+  );
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:16 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:14, padding:24, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto" }}>
         <div style={{ fontSize:18, fontWeight:700, color:"#111", marginBottom:4 }}>Prior-school record — {coach}</div>
         <div style={{ fontSize:13, color:"#6b7280", marginBottom:16 }}>Wins &amp; accomplishments {coach} earned at other schools. These add to their career Coach Wins record and Hall of Fame résumé.</div>
+        <div style={sectionLabel}>Overall record</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+          {OVERALL.map(([k, label]) => (<label key={k} style={fieldLabel}>{label}{numInput(k)}</label>))}
+        </div>
+        <div style={sectionLabel}>League record</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
+          {LEAGUE.map(([k, label]) => (<label key={k} style={fieldLabel}>{label}{numInput(k)}</label>))}
+        </div>
+        <div style={sectionLabel}>Accomplishments</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-          {FIELDS.map(([k, label]) => (
-            <label key={k} style={{ fontSize:12, color:"#374151", fontWeight:600 }}>
-              {label}
-              <input type="number" min="0" value={vals[k]} onChange={e=>setV(k, e.target.value)}
-                style={{ display:"block", width:"100%", marginTop:4, padding:"8px 10px", border:"1px solid #d1d5db", borderRadius:8, fontSize:14, boxSizing:"border-box" }} />
-            </label>
-          ))}
+          {ACCOLADES.map(([k, label]) => (<label key={k} style={fieldLabel}>{label}{numInput(k)}</label>))}
         </div>
         <label style={{ fontSize:12, color:"#374151", fontWeight:600 }}>
           Previous school(s) / notes
@@ -2895,7 +2906,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
   );
 
   const sorted = [...seasons]
-    .filter(s => s.wins !== null || s.coach)
+    .filter(s => s.season != null && s.season !== "")  // show every year, even with no record/coach
     .sort((a, b) => sortDir === "desc"
       ? b.season.localeCompare(a.season)
       : a.season.localeCompare(b.season));
@@ -2933,7 +2944,8 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
     if (!coachMap[coach] || !pr) return;
     const rec = coachMap[coach];
     rec.priorWins = Number(pr.wins || 0); rec.priorNote = pr.note || "";
-    rec.wins += Number(pr.wins || 0); rec.losses += Number(pr.losses || 0);
+    rec.wins += Number(pr.wins || 0); rec.losses += Number(pr.losses || 0); rec.ties += Number(pr.ties || 0);
+    rec.leagueWins += Number(pr.leagueWins || 0); rec.leagueLosses += Number(pr.leagueLosses || 0); rec.leagueTies += Number(pr.leagueTies || 0);
     rec.titles += Number(pr.leagueChamps || 0) + Number(pr.stateChamps || 0);
   });
 
