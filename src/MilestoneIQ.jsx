@@ -2438,9 +2438,77 @@ function mergeSeasonRows(all) {
   }
   return Object.values(byPS);
 }
+// Merge two players in a program into one (the same athlete entered under two different names). The coach
+// picks both players and which NAME to keep; we rename the other onto it (server-side rename_player), which
+// combines every season, stat, record and award. Reflects on every tab + the public page, and — because
+// cross-sport careers are matched by name — links the player's other-sport stats automatically.
+function MergePlayersModal({ school, roster = [], onClose }) {
+  const names = [...new Set((roster || []).map((p) => p.name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [keep, setKeep] = useState("a");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const canMerge = a && b && a !== b;
+  const keeper = keep === "a" ? a : b;
+  const loser = keep === "a" ? b : a;
+  const doMerge = async () => {
+    if (!canMerge) return;
+    if (!window.confirm(`Merge "${loser}" into "${keeper}"?\n\nEvery season, stat, record and award from both will combine under "${keeper}". This cannot be undone.`)) return;
+    setBusy(true); setErr("");
+    const { error } = await renamePlayer(school.id, loser, keeper);
+    if (error) { setBusy(false); setErr(error.message || String(error)); return; }
+    window.location.reload();
+  };
+  const sel = { width: "100%", padding: "9px 11px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box", background: "#fff", marginTop: 4 };
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 20 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#111", marginBottom: 4 }}>Merge two players</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Combine the same athlete that was entered under two names. Seasons &amp; stats merge under the name you keep — and their record on the public page and any other-sport career update automatically.</div>
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>First player
+          <select value={a} onChange={(e) => setA(e.target.value)} style={{ ...sel, marginBottom: 12 }}>
+            <option value="">Select a player…</option>
+            {names.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Second player
+          <select value={b} onChange={(e) => setB(e.target.value)} style={{ ...sel, marginBottom: 16 }}>
+            <option value="">Select a player…</option>
+            {names.filter((n) => n !== a).map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+
+        {canMerge && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Keep which name?</div>
+            {[["a", a], ["b", b]].map(([k, n]) => (
+              <label key={k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: `1px solid ${keep === k ? "#1a56db" : "#e5e7eb"}`, borderRadius: 8, marginBottom: 6, cursor: "pointer", background: keep === k ? "#eff6ff" : "#fff" }}>
+                <input type="radio" name="keepname" checked={keep === k} onChange={() => setKeep(k)} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#111" }}>{n}</span>
+              </label>
+            ))}
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>Result: <strong>{keeper}</strong> — with {loser}'s seasons &amp; stats merged in.</div>
+          </div>
+        )}
+        {err && <div style={{ fontSize: 12, color: "#991b1b", marginBottom: 12 }}>⚠️ {err}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+          <button onClick={onClose} style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+          <button onClick={doMerge} disabled={!canMerge || busy}
+            style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: (!canMerge || busy) ? "default" : "pointer", opacity: (!canMerge || busy) ? 0.5 : 1 }}>
+            {busy ? "Merging…" : "Merge players"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function ImportSeasons({ school, roster = [] }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [showMerge, setShowMerge] = useState(false);
   const onFiles = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
@@ -2609,14 +2677,20 @@ function ImportSeasons({ school, roster = [] }) {
     } catch (err) { setBusy(false); setMsg("Template error: " + (err && err.message ? err.message : String(err))); }
   };
   return (
+    <>
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
         {busy ? "Working…" : "📥 Import season stats (.xlsx or PDF)"}
         <input type="file" accept=".xlsx,.xls,.pdf" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
       <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
+      {(roster || []).length >= 2 && (
+        <button onClick={() => setShowMerge(true)} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>🔗 Merge players</button>
+      )}
       {msg && <span style={{ fontSize: 12, color: msg.indexOf("✓") === 0 ? "#166534" : ((msg.indexOf("fail") >= 0 || msg.indexOf("error") >= 0) ? "#991b1b" : "#6b7280") }}>{msg}</span>}
     </div>
+    {showMerge && <MergePlayersModal school={school} roster={roster} onClose={() => setShowMerge(false)} />}
+    </>
   );
 }
 
