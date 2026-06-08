@@ -2569,7 +2569,12 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const PAGE_SIZE = 25;
 
   if (!roster.length) return (
-    <div style={{padding:40,textAlign:"center",color:"#9ca3af"}}>No all-time roster data available.</div>
+    <div>
+      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} roster={roster} /></div>}
+      <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",border:"2px dashed #e5e7eb",borderRadius:12}}>
+        No all-time roster data yet — use <strong>Import season stats</strong> above to add a season's stats (or a roster) and get started.
+      </div>
+    </div>
   );
 
   const effectiveIsActive = makeEffectiveIsActive(athletes);
