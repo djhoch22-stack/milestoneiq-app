@@ -2265,7 +2265,7 @@ function fullerSeasonName(a, b) {
 // (siblings/cousins): numbered entries group by last name + number; un-numbered entries
 // attach to a numbered group only when their last-name+initial is unambiguous, else stand alone.
 function reconcileSeasonAthletes(athletes) {
-  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter((t) => t && !/^\d+$/.test(t));
   const lastInit = (n) => { const p = norm(n); return p.length >= 2 ? `${p[p.length - 1]}|${p[0][0]}` : p.join(" "); };
   const groups = {};
   const numbered = {}; // `${last}|${init}` -> Set(group keys that carry a number)
@@ -2314,7 +2314,7 @@ function reconcileSeasonAthletes(athletes) {
 // to a stored one by exact (normalized) name, else by last-name+first-initial when unambiguous, so
 // "Tommy Steeves" updates a stored "T. Steeves" instead of duplicating it.
 function mergeSeasonIntoExisting(fresh, existing) {
-  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter((t) => t && !/^\d+$/.test(t));
   const exactKey = (n) => norm(n).join(" ");
   const lastInit = (n) => { const p = norm(n); return p.length >= 2 ? `${p[p.length - 1]}|${p[0][0]}` : p.join(" "); };
   const byExact = new Map(), byInit = new Map();
@@ -2345,7 +2345,7 @@ function mergeSeasonIntoExisting(fresh, existing) {
 // — even a stray duplicate — don't count, and two full siblings stay ambiguous → left as-is). Uses the
 // fuller name. This is what makes uploading a stat sheet without its roster still land on the right player.
 function resolveNamesAgainstProgram(fresh, programNames) {
-  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
+  const norm = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter((t) => t && !/^\d+$/.test(t));
   const lastInit = (n) => { const p = norm(n); return p.length >= 2 ? `${p[p.length - 1]}|${p[0][0]}` : p.join(" "); };
   const isFull = (n) => { const p = norm(n); return !!(p[0] && p[0].length > 1); };
   const byInit = new Map();
@@ -2357,6 +2357,23 @@ function resolveNamesAgainstProgram(fresh, programNames) {
     if (fulls.length === 1 && fullerSeasonName(fulls[0], f.player_name)) return { ...f, player_name: fulls[0] };
     return f;
   });
+}
+// Merge any fresh rows that resolve to the SAME player (e.g. the roster's empty "Tate Kastens" row + the
+// stat row that just resolved to "Tate Kastens") into one — so a player is never written to the season
+// twice. Order-independent: works regardless of whether the roster or the stat sheet was read first.
+function dedupeFreshByName(fresh) {
+  const key = (n) => String(n || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter((t) => t && !/^\d+$/.test(t)).join(" ");
+  const byName = new Map();
+  for (const f of (fresh || [])) {
+    const k = key(f.player_name);
+    if (!k) continue;
+    if (byName.has(k)) {
+      const cur = byName.get(k);
+      cur.stats = { ...cur.stats, ...f.stats };
+      if (fullerSeasonName(f.player_name, cur.player_name)) cur.player_name = f.player_name;
+    } else byName.set(k, { player_name: f.player_name, stats: { ...(f.stats || {}) } });
+  }
+  return [...byName.values()];
 }
 function mergeSeasonRows(all) {
   const byPS = {};
@@ -2430,7 +2447,11 @@ function ImportSeasons({ school, roster = [] }) {
         const bySeason = {};
         const noNewStats = []; // seasons this upload added no new stats to (just names) — for the notice
         for (const s of seasons) {
-          const fresh = resolveNamesAgainstProgram(reconcileSeasonAthletes(rawBySeason[s]), programNames);
+          // Resolve against BOTH the program AND this upload's own roster names, then dedupe — so the
+          // roster's full name lands on the player even if reconcile couldn't pair it by jersey, and a
+          // player is never written twice. Independent of which file (roster vs stats) is read first.
+          const uploadNames = (rawBySeason[s] || []).map((a) => a.name).filter(Boolean);
+          const fresh = dedupeFreshByName(resolveNamesAgainstProgram(reconcileSeasonAthletes(rawBySeason[s]), [...programNames, ...uploadNames]));
           // MERGE into what's already stored for the season (never blind-replace). New stats win on
           // conflict; any stored stat or player the upload didn't include is KEPT — so a roster-only or
           // failed-stat upload can't erase a season; empty new stats just leave the stored ones intact.
