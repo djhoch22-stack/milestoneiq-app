@@ -55,19 +55,19 @@ const SPORTS = {
         { name: "Passing Attempts", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing TDs", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Completion", variants: ["Single game"] },
+        { name: "Longest Completion", variants: ["Longest"] },
       ]},
       { group: "Rushing", stats: [
         { name: "Rushes", variants: STAT_VARIANTS_STANDARD },
         { name: "Rushing Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Rushing TDs", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Rush", variants: ["Single game"] },
+        { name: "Longest Rush", variants: ["Longest"] },
       ]},
       { group: "Receiving", stats: [
         { name: "Receptions", variants: STAT_VARIANTS_STANDARD },
         { name: "Receiving Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Receiving TDs", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Reception", variants: ["Single game"] },
+        { name: "Longest Reception", variants: ["Longest"] },
       ]},
       { group: "Offense", stats: [
         { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
@@ -94,29 +94,29 @@ const SPORTS = {
         { name: "Field Goals Attempts", variants: STAT_VARIANTS_STANDARD },
         { name: "PAT Mades", variants: STAT_VARIANTS_STANDARD },
         { name: "PAT Attempts", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Field Goal", variants: ["Single game"] },
+        { name: "Longest Field Goal", variants: ["Longest"] },
       ]},
       { group: "Punting", stats: [
         { name: "Punts", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Yards", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Punt", variants: ["Single game"] },
+        { name: "Longest Punt", variants: ["Longest"] },
       ]},
       { group: "Punt Returns", stats: [
         { name: "Punt Returns", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Return Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Return TDs", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Punt Return", variants: ["Single game"] },
+        { name: "Longest Punt Return", variants: ["Longest"] },
       ]},
       { group: "Kickoffs", stats: [
         { name: "Kick Offs", variants: STAT_VARIANTS_STANDARD },
         { name: "Kick Off Yards", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Kick Off", variants: ["Single game"] },
+        { name: "Longest Kick Off", variants: ["Longest"] },
       ]},
       { group: "Kickoff Returns", stats: [
         { name: "Kick Off Returns", variants: STAT_VARIANTS_STANDARD },
         { name: "Kick Off Return Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Kick Off Return TDs", variants: STAT_VARIANTS_STANDARD },
-        { name: "Longest Kick Off Return", variants: ["Single game"] },
+        { name: "Longest Kick Off Return", variants: ["Longest"] },
       ]},
       { group: "Coaching", stats: [
         { name: "Coach Wins", variants: ["Career total","Single season"] },
@@ -544,7 +544,7 @@ function longestRecordsFrom(seasonRows, sport) {
       const v = Number(r.stats?.[stat]);
       if (!isNaN(v) && v > 0 && (!best || v > best.value)) best = { value: v, holderName: r.player_name, holderYear: r.season || "" };
     }
-    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Single game", sport, auto: true, ...best });
+    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Longest", sport, auto: true, ...best });
   }
   return out;
 }
@@ -4808,10 +4808,12 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     if (so) { const fi = so.indexOf(n); if (fi !== -1) return fi; }
                     const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i;
                   };
-                  const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
+                  const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Longest"];
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
                   const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
+                  // "Longest …" records live INSIDE their parent stat's tile (Longest Completion under Completetions, etc.).
+                  const LONGEST_PARENT = { "Longest Completion":"Completetions", "Longest Rush":"Rushes", "Longest Reception":"Receptions", "Longest Field Goal":"Field Goals Made", "Longest Punt":"Punts", "Longest Punt Return":"Punt Returns", "Longest Kick Off Return":"Kick Off Returns", "Longest Kick Off":"Kick Offs" };
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
@@ -4832,7 +4834,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   ];
                   const byGroup = {};
                   allRecords.forEach(r => {
-                    const tileStat = PCT_PARENT[r.statName] || r.statName;
+                    const tileStat = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName;
                     const grp = getGroup(tileStat);
                     if (!byGroup[grp]) byGroup[grp] = {};
                     if (!byGroup[grp][tileStat]) byGroup[grp][tileStat] = [];
