@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, PCT_DEFS, shootingPct, pctRecordsFrom,
-  PERGAME_DEFS, perGame, pergameRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName,
 } from "./_lib.js";
 
@@ -60,6 +60,7 @@ export default async function handler(req, res) {
   const autoRecs = [
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
+    ...longestRecordsFrom(seasonRows, team.sport),
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
     ...coachWinsRecordsFrom(seasonsList, team.sport, team.coach_prior || {}),
   ];
