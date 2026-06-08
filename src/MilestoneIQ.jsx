@@ -51,7 +51,7 @@ const SPORTS = {
         { name: "Wins", variants: ["Career total","Single season"] },
       ]},
       { group: "Passing", stats: [
-        { name: "Completetions", variants: STAT_VARIANTS_STANDARD },
+        { name: "Completions", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing Attempts", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing TDs", variants: STAT_VARIANTS_STANDARD },
@@ -223,7 +223,7 @@ const STAT_ORDER = [
   "Three Pointers Made","Three Pointers Attempted",
   "Free Throws Made","Free Throws Attempted",
   // Football (canonical order; "Field Goals Made" is shared with basketball above, so it is not repeated)
-  "Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion",
+  "Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion",
   "Rushes","Rushing Yards","Rushing TDs","Longest Rush",
   "Receptions","Receiving Yards","Receiving TDs","Longest Reception",
   "Total Yards","Total TDs",
@@ -236,7 +236,7 @@ const STAT_ORDER = [
 ];
 
 // Football: the exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
@@ -248,7 +248,7 @@ const FB_STAT_RENAME = {
   "Fumbles Forced": "Forced Fumbles", "Fumbles Recovered": "Fumble Recoveries",
   "Kick Return Yards": "Kick Off Return Yards", "Kick Returns": "Kick Off Returns",
   "Kick Return TDs": "Kick Off Return TDs", "Pass Attempts": "Passing Attempts",
-  "Pass Completions": "Completetions", "Passes Defended": "Pass Break Ups",
+  "Pass Completions": "Completions", "Completetions": "Completions", "Passes Defended": "Pass Break Ups",
   "Punting Yards": "Punt Yards", "Rushing Attempts": "Rushes", "Field Goals Attempted": "Field Goals Attempts",
   "Assisted Tackles": "Assist Tackles", "Interception Yards": "Interception Return Yards",
   "Interception Return Yds": "Interception Return Yards", "Sack Yards": "Sack Yards Lost",
@@ -352,7 +352,7 @@ const MILESTONE_THRESHOLDS = {
 // Football milestone thresholds for EVERY one of the 34 stats, so the milestones tab lists them all.
 const FOOTBALL_THRESHOLDS = {
   "Games Played":[10,20,30,40], "Wins":[10,20,30,40],
-  "Completetions":[50,100,200,400], "Passing Attempts":[100,200,400,700], "Passing Yards":[500,1000,2500,5000], "Passing TDs":[10,25,50,75],
+  "Completions":[50,100,200,400], "Passing Attempts":[100,200,400,700], "Passing Yards":[500,1000,2500,5000], "Passing TDs":[10,25,50,75],
   "Rushes":[100,250,500,750], "Rushing Yards":[250,500,1000,2500], "Rushing TDs":[10,25,50],
   "Receptions":[25,50,100,150], "Receiving Yards":[250,500,1000,2000], "Receiving TDs":[5,10,25,50],
   "Total Yards":[500,1000,2500,5000], "Total TDs":[10,25,50,75],
@@ -492,7 +492,7 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
   { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
   // Football — per-game over a season AND over a career
-  { stat: "Completetions" }, { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
+  { stat: "Completions" }, { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
   { stat: "Rushes" }, { stat: "Rushing Yards" }, { stat: "Rushing TDs" },
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
@@ -1112,7 +1112,7 @@ function ImportModal({ school, onClose, onImport }) {
       example:  "Natalie Bohannon,2026,82,72,986,118,586,194,392,104,12,358,798,42,128,228,310"
     },
     football: {
-      headers: "Name,Position,Grad Year,Games Played,Wins,Completetions,Passing Attempts,Passing Yards,Passing TDs,Rushes,Rushing Yards,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Yards,Total TDs,Tackles,Solo Tackles,Assist Tackles,Sacks,Sack Yards Lost,Hurries,Interceptions,Interception Return Yards,Pass Break Ups,Forced Fumbles,Fumble Recoveries,Blocked Punts,Blocked Field Goals,Safeties,Field Goals Made,Field Goals Attempts,PAT Mades,PAT Attempts,Punts,Punt Yards,Punt Returns,Punt Return Yards,Punt Return TDs,Kick Offs,Kick Off Yards,Kick Off Returns,Kick Off Return Yards,Kick Off Return TDs,Coach Wins",
+      headers: "Name,Position,Grad Year,Games Played,Wins,Completions,Passing Attempts,Passing Yards,Passing TDs,Rushes,Rushing Yards,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Yards,Total TDs,Tackles,Solo Tackles,Assist Tackles,Sacks,Sack Yards Lost,Hurries,Interceptions,Interception Return Yards,Pass Break Ups,Forced Fumbles,Fumble Recoveries,Blocked Punts,Blocked Field Goals,Safeties,Field Goals Made,Field Goals Attempts,PAT Mades,PAT Attempts,Punts,Punt Yards,Punt Returns,Punt Return Yards,Punt Return TDs,Kick Offs,Kick Off Yards,Kick Off Returns,Kick Off Return Yards,Kick Off Return TDs,Coach Wins",
       example:  "Trenton Steeves,QB,2025,5,2,43,106,574,3,14,52,3,0,0,0,626,3,12,0,1,4,1,1,0,0,0,0,17,508,0,0,0,11,258,0,0,0,0"
     },
     soccer_girls: {
@@ -2560,7 +2560,7 @@ function ImportSeasons({ school, roster = [] }) {
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
 
-  const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Completetions") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
+  const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Completions") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
   const [filterActive, setFilterActive] = useState("all");
   const [search, setSearch] = useState("");
@@ -3451,6 +3451,7 @@ function coachHofTier(score) {
 // Player honors → HOF points (single source of truth; edit `points` to retune).
 // State-level outranks league; Player of the Year > 1st team > 2nd team > Honorable Mention.
 const PLAYER_HONORS = [
+  { kind:"team_mvp",       label:"Team MVP",                     points:5 },
   { kind:"league_poy",     label:"League Player of the Year",    points:8 },
   { kind:"all_league_1st", label:"First Team All-League",        points:5 },
   { kind:"all_league_2nd", label:"Second Team All-League",       points:3 },
@@ -4873,8 +4874,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
                   // Percentage records live inside their "made" tile (e.g. FG% under Field Goals Made)
                   const PCT_PARENT = { "Field Goal Percentage":"Field Goals Made", "Three Point Percentage":"Three Pointers Made", "Free Throw Percentage":"Free Throws Made" };
-                  // "Longest …" records live INSIDE their parent stat's tile (Longest Completion under Completetions, etc.).
-                  const LONGEST_PARENT = { "Longest Completion":"Completetions", "Longest Rush":"Rushes", "Longest Reception":"Receptions", "Longest Field Goal":"Field Goals Made", "Longest Punt":"Punts", "Longest Punt Return":"Punt Returns", "Longest Kick Off Return":"Kick Off Returns", "Longest Kick Off":"Kick Offs" };
+                  // "Longest …" records live INSIDE their parent stat's tile (Longest Completion under Completions, etc.).
+                  const LONGEST_PARENT = { "Longest Completion":"Completions", "Longest Rush":"Rushes", "Longest Reception":"Receptions", "Longest Field Goal":"Field Goals Made", "Longest Punt":"Punts", "Longest Punt Return":"Punt Returns", "Longest Kick Off Return":"Kick Off Returns", "Longest Kick Off":"Kick Offs" };
                   // Manual records (minus any hand-entered % rows) + auto-computed FG%/3P%/FT%
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
