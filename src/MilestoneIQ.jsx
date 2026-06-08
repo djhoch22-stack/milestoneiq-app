@@ -4370,7 +4370,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                         <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
                           <span style={{ fontWeight:600, color:"#111" }}>{r.statName}</span>
                           <span style={{ color:"#6b7280" }}>{r.variant}</span>
-                          <span style={{ fontWeight:700, color:"#b45309" }}>{(r.value||0).toLocaleString()} 🏆</span>
+                          <span style={{ fontWeight:700, color:"#b45309" }}>{(r.value||0).toLocaleString()} {SPORTS[s.sport]?.icon || "🏆"}</span>
                         </div>
                       ))}
                     </div>
@@ -4402,7 +4402,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                     <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
                       {secs.map(season => (
                         <div key={season.season} style={{ display:"flex", justifyContent:"space-between", background:"#f9fafb", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
-                          <span style={{ fontWeight:600, color:"#111" }}>{season.season}</span>
+                          <span style={{ fontWeight:600, color:"#111" }}>{SPORTS[s.sport]?.icon ? SPORTS[s.sport].icon + " " : ""}{season.season}</span>
                           <span style={{ color:"#6b7280" }}>{season.notes}</span>
                           <span style={{ fontWeight:700, color:"#92400e" }}>+{getSeasonSuccessScore(season.notes)}</span>
                         </div>
