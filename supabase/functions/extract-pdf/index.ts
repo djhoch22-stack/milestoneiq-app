@@ -36,9 +36,9 @@ FOOTBALL — use these EXACT stat names (the coach's set), mapping the column wi
 - Rushing section: Car→"Rushes", Yds→"Rushing Yards", TD→"Rushing TDs", Lng→"Longest Rush"
 - Receiving section: Rec→"Receptions", Yds→"Receiving Yards", TD→"Receiving TDs", Lng→"Longest Reception"
 - Total Yards section: Total→"Total Yards"
-- Tackles section: "Tot Tckls"→"Tackles" (ignore Solo, Asst, TFL)
-- Sacks section: Sacks→"Sacks" (a decimal like 1.0/3.0; ignore Ydl/Hurs)
-- Defensive section: Int→"Interceptions", PD→"Pass Break Ups", "Fmb Rec"→"Fumble Recoveries", Caus→"Forced Fumbles" (ignore Int Yds, FR Yds, Blk Pnts, Blk FGs)
+- Tackles section: "Tot Tckls"→"Tackles", Solo→"Solo Tackles", Asst→"Assist Tackles" (ignore TFL)
+- Sacks section: Sacks→"Sacks" (a decimal like 1.0/3.0), the sack yards-lost column Ydl→"Sack Yards Lost", Hurs→"Hurries"
+- Defensive section: Int→"Interceptions", the interception-return-yards column ("IR" or "Int Yds")→"Interception Return Yards", PD→"Pass Break Ups", "Fmb Rec"→"Fumble Recoveries", Caus→"Forced Fumbles", "Blk Pnts"→"Blocked Punts", "Blk FGs"→"Blocked Field Goals" (ignore FR Yds)
 - "PATs and Field Goals" section: PAT→"PAT Mades", the Att right after PAT→"PAT Attempts", FG→"Field Goals Made", the Att right after FG→"Field Goals Attempts", the FG Lng→"Longest Field Goal"
 - "Punts" section: P→"Punts", Yds→"Punt Yards", Lng→"Longest Punt"
 - "Kickoffs" section: KO→"Kick Offs", Yds→"Kick Off Yards"
