@@ -71,16 +71,16 @@ export const STAT_ORDER = [
   "Rushes","Rushing Yards","Rushing TDs",
   "Receptions","Receiving Yards","Receiving TDs",
   "Total Yards","Total TDs",
-  "Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals",
-  "Field Goals Attempts","PAT Mades","PAT Attempts",
-  "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
-  "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
+  "Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
+  "Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts",
+  "Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return",
+  "Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return",
   "All-Purpose Yards",
   "Coach Wins",
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -198,7 +198,7 @@ export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
 }
 // Football "Longest …" records (longest rush/reception/FG/punt/punt-return/kick-return) —
 // single-PLAY maxes, so the program record = MAX over every player-season (never summed).
-const LONGEST_STATS = ["Longest Completion","Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
+const LONGEST_STATS = ["Longest Completion","Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Off","Longest Kick Off Return"];
 export function longestRecordsFrom(seasonRows, sport) {
   if (sport !== "football") return [];
   const out = [];
@@ -272,7 +272,7 @@ const HOF_STAT_WEIGHTS = {
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
   "Total Tackles": 8, "Tackles": 8, "Solo Tackles": 4, "Assist Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
-  "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Total TDs": 9,
+  "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
   "Goals": 10, "Saves": 8, "Shutouts": 7, "Coach Wins": 0,
 };
 function getSeasonSuccessScore(notes) {
