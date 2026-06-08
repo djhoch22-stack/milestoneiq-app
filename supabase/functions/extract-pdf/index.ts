@@ -32,7 +32,7 @@ CRITICAL:
 
 FOOTBALL — use these EXACT stat names (the coach's set), mapping the column within each section:
 - Games Played (GP). Wins: read the team's OVERALL win total from the "Overall W-L" line near the top of the stat sheet (e.g. "Overall 4-5" → 4) and set "Wins" to that number for EVERY athlete on the sheet — there is no per-player wins column, so never leave Wins blank or guess.
-- Passing section: the COMPLETIONS column (header is "C", "Cmp", or "Comp"; if completions are shown combined as "Comp/Att" or "C-A" like 18/30, take the FIRST number as completions and the second as Passing Attempts)→"Completetions", Att→"Passing Attempts", Yds→"Passing Yards", TD→"Passing TDs", Lng→"Longest Completion" (ignore the passing Int column)
+- Passing section: the COMPLETIONS column (header is "C", "Cmp", or "Comp"; if completions are shown combined as "Comp/Att" or "C-A" like 18/30, take the FIRST number as completions and the second as Passing Attempts)→"Completions", Att→"Passing Attempts", Yds→"Passing Yards", TD→"Passing TDs", Lng→"Longest Completion" (ignore the passing Int column)
 - Rushing section: Car→"Rushes", Yds→"Rushing Yards", TD→"Rushing TDs", Lng→"Longest Rush"
 - Receiving section: Rec→"Receptions", Yds→"Receiving Yards", TD→"Receiving TDs", Lng→"Longest Reception"
 - Total Yards section: Total→"Total Yards"
