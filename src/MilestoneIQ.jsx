@@ -2482,7 +2482,10 @@ function ImportSeasons({ school, roster = [] }) {
         // Overview / Athletes / All-Time / Records / Milestones tabs (the .xlsx path already did this).
         await recomputeCareerFromSeasons(school.id);
         setBusy(false);
-        setMsg(`✓ Imported ${total} player-season rows & updated career totals${noNewStats.length ? ` (no new stats read for ${noNewStats.join(", ")} — existing stats kept)` : ""}${errs.length ? ` — ${errs.length} file issue${errs.length > 1 ? "s" : ""}: ${errs[0]}` : ""} — reload to see them.`);
+        // Flag players that came in with initials-only names (no full-name source matched) so the coach
+        // knows to upload that season's roster alongside the stats — that's what leaves abbreviated names.
+        const abbrevNames = [...new Set(seasons.flatMap(s => (bySeason[s] || []).map(p => p.player_name)).filter(n => /^[A-Za-z]\.?\s/.test(n || "")))];
+        setMsg(`✓ Imported ${total} player-season rows & updated career totals${noNewStats.length ? ` (no new stats read for ${noNewStats.join(", ")} — existing stats kept)` : ""}${errs.length ? ` — ${errs.length} file issue${errs.length > 1 ? "s" : ""}: ${errs[0]}` : ""}${abbrevNames.length ? ` — ⚠️ ${abbrevNames.length} player(s) imported with INITIALS ONLY (${abbrevNames.slice(0, 3).join(", ")}${abbrevNames.length > 3 ? "…" : ""}); upload that season's ROSTER together with the stat sheet to get full names` : ""} — reload to see them.`);
         return;
       }
       // Spreadsheet matrix (one workbook = the WHOLE history) → replace all season data.
