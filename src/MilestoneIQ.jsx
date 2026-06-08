@@ -1359,21 +1359,26 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 }
 
 // ── Add Athlete Modal ──────────────────────────────────────────────────────────
-function AddAthleteModal({ onClose, onAdd, sport }) {
+function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
   const sportDef = SPORTS[sport] || SPORTS.football;
   const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n)))];
   const [form, setForm] = useState({ name:"", position:"", gradYear: new Date().getFullYear()+2 });
   const [stats, setStats] = useState({});
+  const [err, setErr] = useState("");
+  const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const taken = new Set((existingNames || []).map(norm));
   const handleSubmit = () => {
-    if (!form.name.trim()) return;
-    onAdd({ id:`a${Date.now()}`, isActive:true, ...form, gradYear: Number(form.gradYear), stats });
+    const nm = form.name.trim();
+    if (!nm) { setErr("Enter a name."); return; }
+    if (taken.has(norm(nm))) { setErr(`"${nm}" is already in this program — open them to edit instead.`); return; }
+    onAdd({ id:`a${Date.now()}`, isActive:true, ...form, name: nm, gradYear: Number(form.gradYear), stats });
     onClose();
   };
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
       <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:500,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
-          <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Add athlete</h2>
+          <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Add player</h2>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer" }}>✕</button>
         </div>
         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16 }}>
@@ -1395,8 +1400,9 @@ function AddAthleteModal({ onClose, onAdd, sport }) {
             </div>
           ))}
         </div>
-        <button onClick={handleSubmit} style={{ marginTop:20,width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:600,fontSize:14,cursor:"pointer" }}>
-          Add athlete
+        {err && <div style={{ marginTop:14,fontSize:13,color:"#991b1b",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"8px 12px" }}>⚠️ {err}</div>}
+        <button onClick={handleSubmit} style={{ marginTop:err?12:20,width:"100%",background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontWeight:600,fontSize:14,cursor:"pointer" }}>
+          Add player
         </button>
       </div>
     </div>
@@ -1985,6 +1991,22 @@ function programRecordCount(school) {
   ];
   const manualKeys = new Set((school.records || []).map(r => r.statName + "|" + r.variant));
   return (school.records || []).length + autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)).length;
+}
+// Add a manually-created player to BOTH the all-time roster and (when active) the active roster, so they
+// show on the All-Time AND Athletes tabs. Returns the updated school, or null if the name already exists.
+function withAddedPlayer(school, a) {
+  const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const exists = [...(school.allTimeRoster || []), ...(school.athletes || [])].some(p => norm(p.name) === norm(a.name));
+  if (exists) return null;
+  const active = a.isActive !== false;
+  const ts = Date.now();
+  const allTime = { id: `t${ts}`, name: a.name, gradYear: a.gradYear || null, isActive: active, isCurrent: active, schoolHallOfFame: false, stateHallOfFame: false, stats: a.stats || {} };
+  const athlete = { id: a.id || `a${ts}`, name: a.name, position: a.position || null, gradYear: a.gradYear || null, jersey: a.jersey || null, isActive: active, stats: a.stats || {} };
+  return {
+    ...school,
+    allTimeRoster: [...(school.allTimeRoster || []), allTime],
+    athletes: active ? [...(school.athletes || []), athlete] : (school.athletes || []),
+  };
 }
 function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effectiveIsActive, rankFor }) {
   const isActive = effectiveIsActive(player);
@@ -2743,13 +2765,23 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
   const PAGE_SIZE = 25;
+  const addPlayerModal = (showAdd && school && onUpdate) ? (
+    <AddAthleteModal sport={school.sport} existingNames={[...(roster || []), ...(athletes || [])].map(p => p.name)}
+      onClose={() => setShowAdd(false)}
+      onAdd={(a) => { const upd = withAddedPlayer(school, a); if (upd) onUpdate(upd); }} />
+  ) : null;
+  const addPlayerBtn = (school && onUpdate) ? (
+    <button onClick={() => setShowAdd(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>+ Add player</button>
+  ) : null;
 
   if (!roster.length) return (
     <div>
-      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} roster={roster} /></div>}
+      {addPlayerModal}
+      {school && school.id && <div style={{ marginBottom:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center" }}><ImportSeasons school={school} roster={roster} />{addPlayerBtn}</div>}
       <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",border:"2px dashed #e5e7eb",borderRadius:12}}>
-        No all-time roster data yet — use <strong>Import season stats</strong> above to add a season's stats (or a roster) and get started.
+        No all-time roster data yet — use <strong>Import season stats</strong> above, or <strong>+ Add player</strong> to enter one by hand.
       </div>
     </div>
   );
@@ -2783,13 +2815,15 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           rankFor={rankFor}
         />
       )}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+      {addPlayerModal}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:12}}>
         <div>
           <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#111"}}>All-time program history</h2>
           <p style={{margin:"4px 0 0",fontSize:13,color:"#6b7280"}}>
             {roster.length} players · {roster.filter(p=>effectiveIsActive(p)).length} currently active · records since 1977
           </p>
         </div>
+        {addPlayerBtn}
       </div>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
         <select value={sortStat} onChange={e=>{setSortStat(e.target.value);setPage(0);}}
@@ -4761,7 +4795,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   return (
     <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
       {showImport && <ImportModal school={school} onClose={()=>setShowImport(false)} onImport={handleImport} />}
-      {showAddAthlete && <AddAthleteModal onClose={()=>setShowAddAthlete(false)} sport={school.sport} onAdd={a=>{ onUpdate({...school,athletes:[...school.athletes,a]}); }} />}
+      {showAddAthlete && <AddAthleteModal onClose={()=>setShowAddAthlete(false)} sport={school.sport} existingNames={[...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name)} onAdd={a=>{ const upd = withAddedPlayer(school, a); if (upd) onUpdate(upd); }} />}
       {showRecords && <RecordsModal school={school} onClose={()=>setShowRecords(false)} onSave={recs=>onUpdate({...school,records:recs})} />}
       {showMilestoneSettings && <MilestoneSettingsModal school={school} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
       {showEmailPreview && <EmailPreviewModal allAlerts={allAlerts} school={school} onClose={()=>setShowEmailPreview(false)} />}
@@ -4940,7 +4974,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   })}
                 </div>
                 <button onClick={()=>setShowImport(true)} style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer" }}>↑ Import</button>
-                <button onClick={()=>setShowAddAthlete(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add athlete</button>
+                <button onClick={()=>setShowAddAthlete(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add player</button>
               </div>
             </div>
             <div style={{ display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px,1fr))",gap:12 }}>
