@@ -74,6 +74,9 @@ Deno.serve(async (req) => {
         model: "claude-opus-4-8",
         max_tokens: 32000,
         thinking: { type: "adaptive" }, // multi-table stat sheets need real reasoning to map columns correctly
+        stream: true, // STREAM: a big multi-table stat sheet can take a while; streaming keeps the upstream
+                      // connection alive so the request never hits a response timeout (which surfaced as
+                      // "extract failed" and let a roster-only import slip through).
         messages: [{
           role: "user",
           content: [
@@ -83,9 +86,35 @@ Deno.serve(async (req) => {
         }],
       }),
     });
-    const data = await r.json();
-    if (data.error) return json({ error: data.error.message || "Anthropic API error" }, 502);
-    const text = (data.content || []).map((c: { text?: string }) => c.text || "").join("");
+    if (!r.ok || !r.body) {
+      const errTxt = await r.text().catch(() => "");
+      let errMsg = "Anthropic API error";
+      try { errMsg = JSON.parse(errTxt)?.error?.message || errMsg; } catch { if (errTxt) errMsg = errTxt.slice(0, 300); }
+      return json({ error: errMsg }, 502);
+    }
+    // Accumulate the streamed text deltas (Anthropic server-sent events). We only keep "text_delta"
+    // (the JSON answer) — thinking deltas are ignored. Buffering by line tolerates chunk splits.
+    let text = "";
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const evt = JSON.parse(payload);
+          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") text += evt.delta.text;
+          else if (evt.type === "error") return json({ error: evt.error?.message || "stream error" }, 502);
+        } catch { /* ignore keep-alive / non-JSON lines */ }
+      }
+    }
     let parsed: { athletes?: unknown[] };
     try {
       let t = text.replace(/```json|```/g, "").trim();
