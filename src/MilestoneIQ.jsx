@@ -2450,14 +2450,18 @@ function ImportSeasons({ school, roster = [] }) {
         // Full-name roster of everyone already in the program (all-time + active), so abbreviated stat-sheet
         // names ("T. Kastens") resolve to the existing player ("Tate Kastens") instead of duplicating them.
         const programNames = [...new Set([...(roster || []), ...(school.athletes || [])].map((p) => p.name).filter(Boolean))];
+        // EVERY name seen anywhere in THIS upload (all files + all seasons). Resolving against this — not
+        // just the current season — means a full name on the roster fixes abbreviated stat-sheet names even
+        // when the roster and the stat sheet parsed into DIFFERENT season buckets (e.g. different filenames).
+        // This is the key to a roster+stats upload never leaving "J. Lastname" behind, for every sport.
+        const allUploadNames = [...new Set(Object.values(rawBySeason).flat().map((a) => a.name).filter(Boolean))];
         const bySeason = {};
         const noNewStats = []; // seasons this upload added no new stats to (just names) — for the notice
         for (const s of seasons) {
-          // Resolve against BOTH the program AND this upload's own roster names, then dedupe — so the
-          // roster's full name lands on the player even if reconcile couldn't pair it by jersey, and a
-          // player is never written twice. Independent of which file (roster vs stats) is read first.
-          const uploadNames = (rawBySeason[s] || []).map((a) => a.name).filter(Boolean);
-          const fresh = dedupeFreshByName(resolveNamesAgainstProgram(reconcileSeasonAthletes(rawBySeason[s]), [...programNames, ...uploadNames]));
+          // Resolve against the program AND every name in this whole upload, then dedupe — so the roster's
+          // full name lands on the player even if reconcile couldn't pair it by jersey or the roster parsed
+          // into a different season bucket, and a player is never written twice. Order-independent.
+          const fresh = dedupeFreshByName(resolveNamesAgainstProgram(reconcileSeasonAthletes(rawBySeason[s]), [...programNames, ...allUploadNames]));
           // MERGE into what's already stored for the season (never blind-replace). New stats win on
           // conflict; any stored stat or player the upload didn't include is KEPT — so a roster-only or
           // failed-stat upload can't erase a season; empty new stats just leave the stored ones intact.
