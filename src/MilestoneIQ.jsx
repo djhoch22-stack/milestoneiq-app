@@ -214,9 +214,9 @@ const STAT_ORDER = [
   "Three Pointers Made","Three Pointers Attempted",
   "Free Throws Made","Free Throws Attempted",
   // Football (canonical order; "Field Goals Made" is shared with basketball above, so it is not repeated)
-  "Completetions","Passing Attempts","Passing Yards","Passing TDs",
-  "Rushes","Rushing Yards","Rushing TDs",
-  "Receptions","Receiving Yards","Receiving TDs",
+  "Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion",
+  "Rushes","Rushing Yards","Rushing TDs","Longest Rush",
+  "Receptions","Receiving Yards","Receiving TDs","Longest Reception",
   "Total Yards","Total TDs",
   "Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries",
   "Field Goals Attempts","PAT Mades","PAT Attempts",
@@ -227,7 +227,7 @@ const STAT_ORDER = [
 ];
 
 // Football: the exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
@@ -280,8 +280,9 @@ function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap(p => Object.keys(p.stats || {})))]
     .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
-  // "Longest …" stats are single-play maxes shown only as records, never as summed columns.
-  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s)).sort((a, b) => byStatOrder(a, b, sport));
+  // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
+  // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
+  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s) || base.includes(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
@@ -1813,7 +1814,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
         season: String(row.season).trim(), grade: row.grade ? String(row.grade).trim() : null, stats,
       });
       if (error) { setBusy(false); setErr(`Couldn't save ${row.season}: ${error.message || error}`); return; }
-      for (const k in stats) career[k] = (career[k] || 0) + stats[k];
+      for (const k in stats) career[k] = /^Longest /.test(k) ? Math.max(career[k] || 0, stats[k]) : (career[k] || 0) + stats[k];
     }
     setBusy(false); setEditing(false); load();
     // Roll the edited seasons into the player's career so their all-time rank + totals refresh
@@ -1824,7 +1825,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" };
   const td = { textAlign: "right", padding: "6px 8px", fontSize: 13, color: "#111", whiteSpace: "nowrap" };
   const inp = { width: 58, border: "1px solid #d1d5db", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" };
-  const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0);
+  const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (/^Longest /.test(c) ? (rows || []).reduce((m, r) => Math.max(m, Number(r.stats?.[c]) || 0), 0) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0));
   // Derived columns — shooting % (made÷att) and per-game (stat÷GP) — computed, shown only
   // when the program tracks the inputs so other sports stay unaffected.
   const pctCols = PCT_DEFS.filter((d) => careerOf(d.att) > 0 || (rows || []).some((r) => Number(r.stats?.[d.att]) > 0));
@@ -4757,7 +4758,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...longestRecordsFrom(allSeasonRows, school.sport),
-                    ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
+                    ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s)), school.sport),
                     ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
                   ];
                   // Manual records are AUTHORITATIVE: a manually entered/edited record overrides the
