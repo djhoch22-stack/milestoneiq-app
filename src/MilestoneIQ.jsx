@@ -2288,6 +2288,24 @@ function reconcileSeasonAthletes(athletes) {
     const cand = numbered[lastInit(a.name)];
     add(cand && cand.size === 1 ? [...cand][0] : lastInit(a.name), a);
   }
+  // Pass 3: the SAME player can carry DIFFERENT jersey numbers on the roster vs the stat sheet (uniform
+  // change, or a misread number), leaving a full-name group AND an abbreviated group for one last+initial.
+  // When exactly ONE of them is a full name, fold the abbreviated one(s) into it — so the roster's full
+  // name and the stat sheet's numbers land on a single player instead of duplicating. Two full names that
+  // share a last+initial are siblings, so they're left separate.
+  const isFullName = (k) => { const p = norm(groups[k] ? groups[k].player_name : ""); return !!(p[0] && p[0].length > 1); };
+  for (const li in numbered) {
+    const keys = [...numbered[li]].filter((k) => groups[k]);
+    if (keys.length < 2) continue;
+    const fulls = keys.filter(isFullName);
+    if (fulls.length !== 1) continue;
+    const target = fulls[0];
+    for (const k of keys) {
+      if (k === target || isFullName(k)) continue;
+      Object.assign(groups[target].stats, groups[k].stats);
+      delete groups[k];
+    }
+  }
   return Object.values(groups).map((g) => ({ player_name: g.player_name, stats: g.stats }));
 }
 // Merge freshly-extracted season rows INTO the rows already stored for that season. New stats win on
