@@ -1104,7 +1104,10 @@ begin
   drop table if exists _pc;
   create temp table _pc as
   with kv as (
-    select lower(ps.player_name) lname, e.key, sum((e.value)::numeric) val
+    select lower(ps.player_name) lname, e.key,
+           -- "Longest …" stats (longest rush/reception/completion/punt/etc.) are single-play maxes:
+           -- a CAREER longest is the MAX across seasons, never the SUM. Everything else sums.
+           case when e.key like 'Longest %' then max((e.value)::numeric) else sum((e.value)::numeric) end val
     from public.player_seasons ps, jsonb_each_text(ps.stats) e
     where ps.program_id = p_program and e.value ~ '^-?[0-9]+(\.[0-9]+)?$'
     group by lower(ps.player_name), e.key
