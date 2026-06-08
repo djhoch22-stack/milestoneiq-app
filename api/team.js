@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     ...pctRecordsFrom(seasonRows, careerPool, team.sport),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
     ...longestRecordsFrom(seasonRows, team.sport),
-    ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport), team.sport),
+    ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport).filter(s => !/^Longest /.test(s)), team.sport),
     ...coachWinsRecordsFrom(seasonsList, team.sport, team.coach_prior || {}),
   ];
   // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
