@@ -114,7 +114,8 @@ export function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap((p) => Object.keys(p.stats || {})))]
     .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
-  return [...new Set([...base, ...present])].sort((a, b) => byStatOrder(a, b, sport));
+  // "Longest …" stats are single-play maxes shown only as records, never as summed columns.
+  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
@@ -158,7 +159,7 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
   { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
   // Football — per-game over a season AND over a career
-  { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
+  { stat: "Completetions" }, { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
   { stat: "Rushes" }, { stat: "Rushing Yards" }, { stat: "Rushing TDs" },
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
@@ -191,6 +192,22 @@ export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
       if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: "Per game avg (career)", sport, ...car });
+  }
+  return out;
+}
+// Football "Longest …" records (longest rush/reception/FG/punt/punt-return/kick-return) —
+// single-PLAY maxes, so the program record = MAX over every player-season (never summed).
+const LONGEST_STATS = ["Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
+export function longestRecordsFrom(seasonRows, sport) {
+  if (sport !== "football") return [];
+  const out = [];
+  for (const stat of LONGEST_STATS) {
+    let best = null;
+    for (const r of (seasonRows || [])) {
+      const v = Number(r.stats?.[stat]);
+      if (!isNaN(v) && v > 0 && (!best || v > best.value)) best = { value: v, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Single game", sport, ...best });
   }
   return out;
 }
