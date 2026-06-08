@@ -55,6 +55,7 @@ const SPORTS = {
         { name: "Passing Attempts", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Passing TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Completion", variants: ["Single game"] },
       ]},
       { group: "Rushing", stats: [
         { name: "Rushes", variants: STAT_VARIANTS_STANDARD },
@@ -515,7 +516,7 @@ function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
 // Football "Longest …" records (longest rush / reception / field goal / punt / punt-return /
 // kick-return). These are single-PLAY maxes, so the program record = the MAX over every
 // player-season (NOT summed). Source is the season rows; the holder is that player+year.
-const LONGEST_STATS = ["Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
+const LONGEST_STATS = ["Longest Completion","Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
 function longestRecordsFrom(seasonRows, sport) {
   if (sport !== "football") return [];
   const out = [];
