@@ -8,8 +8,8 @@
 // Deploy:  supabase functions deploy extract-pdf --no-verify-jwt
 //   Verify JWT OFF (browser CORS preflight carries no JWT; we validate inside).
 //   Secret required: ANTHROPIC_API_KEY (an Anthropic API key — console.anthropic.com).
-//   Model: claude-opus-4-8. To cut cost, swap to "claude-haiku-4-5" or
-//   "claude-sonnet-4-6" below (less accurate on messy stat sheets).
+//   Model: claude-sonnet-4-6 (fast — fits the edge-function time limit on big multi-table sheets).
+//   For max accuracy on messy sheets, switch to "claude-opus-4-8" + thinking:{type:"adaptive"} below.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
@@ -71,12 +71,16 @@ Deno.serve(async (req) => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-8",
+        model: "claude-sonnet-4-6", // FAST — a big multi-table sheet finishes well within the edge-function
+                                     // time limit. Opus timed out, then (with streaming) over-thought until
+                                     // the JSON answer got truncated and stats came back empty.
         max_tokens: 32000,
-        thinking: { type: "adaptive" }, // multi-table stat sheets need real reasoning to map columns correctly
-        stream: true, // STREAM: a big multi-table stat sheet can take a while; streaming keeps the upstream
-                      // connection alive so the request never hits a response timeout (which surfaced as
-                      // "extract failed" and let a roster-only import slip through).
+        // Thinking OFF: the per-column mapping below is fully explicit, so no reasoning phase is needed —
+        // the whole budget + time goes to the JSON answer. Re-enable adaptive thinking (prefer opus) only
+        // if column mapping ever regresses.
+        thinking: { type: "disabled" },
+        stream: true, // STREAM: keeps the upstream connection alive so a long read can't hit a response
+                      // timeout (which had surfaced as "extract failed" and let a roster-only import slip in).
         messages: [{
           role: "user",
           content: [
@@ -94,7 +98,7 @@ Deno.serve(async (req) => {
     }
     // Accumulate the streamed text deltas (Anthropic server-sent events). We only keep "text_delta"
     // (the JSON answer) — thinking deltas are ignored. Buffering by line tolerates chunk splits.
-    let text = "";
+    let text = "", stopReason = "";
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
@@ -111,20 +115,27 @@ Deno.serve(async (req) => {
         try {
           const evt = JSON.parse(payload);
           if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") text += evt.delta.text;
+          else if (evt.type === "message_delta" && evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
           else if (evt.type === "error") return json({ error: evt.error?.message || "stream error" }, 502);
         } catch { /* ignore keep-alive / non-JSON lines */ }
       }
     }
-    let parsed: { athletes?: unknown[] };
+    let parsed: { athletes?: any[] };
     try {
       let t = text.replace(/```json|```/g, "").trim();
       const a = t.indexOf("{"), b = t.lastIndexOf("}"); // tolerate any preamble/notes around the JSON
       if (a >= 0 && b > a) t = t.slice(a, b + 1);
       parsed = JSON.parse(t);
     } catch {
-      return json({ error: "Could not parse the model's output as JSON" }, 502);
+      return json({ error: `Could not parse the model's output as JSON (stop_reason: ${stopReason || "?"}). Output started: ${text.slice(0, 300)}` }, 502);
     }
-    return json({ athletes: parsed.athletes || [] });
+    const athletes = parsed.athletes || [];
+    // Surface "no stats" instead of silently importing empty rows — that's how a truncated / over-thought
+    // response showed up as "none of the stats made it through."
+    const withStats = athletes.filter((a: any) => a && a.stats && Object.keys(a.stats).length > 0).length;
+    if (athletes.length > 0 && withStats === 0)
+      return json({ error: `read ${athletes.length} players but 0 had stats (stop_reason: ${stopReason || "?"}). Output started: ${text.slice(0, 300)}` }, 502);
+    return json({ athletes });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
