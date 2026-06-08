@@ -288,6 +288,9 @@ const DISPLAY_STATS = {
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY,
 };
+// Every canonical display stat across all sports — lets the season importer accept a tab named with
+// the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
+const ALL_DISPLAY_STATS = new Set(Object.values(DISPLAY_STATS).flat());
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
 // data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
 function statsToDisplay(roster, sport) {
@@ -2178,7 +2181,10 @@ function parseSeasonsWorkbook(XLSX, buf) {
   const wb = XLSX.read(buf, { type: "array" });
   const byPS = {};
   for (const sheetName of wb.SheetNames) {
-    const stat = SEASON_STAT_MAP[String(sheetName).trim()];
+    const raw = String(sheetName).trim();
+    // Short-name map first (Games→Games Played…); else accept a full canonical category name so the
+    // football template (tabs named "Rushing Yards", "Tackles", …) round-trips on re-upload.
+    const stat = SEASON_STAT_MAP[raw] || (ALL_DISPLAY_STATS.has(raw) ? raw : null);
     if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false });
     if (!grid.length) continue;
@@ -2527,11 +2533,13 @@ function ImportSeasons({ school, roster = [] }) {
       const endStart = Math.max(curAcadStart, ...(seasonStarts.length ? seasonStarts : [curAcadStart]));
       const cols = [];
       for (let y = 1964; y <= endStart; y++) cols.push(`${y}-${y + 1}`);
-      // Stats/tabs for this sport (soccer → Games/Wins/Points/Goals/Assists/Shots/Saves/SOs).
-      const stats = TEMPLATE_STATS[school.sport] || [...new Set(Object.values(SEASON_STAT_MAP))];
+      // One tab per stat. Sports with a curated short-tab list use it; otherwise (football) use the
+      // EXACT categories shown on the All-Time tab — statsToDisplay() — so every category gets a tab.
+      const stats = TEMPLATE_STATS[school.sport] || statsToDisplay(roster, school.sport);
       const wb = new ExcelJS.Workbook();
       for (const stat of stats) {
-        const sheetName = SHEET_FOR_STAT[stat] || stat;
+        // Football: full category name as the tab (matches All-Time labels); other sports keep short names.
+        const sheetName = school.sport === "football" ? stat : (SHEET_FOR_STAT[stat] || stat);
         const ws = wb.addWorksheet(sheetName, { views: [{ state: "frozen", xSplit: 1, ySplit: 1 }] }); // freeze col A + row 1
         const header = ws.addRow([stat, ...cols]); // A1 = stat label; B1.. = seasons; names go in A2+
         header.font = { bold: true };
