@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
@@ -1946,6 +1946,46 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   );
 }
 
+// ── Program tile metrics — ONE source of truth so the home cards, the Overview tiles, the program header,
+//    and the nav all show the SAME numbers. ─────────────────────────────────────────────────────────────
+// Active-roster milestone alerts. Milestones track CAREER totals, so each active athlete is enriched with
+// their all-time career stats before checking (the raw athletes-table stats undercount); dismissed alerts
+// are dropped. Mirrors the Alerts/Overview logic exactly so every surface agrees.
+function activeAlerts(school) {
+  const careerByName = {};
+  (school.allTimeRoster || []).forEach(p => { if (p && p.name) careerByName[p.name.toLowerCase().trim()] = p.stats; });
+  const dismissed = new Set(school.dismissedAlerts || []);
+  return (school.athletes || [])
+    .filter(a => a.isActive !== false)
+    .map(a => {
+      const cs = careerByName[(a.name || "").toLowerCase().trim()];
+      const athlete = cs ? { ...a, stats: cs } : a;
+      const alerts = getMilestoneAlerts(athlete, school.records || [], school.milestones || [], school.sport)
+        .filter(al => !dismissed.has(`${a.id}|${al.statName}|${al.target}`));
+      return { athlete, alerts };
+    })
+    .filter(x => x.alerts.length > 0);
+}
+function activeAlertCount(school) { return activeAlerts(school).reduce((n, x) => n + x.alerts.length, 0); }
+// Inducted Hall-of-Fame members (school or state).
+function hofMemberCount(school) { return (school.allTimeRoster || []).filter(p => p.schoolHallOfFame || p.stateHallOfFame).length; }
+// Total records a program shows on the Records tab = stored records + every auto-computed record
+// (career / single-season / per-game / % / longest / coach-wins), minus auto rows a manual record overrides.
+// Needs the program's season rows in school.allSeasonRows; with none it still counts career/coach records.
+function programRecordCount(school) {
+  const seasonRows = school.allSeasonRows || [];
+  const recPool = [...(school.athletes || []), ...(school.allTimeRoster || [])];
+  const statNames = statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s));
+  const autoRecs = [
+    ...pctRecordsFrom(seasonRows, recPool, school.sport),
+    ...pergameRecordsFrom(seasonRows, recPool, school.sport),
+    ...longestRecordsFrom(seasonRows, school.sport),
+    ...autoStatRecords(seasonRows, (school.allTimeRoster || []), statNames, school.sport),
+    ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
+  ];
+  const manualKeys = new Set((school.records || []).map(r => r.statName + "|" + r.variant));
+  return (school.records || []).length + autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)).length;
+}
 function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effectiveIsActive, rankFor }) {
   const isActive = effectiveIsActive(player);
   const canManage = !!(school && school.id);
@@ -4629,6 +4669,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
     getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows(data || []); });
     return () => { alive = false; };
   }, [school.id]);
+  // Full record total (auto + stored) for the header & Overview tile — memoized so it isn't recomputed
+  // on every render (it builds the whole Records-tab record set).
+  const recordTotal = useMemo(() => programRecordCount({ ...school, allSeasonRows }), [school, allSeasonRows]);
   const dismissedSet = new Set(school.dismissedAlerts || []);
 
   const dismissAlert = (athleteId, statName, target) => {
@@ -4733,7 +4776,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             }
             <div>
               <h1 style={{ margin:0,fontSize: isMobile ? 17 : 20,fontWeight:700,color:"#111" }}>{school.name}</h1>
-              <div style={{ fontSize: isMobile ? 11 : 13,color:"#6b7280" }}>{school.mascot} · {sport.label} · {school.athletes.filter(a=>a.isActive!==false).length} athletes · {(school.records||[]).length} records on file</div>
+              <div style={{ fontSize: isMobile ? 11 : 13,color:"#6b7280" }}>{school.mascot} · {sport.label} · {school.athletes.filter(a=>a.isActive!==false).length} athletes · {recordTotal} records on file</div>
             </div>
           </div>
           <div style={{ display:"flex",gap:8 }}>
@@ -4810,7 +4853,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               </div>
             )}
             <div style={{ display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",gap:12,marginBottom:20 }}>
-              {[["Athletes",school.athletes.filter(a=>a.isActive!==false).length,"👤"],["Active alerts",totalAlertCount,"🎯"],["Records on file",(school.records||[]).length,"📋"],["Sport",sport.label.split(" ")[0],sport.icon]].map(([label,val,icon])=>(
+              {[["Athletes",school.athletes.filter(a=>a.isActive!==false).length,"👤"],["Active alerts",totalAlertCount,"🎯"],["Records on file",recordTotal,"📋"],["Sport",sport.label.split(" ")[0],sport.icon]].map(([label,val,icon])=>(
                 <div key={label} style={{ background:"#fff",borderRadius:12,padding:"16px 20px",border:"1px solid #e8e4dd" }}>
                   <div style={{ fontSize:22,marginBottom:4 }}>{icon}</div>
                   <div style={{ fontSize:26,fontWeight:700,color:"#111" }}>{val}</div>
@@ -5610,6 +5653,48 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     if (sc) setActiveSchool(sc);
   }, [schools, activeSchool]);
 
+  // Accurate "records" count for the home tiles = the FULL Records-tab total (auto + stored). The home
+  // page doesn't carry season rows, so fetch them per program once and compute the count; until the fetch
+  // lands we show the stored-record count. Refetches when the set of programs changes (and on reload).
+  const [recordCounts, setRecordCounts] = useState({});
+  const schoolIdsKey = schools.map(s => s.id).join(",");
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all((schools || []).map(async (sc) => {
+        if (!sc.id) return [sc.id, (sc.records || []).length];
+        try { const { data } = await getAllPlayerSeasons(sc.id); return [sc.id, programRecordCount({ ...sc, allSeasonRows: data || [] })]; }
+        catch { return [sc.id, (sc.records || []).length]; }
+      }));
+      if (!cancelled) setRecordCounts(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [schoolIdsKey, authed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Per-USER program order for the home page (drag to reorder). Saved in THIS browser keyed by user id, so
+  // each admin gets their own order — one user's reordering never changes another's view. New programs append.
+  const orderKey = `mq_program_order_${userId || "anon"}`;
+  const [programOrder, setProgramOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(orderKey) || "[]"); } catch (e) { return []; }
+  });
+  const orderedSchools = useMemo(() => {
+    if (!programOrder.length) return schools;
+    const idx = new Map(programOrder.map((id, i) => [String(id), i]));
+    return [...schools].sort((a, b) => (idx.has(String(a.id)) ? idx.get(String(a.id)) : 1e9) - (idx.has(String(b.id)) ? idx.get(String(b.id)) : 1e9));
+  }, [schools, programOrder]);
+  const dragId = useRef(null);
+  const reorderTo = (targetId) => {
+    const from = dragId.current; dragId.current = null;
+    if (from == null || from === targetId) return;
+    const ids = orderedSchools.map(s => s.id);
+    const fromIdx = ids.indexOf(from), toIdx = ids.indexOf(targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
+    setProgramOrder(ids);
+    try { localStorage.setItem(orderKey, JSON.stringify(ids)); } catch (e) {}
+  };
+
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -5636,15 +5721,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} />;
   }
 
-  const totalAlerts = schools.reduce((acc,sc) => {
-    const dismissed = new Set(sc.dismissedAlerts || []);
-    return acc + sc.athletes
-      .filter(a => a.isActive !== false)
-      .reduce((a, athlete) =>
-        a + getMilestoneAlerts(athlete, sc.records||[], sc.milestones||[], sc.sport)
-          .filter(al => !dismissed.has(`${athlete.id}|${al.statName}|${al.target}`)).length
-      , 0);
-  }, 0);
+  const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc), 0);
 
   // ── Settings page ─────────────────────────────────────────────────────────
   const SettingsPage = () => {
@@ -5866,15 +5943,9 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
           )}
 
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14 }}>
-            {schools.map(school=>{
+            {orderedSchools.map(school=>{
               const sport = SPORTS[school.sport]||SPORTS.football;
-              const dismissed = new Set(school.dismissedAlerts || []);
-              const alerts = school.athletes
-                .filter(a => a.isActive !== false)
-                .reduce((a,athlete) =>
-                  a + getMilestoneAlerts(athlete,school.records||[],school.milestones||[],school.sport)
-                    .filter(al => !dismissed.has(`${athlete.id}|${al.statName}|${al.target}`)).length
-                , 0);
+              const alerts = activeAlertCount(school);
               const topAthlete = [...school.athletes].filter(a=>a.isActive!==false).sort((a,b)=>{
                 const at=Object.values(a.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
                 const bt=Object.values(b.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
@@ -5882,6 +5953,8 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
               })[0];
               return (
                 <div key={school.id} onClick={()=>setActiveSchool(school)}
+                  onDragOver={(e)=>{ if (dragId.current && dragId.current !== school.id) e.preventDefault(); }}
+                  onDrop={()=>reorderTo(school.id)}
                   style={{ background:"#fff",borderRadius:14,border:"1px solid #e8e4dd",overflow:"hidden",cursor:"pointer",transition:"transform 0.15s" }}
                   onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
                   onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
@@ -5897,12 +5970,19 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                         <div style={{ color:"rgba(255,255,255,0.7)",fontSize:12 }}>{school.mascot.replace(/\s*\(.*?\)/g,"")}</div>
                       </div>
                     </div>
-                    {alerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:12,padding:"4px 10px",fontSize:13,fontWeight:700 }}>🔔 {alerts}</div>}
+                    <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                      {alerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:12,padding:"4px 10px",fontSize:13,fontWeight:700 }}>🔔 {alerts}</div>}
+                      {orderedSchools.length>1 && (
+                        <span draggable onDragStart={()=>{ dragId.current=school.id; }} onClick={(e)=>e.stopPropagation()}
+                          title="Drag to reorder your programs"
+                          style={{ cursor:"grab",color:"rgba(255,255,255,0.65)",fontSize:18,lineHeight:1,userSelect:"none",padding:"0 2px" }}>⠿</span>
+                      )}
+                    </div>
                   </div>
                   <div style={{ padding:16 }}>
                     <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12 }}>
                       {[[school.athletes.filter(a=>a.isActive!==false).length,"athletes"],
-                    [(school.allTimeRoster||[]).filter(p=>p.schoolHallOfFame||p.stateHallOfFame).length||null,"HOF"],[alerts,"alerts"],[(school.records||[]).length,"records"]].map(([v,l])=>(
+                    [hofMemberCount(school),"HOF"],[alerts,"alerts"],[recordCounts[school.id] ?? (school.records||[]).length,"records"]].map(([v,l])=>(
                         <div key={l} style={{ textAlign:"center",background:"#f9fafb",borderRadius:8,padding:"8px 4px" }}>
                           <div style={{ fontWeight:700,fontSize:18,color:"#111" }}>{v}</div>
                           <div style={{ fontSize:11,color:"#9ca3af" }}>{l}</div>
