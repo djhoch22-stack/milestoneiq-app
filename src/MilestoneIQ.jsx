@@ -75,11 +75,18 @@ const SPORTS = {
       ]},
       { group: "Defense", stats: [
         { name: "Tackles", variants: STAT_VARIANTS_STANDARD },
+        { name: "Solo Tackles", variants: STAT_VARIANTS_STANDARD },
+        { name: "Assist Tackles", variants: STAT_VARIANTS_STANDARD },
         { name: "Sacks", variants: STAT_VARIANTS_STANDARD },
+        { name: "Sack Yards Lost", variants: STAT_VARIANTS_STANDARD },
+        { name: "Hurries", variants: STAT_VARIANTS_STANDARD },
         { name: "Interceptions", variants: STAT_VARIANTS_STANDARD },
+        { name: "Interception Return Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Pass Break Ups", variants: STAT_VARIANTS_STANDARD },
         { name: "Forced Fumbles", variants: STAT_VARIANTS_STANDARD },
         { name: "Fumble Recoveries", variants: STAT_VARIANTS_STANDARD },
+        { name: "Blocked Punts", variants: STAT_VARIANTS_STANDARD },
+        { name: "Blocked Field Goals", variants: STAT_VARIANTS_STANDARD },
       ]},
       { group: "Kicking", stats: [
         { name: "Field Goals Made", variants: STAT_VARIANTS_STANDARD },
@@ -218,7 +225,7 @@ const STAT_ORDER = [
   "Rushes","Rushing Yards","Rushing TDs","Longest Rush",
   "Receptions","Receiving Yards","Receiving TDs","Longest Reception",
   "Total Yards","Total TDs",
-  "Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries",
+  "Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals",
   "Field Goals Attempts","PAT Mades","PAT Attempts",
   "Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs",
   "Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs",
@@ -227,7 +234,7 @@ const STAT_ORDER = [
 ];
 
 // Football: the exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
@@ -241,6 +248,9 @@ const FB_STAT_RENAME = {
   "Kick Return TDs": "Kick Off Return TDs", "Pass Attempts": "Passing Attempts",
   "Pass Completions": "Completetions", "Passes Defended": "Pass Break Ups",
   "Punting Yards": "Punt Yards", "Rushing Attempts": "Rushes", "Field Goals Attempted": "Field Goals Attempts",
+  "Assisted Tackles": "Assist Tackles", "Interception Yards": "Interception Return Yards",
+  "Interception Return Yds": "Interception Return Yards", "Sack Yards": "Sack Yards Lost",
+  "Blocked Punt": "Blocked Punts", "Blocked Field Goal": "Blocked Field Goals", "Hurry": "Hurries",
 };
 const fixFbStat = (sport, n) => (sport === "football" ? (FB_STAT_RENAME[n] || n) : n);
 
@@ -342,8 +352,11 @@ const FOOTBALL_THRESHOLDS = {
   "Rushes":[100,250,500,750], "Rushing Yards":[250,500,1000,2500], "Rushing TDs":[10,25,50],
   "Receptions":[25,50,100,150], "Receiving Yards":[250,500,1000,2000], "Receiving TDs":[5,10,25,50],
   "Total Yards":[500,1000,2500,5000], "Total TDs":[10,25,50,75],
-  "Tackles":[50,100,200,300], "Sacks":[5,10,20,30], "Interceptions":[3,5,10,15], "Pass Break Ups":[5,10,20,30],
+  "Tackles":[50,100,200,300], "Solo Tackles":[25,50,100,150], "Assist Tackles":[15,30,60,100],
+  "Sacks":[5,10,20,30], "Sack Yards Lost":[25,50,100,150], "Hurries":[5,10,20,30],
+  "Interceptions":[3,5,10,15], "Interception Return Yards":[25,50,100,200], "Pass Break Ups":[5,10,20,30],
   "Forced Fumbles":[3,5,10,15], "Fumble Recoveries":[3,5,10,15],
+  "Blocked Punts":[1,2,3,5], "Blocked Field Goals":[1,2,3,5],
   "Field Goals Made":[5,10,25,50], "Field Goals Attempts":[10,25,50,75], "PAT Mades":[25,50,100,150], "PAT Attempts":[25,50,100,150],
   "Punts":[25,50,100,150], "Punt Yards":[500,1000,2500,5000],
   "Punt Returns":[10,25,50,75], "Punt Return Yards":[100,250,500,1000], "Punt Return TDs":[1,3,5,10],
@@ -1095,7 +1108,7 @@ function ImportModal({ school, onClose, onImport }) {
       example:  "Natalie Bohannon,2026,82,72,986,118,586,194,392,104,12,358,798,42,128,228,310"
     },
     football: {
-      headers: "Name,Position,Grad Year,Games Played,Wins,Completetions,Passing Attempts,Passing Yards,Passing TDs,Rushes,Rushing Yards,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Yards,Total TDs,Tackles,Sacks,Interceptions,Pass Break Ups,Forced Fumbles,Fumble Recoveries,Field Goals Made,Field Goals Attempts,PAT Mades,PAT Attempts,Punts,Punt Yards,Punt Returns,Punt Return Yards,Punt Return TDs,Kick Offs,Kick Off Yards,Kick Off Returns,Kick Off Return Yards,Kick Off Return TDs,Coach Wins",
+      headers: "Name,Position,Grad Year,Games Played,Wins,Completetions,Passing Attempts,Passing Yards,Passing TDs,Rushes,Rushing Yards,Rushing TDs,Receptions,Receiving Yards,Receiving TDs,Total Yards,Total TDs,Tackles,Solo Tackles,Assist Tackles,Sacks,Sack Yards Lost,Hurries,Interceptions,Interception Return Yards,Pass Break Ups,Forced Fumbles,Fumble Recoveries,Blocked Punts,Blocked Field Goals,Field Goals Made,Field Goals Attempts,PAT Mades,PAT Attempts,Punts,Punt Yards,Punt Returns,Punt Return Yards,Punt Return TDs,Kick Offs,Kick Off Yards,Kick Off Returns,Kick Off Return Yards,Kick Off Return TDs,Coach Wins",
       example:  "Trenton Steeves,QB,2025,5,2,43,106,574,3,14,52,3,0,0,0,626,3,12,0,1,4,1,1,0,0,0,0,17,508,0,0,0,11,258,0,0,0,0"
     },
     soccer_girls: {
@@ -3065,8 +3078,16 @@ const HOF_STAT_WEIGHTS = {
   "Receiving Yards":          10,
   "Receiving TDs":             9,
   "Total Tackles":             8,
+  "Tackles":                   8,
+  "Solo Tackles":              4,
+  "Assist Tackles":            2,
   "Sacks":                     8,
+  "Sack Yards Lost":           2,
+  "Hurries":                   3,
   "Interceptions":             7,
+  "Interception Return Yards": 3,
+  "Blocked Punts":             5,
+  "Blocked Field Goals":       5,
   "Total TDs":                 9,
   // Soccer
   "Goals":                    10,
