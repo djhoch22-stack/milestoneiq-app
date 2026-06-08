@@ -184,6 +184,8 @@ alter table public.seasons           add column if not exists league_losses int;
 alter table public.seasons           add column if not exists coach text;
 alter table public.seasons           add column if not exists notes text;
 alter table public.seasons           add column if not exists win_pct numeric;
+alter table public.seasons           add column if not exists ties int;
+alter table public.seasons           add column if not exists league_ties int;
 
 alter table public.subscriptions     add column if not exists status text;
 alter table public.subscriptions     add column if not exists stripe_customer_id text;
