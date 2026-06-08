@@ -60,11 +60,13 @@ const SPORTS = {
         { name: "Rushes", variants: STAT_VARIANTS_STANDARD },
         { name: "Rushing Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Rushing TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Rush", variants: ["Single game"] },
       ]},
       { group: "Receiving", stats: [
         { name: "Receptions", variants: STAT_VARIANTS_STANDARD },
         { name: "Receiving Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Receiving TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Reception", variants: ["Single game"] },
       ]},
       { group: "Offense", stats: [
         { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
@@ -83,15 +85,18 @@ const SPORTS = {
         { name: "Field Goals Attempts", variants: STAT_VARIANTS_STANDARD },
         { name: "PAT Mades", variants: STAT_VARIANTS_STANDARD },
         { name: "PAT Attempts", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Field Goal", variants: ["Single game"] },
       ]},
       { group: "Punting", stats: [
         { name: "Punts", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Yards", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Punt", variants: ["Single game"] },
       ]},
       { group: "Punt Returns", stats: [
         { name: "Punt Returns", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Return Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Punt Return TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Punt Return", variants: ["Single game"] },
       ]},
       { group: "Kickoffs", stats: [
         { name: "Kick Offs", variants: STAT_VARIANTS_STANDARD },
@@ -101,6 +106,7 @@ const SPORTS = {
         { name: "Kick Off Returns", variants: STAT_VARIANTS_STANDARD },
         { name: "Kick Off Return Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Kick Off Return TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "Longest Kick Return", variants: ["Single game"] },
       ]},
       { group: "Coaching", stats: [
         { name: "Coach Wins", variants: ["Career total","Single season"] },
@@ -273,7 +279,8 @@ function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap(p => Object.keys(p.stats || {})))]
     .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
-  return [...new Set([...base, ...present])].sort((a, b) => byStatOrder(a, b, sport));
+  // "Longest …" stats are single-play maxes shown only as records, never as summed columns.
+  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
@@ -466,7 +473,7 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Total Rebounds" }, { stat: "Offensive Rebounds" }, { stat: "Defensive Rebounds" }, { stat: "Steals" }, { stat: "Blocks" },
   { stat: "Field Goals Made" }, { stat: "Field Goals Attempted" }, { stat: "Three Pointers Made" }, { stat: "Three Pointers Attempted" }, { stat: "Free Throws Made" }, { stat: "Free Throws Attempted" },
   // Football — per-game over a season AND over a career
-  { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
+  { stat: "Completetions" }, { stat: "Passing Attempts" }, { stat: "Passing Yards" }, { stat: "Passing TDs" },
   { stat: "Rushes" }, { stat: "Rushing Yards" }, { stat: "Rushing TDs" },
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
@@ -502,6 +509,23 @@ function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
       if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: "Per game avg (career)", sport, auto: true, ...car });
+  }
+  return out;
+}
+// Football "Longest …" records (longest rush / reception / field goal / punt / punt-return /
+// kick-return). These are single-PLAY maxes, so the program record = the MAX over every
+// player-season (NOT summed). Source is the season rows; the holder is that player+year.
+const LONGEST_STATS = ["Longest Rush","Longest Reception","Longest Field Goal","Longest Punt","Longest Punt Return","Longest Kick Return"];
+function longestRecordsFrom(seasonRows, sport) {
+  if (sport !== "football") return [];
+  const out = [];
+  for (const stat of LONGEST_STATS) {
+    let best = null;
+    for (const r of (seasonRows || [])) {
+      const v = Number(r.stats?.[stat]);
+      if (!isNaN(v) && v > 0 && (!best || v > best.value)) best = { value: v, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Single game", sport, auto: true, ...best });
   }
   return out;
 }
@@ -599,7 +623,7 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
   // Build stat list in the same order as the All-Time tab
   const rawStatNames = [...new Set([
     ...(DISPLAY_STATS[school.sport] || []),
-    ...sportDef.statCategories.map(s => s.name).filter(n => n !== "Coach Wins"),
+    ...sportDef.statCategories.map(s => s.name).filter(n => n !== "Coach Wins" && !/^Longest /.test(n)),
   ])];
   const allStatNames = [
     ...STAT_ORDER.filter(s => rawStatNames.includes(s)),
@@ -1315,7 +1339,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 // ── Add Athlete Modal ──────────────────────────────────────────────────────────
 function AddAthleteModal({ onClose, onAdd, sport }) {
   const sportDef = SPORTS[sport] || SPORTS.football;
-  const statNames = [...new Set(sportDef.statCategories.map(s => s.name))];
+  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n)))];
   const [form, setForm] = useState({ name:"", position:"", gradYear: new Date().getFullYear()+2 });
   const [stats, setStats] = useState({});
   const handleSubmit = () => {
@@ -4731,6 +4755,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const autoRecs = [
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
+                    ...longestRecordsFrom(allSeasonRows, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport), school.sport),
                     ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
                   ];
