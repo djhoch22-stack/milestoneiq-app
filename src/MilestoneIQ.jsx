@@ -2421,7 +2421,7 @@ function ImportSeasons({ school, roster = [] }) {
         // Overview / Athletes / All-Time / Records / Milestones tabs (the .xlsx path already did this).
         await recomputeCareerFromSeasons(school.id);
         setBusy(false);
-        setMsg(`✓ Imported ${total} player-season rows & updated career totals${noNewStats.length ? ` (no new stats read for ${noNewStats.join(", ")} — existing stats kept)` : ""}${errs.length ? ` (${errs.length} file issue${errs.length > 1 ? "s" : ""})` : ""} — reload to see them.`);
+        setMsg(`✓ Imported ${total} player-season rows & updated career totals${noNewStats.length ? ` (no new stats read for ${noNewStats.join(", ")} — existing stats kept)` : ""}${errs.length ? ` — ${errs.length} file issue${errs.length > 1 ? "s" : ""}: ${errs[0]}` : ""} — reload to see them.`);
         return;
       }
       // Spreadsheet matrix (one workbook = the WHOLE history) → replace all season data.
