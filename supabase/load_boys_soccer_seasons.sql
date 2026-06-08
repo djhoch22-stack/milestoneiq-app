@@ -2,8 +2,9 @@
 -- Load DC Boys Soccer season history (1966–2025) into the Seasons tab
 -- ────────────────────────────────────────────────────────────────────────────
 -- From "DC Boy's Soccer Stats.xlsx - Seasons.csv". Per-season overall + league W-L-T,
--- coach, and accomplishments (notes). Empty rows in the sheet are skipped. Upserts by
--- season (replaces just these seasons; any other stored season is left alone).
+-- coach, and accomplishments (notes). EVERY year is inserted — even years with no
+-- recorded record or coach show on the Seasons tab as a blank row (full timeline).
+-- Upserts by season (replaces just these seasons; any other stored season is left alone).
 
 alter table public.seasons add column if not exists ties int;
 alter table public.seasons add column if not exists league_ties int;
@@ -22,8 +23,9 @@ begin
 
   delete from public.seasons where program_id = pid and season = any (array[
     '2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015','2014','2013','2012','2011',
-    '2010','2009','2008','2006','1998','1993','1992','1991','1987','1986','1985','1984','1983','1982','1981',
-    '1980','1979','1978','1977','1976','1966']);
+    '2010','2009','2008','2007','2006','2005','2004','2003','2002','2001','2000','1999','1998','1997','1996',
+    '1995','1994','1993','1992','1991','1990','1989','1988','1987','1986','1985','1984','1983','1982','1981',
+    '1980','1979','1978','1977','1976','1975','1974','1973','1972','1971','1970','1969','1968','1967','1966']);
 
   insert into public.seasons (program_id, season, wins, losses, ties, league_wins, league_losses, league_ties, coach, notes, win_pct)
   select pid, v.season, v.w, v.l, v.t, v.lw, v.ll, v.lt, v.coach, v.notes,
@@ -49,11 +51,26 @@ begin
     ('2010', 9, 6, 1, 1, 1, 0, 'Ed Buteyn', 'League Champs'),
     ('2009', 15, 3, 2, 7, 0, 1, 'Ed Buteyn', 'League Champs'),
     ('2008', null, null, null, null, null, null, null, 'State Champs'),
+    ('2007', null, null, null, null, null, null, null, null),
     ('2006', 13, 4, 2, null, null, null, null, 'State Runner Up'),
+    ('2005', null, null, null, null, null, null, null, null),
+    ('2004', null, null, null, null, null, null, null, null),
+    ('2003', null, null, null, null, null, null, null, null),
+    ('2002', null, null, null, null, null, null, null, null),
+    ('2001', null, null, null, null, null, null, null, null),
+    ('2000', null, null, null, null, null, null, null, null),
+    ('1999', null, null, null, null, null, null, null, null),
     ('1998', null, null, null, null, null, null, null, 'State Champs'),
+    ('1997', null, null, null, null, null, null, null, null),
+    ('1996', null, null, null, null, null, null, null, null),
+    ('1995', null, null, null, null, null, null, null, null),
+    ('1994', null, null, null, null, null, null, null, null),
     ('1993', null, null, null, null, null, null, null, 'League Champs'),
     ('1992', null, null, null, null, null, null, null, 'League Champs'),
     ('1991', null, null, null, null, null, null, null, 'League Champs'),
+    ('1990', null, null, null, null, null, null, null, null),
+    ('1989', null, null, null, null, null, null, null, null),
+    ('1988', null, null, null, null, null, null, null, null),
     ('1987', 12, 5, null, null, null, null, 'Roger Posthumus', null),
     ('1986', 5, 9, null, null, null, null, 'Roger Posthumus', null),
     ('1985', 7, 6, 3, null, null, null, 'Roger Posthumus', null),
@@ -66,6 +83,15 @@ begin
     ('1978', 6, 8, 1, 6, 5, null, 'Roger Posthumus', null),
     ('1977', 5, 9, 1, 5, 6, 1, 'Roger Posthumus', 'League Champs'),
     ('1976', 12, null, null, null, null, null, null, null),
+    ('1975', null, null, null, null, null, null, null, null),
+    ('1974', null, null, null, null, null, null, null, null),
+    ('1973', null, null, null, null, null, null, null, null),
+    ('1972', null, null, null, null, null, null, null, null),
+    ('1971', null, null, null, null, null, null, null, null),
+    ('1970', null, null, null, null, null, null, null, null),
+    ('1969', null, null, null, null, null, null, null, null),
+    ('1968', null, null, null, null, null, null, null, null),
+    ('1967', null, null, null, null, null, null, null, null),
     ('1966', 8, 0, null, null, null, null, null, null)
   ) as v(season, w, l, t, lw, ll, lt, coach, notes);
 end $$;
