@@ -80,7 +80,7 @@ export const STAT_ORDER = [
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Rushes","Rushing Yards","Rushing TDs","Receptions","Receiving Yards","Receiving TDs","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completetions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Sacks","Interceptions","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Punts","Punt Yards","Punt Returns","Punt Return Yards","Punt Return TDs","Kick Offs","Kick Off Yards","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","All-Purpose Yards"];
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -114,8 +114,9 @@ export function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
   const present = [...new Set((roster || []).flatMap((p) => Object.keys(p.stats || {})))]
     .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
-  // "Longest …" stats are single-play maxes shown only as records, never as summed columns.
-  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s)).sort((a, b) => byStatOrder(a, b, sport));
+  // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
+  // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
+  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s) || base.includes(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
