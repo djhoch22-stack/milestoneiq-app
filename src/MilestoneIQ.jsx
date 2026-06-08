@@ -2499,7 +2499,7 @@ function ImportSeasons({ school, roster = [] }) {
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
 
-  const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
+  const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Completetions") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
   const [filterActive, setFilterActive] = useState("all");
   const [search, setSearch] = useState("");
