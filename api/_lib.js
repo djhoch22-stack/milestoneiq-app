@@ -208,7 +208,7 @@ export function longestRecordsFrom(seasonRows, sport) {
       const v = Number(r.stats?.[stat]);
       if (!isNaN(v) && v > 0 && (!best || v > best.value)) best = { value: v, holderName: r.player_name, holderYear: r.season || "" };
     }
-    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Single game", sport, ...best });
+    if (best) out.push({ id: `auto-long-${stat}`, statName: stat, variant: "Longest", sport, ...best });
   }
   return out;
 }
