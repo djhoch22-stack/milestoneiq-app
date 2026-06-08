@@ -130,12 +130,13 @@ Deno.serve(async (req) => {
       return json({ error: `Could not parse the model's output as JSON (stop_reason: ${stopReason || "?"}). Output started: ${text.slice(0, 300)}` }, 502);
     }
     const athletes = parsed.athletes || [];
-    // Surface "no stats" instead of silently importing empty rows — that's how a truncated / over-thought
-    // response showed up as "none of the stats made it through."
+    // A clean finish with players but no stats is a ROSTER (jersey #, full name, no game stats) — those full
+    // names are what de-abbreviate the stat sheets, so we MUST return them, not reject them. Only error when
+    // the model ran OUT OF TOKENS mid-output (truncated), which is a real failure that would drop real stats.
     const withStats = athletes.filter((a: any) => a && a.stats && Object.keys(a.stats).length > 0).length;
-    if (athletes.length > 0 && withStats === 0)
-      return json({ error: `read ${athletes.length} players but 0 had stats (stop_reason: ${stopReason || "?"}). Output started: ${text.slice(0, 300)}` }, 502);
-    return json({ athletes });
+    if (athletes.length > 0 && withStats === 0 && stopReason === "max_tokens")
+      return json({ error: `output was truncated (ran out of tokens) before any stats were read — try again. Output started: ${text.slice(0, 300)}` }, 502);
+    return json({ athletes, noStats: withStats === 0 });
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
