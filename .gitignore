@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Supabase CLI local state (machine-specific — should never be committed)
+supabase/.temp/
+supabase/.branches/
+
+# Environment / secrets
+.env
+.env.local
+.env*.local
+
+# OS / editor cruft
+.DS_Store
+*.log
