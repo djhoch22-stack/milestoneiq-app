@@ -1256,3 +1256,17 @@ update public.seasons set win_pct = case when coalesce(wins,0)+coalesce(losses,0
   then round(wins::numeric/(coalesce(wins,0)+coalesce(losses,0)+coalesce(ties,0))*1000)/10 else null end
   where wins is not null and (ties is null or ties = 0) and win_pct is not null;
 NOTIFY pgrst, 'reload schema';
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- v3.9 — One player per program + name (case-insensitive). Hard backstop against the
+-- duplicate-player bug (a hand-added player re-inserting on every save). Dedupe first so the
+-- index builds, then enforce. Recompute/merge/rename all insert with "where not exists" guards,
+-- so they never collide with this index.
+-- ════════════════════════════════════════════════════════════════════════════
+delete from public.all_time_players a using public.all_time_players b
+ where a.program_id = b.program_id and lower(a.name) = lower(b.name) and a.id > b.id;
+delete from public.athletes a using public.athletes b
+ where a.program_id = b.program_id and lower(a.name) = lower(b.name) and a.id > b.id;
+create unique index if not exists uq_all_time_prog_name on public.all_time_players (program_id, lower(name));
+create unique index if not exists uq_athletes_prog_name on public.athletes (program_id, lower(name));
+NOTIFY pgrst, 'reload schema';
