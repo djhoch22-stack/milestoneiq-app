@@ -2567,10 +2567,73 @@ function MergePlayersModal({ school, roster = [], onClose }) {
     </div>
   );
 }
+// Coach-facing "How to import" guide — opened from the import toolbar. Encodes the lessons that matter most:
+// upload the roster + stats TOGETHER (so initials resolve to full names), name files by season, imports merge.
+function ImportHelpModal({ sport, onClose }) {
+  const tHead = { fontSize: 14, fontWeight: 700, color: "#111", margin: "0 0 5px" };
+  const tBody = { fontSize: 13, color: "#374151", lineHeight: 1.5, margin: 0 };
+  const block = { marginBottom: 16 };
+  const ul = { margin: "4px 0 0", paddingLeft: 18 };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#111" }}>📥 How to import your stats</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Upload a season's PDFs (or an Excel file) and we read the players and stats automatically.</div>
+
+        <div style={{ ...block, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 14px" }}>
+          <p style={tHead}>⭐ The #1 tip: upload the roster AND the stat sheet together</p>
+          <p style={tBody}>Stat sheets often list players by first initial (“J. Smith”). Adding your team <strong>roster</strong> (full names + jersey numbers) in the <strong>same</strong> import lets us match them up — so you get “John Smith,” not “J. Smith.” Just select both files at once.</p>
+        </div>
+
+        <div style={block}>
+          <p style={tHead}>🗓 Put the season in the file name</p>
+          <p style={tBody}>Name files like “2025-2026 {sport === "football" ? "Football" : "Stats"}.pdf” and we detect the season automatically. No year in the name? We'll ask you which season it's for.</p>
+        </div>
+
+        <div style={block}>
+          <p style={tHead}>📄 What you can upload</p>
+          <ul style={ul}>
+            <li style={tBody}><strong>PDF stat sheets</strong> — MaxPreps printouts work great; our AI reads them.</li>
+            <li style={tBody}><strong>PDF rosters</strong> — jersey #, full name, position.</li>
+            <li style={tBody}><strong>Excel template</strong> — click <strong>Download template</strong> to type stats in by hand.</li>
+          </ul>
+          <p style={{ ...tBody, marginTop: 6 }}>You can select several files at once (e.g. a roster + multiple seasons).</p>
+        </div>
+
+        <div style={block}>
+          <p style={tHead}>🛡️ Your data is safe — imports merge, never erase</p>
+          <p style={tBody}>Re-uploading <strong>updates</strong> players and keeps everything else (new stats win on conflicts; nothing you've already entered gets wiped). A corrected re-upload is always safe.</p>
+        </div>
+
+        <div style={block}>
+          <p style={tHead}>✏️ Fixing a name or combining duplicates</p>
+          <ul style={ul}>
+            <li style={tBody}>Name shows as initials only? Upload that season's <strong>roster</strong> and re-import.</li>
+            <li style={tBody}>Open any player → <strong>Edit</strong> to rename, or <strong>+ Add player</strong> to enter one by hand.</li>
+            <li style={tBody}>Two entries for one athlete? Use <strong>🔗 Merge players</strong> to combine them (you pick the name to keep).</li>
+          </ul>
+        </div>
+
+        {sport === "football" && (
+          <div style={block}>
+            <p style={tHead}>🏈 Football tip</p>
+            <p style={tBody}>Football sheets have many sections (passing, rushing, receiving, defense, kicking, returns…). Upload the <strong>full multi-section MaxPreps printout</strong> and we pull every category — including the “Lng” longest-play records.</p>
+          </div>
+        )}
+
+        <button onClick={onClose} style={{ marginTop: 6, width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Got it</button>
+      </div>
+    </div>
+  );
+}
 function ImportSeasons({ school, roster = [] }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [showMerge, setShowMerge] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const onFiles = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
@@ -2746,12 +2809,14 @@ function ImportSeasons({ school, roster = [] }) {
         <input type="file" accept=".xlsx,.xls,.pdf" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
       <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
+      <button onClick={() => setShowHelp(true)} style={{ background: "none", border: "none", color: "#1a56db", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textDecoration: "underline", padding: "8px 2px" }}>❓ How to import</button>
       {(roster || []).length >= 2 && (
         <button onClick={() => setShowMerge(true)} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>🔗 Merge players</button>
       )}
       {msg && <span style={{ fontSize: 12, color: msg.indexOf("✓") === 0 ? "#166534" : ((msg.indexOf("fail") >= 0 || msg.indexOf("error") >= 0) ? "#991b1b" : "#6b7280") }}>{msg}</span>}
     </div>
     {showMerge && <MergePlayersModal school={school} roster={roster} onClose={() => setShowMerge(false)} />}
+    {showHelp && <ImportHelpModal sport={school.sport} onClose={() => setShowHelp(false)} />}
     </>
   );
 }
