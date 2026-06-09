@@ -22,8 +22,8 @@ const PLANS = [
     name: 'Program',
     monthlyPrice: 15,
     annualPrice: 149,
-    monthlyId: 'price_1TdcrABzAEImpxa62G24Ul20',
-    annualId: 'price_1TdczrBzAEImpxa6dKJ8R8gp',
+    monthlyId: 'price_1Tg9sSJUmIvJqxFc2PyEknl9',
+    annualId: 'price_1Tg9suJUmIvJqxFcHZiAPG7r',
     programs: 1,
     description: 'Solo coach, one program',
     features: [
@@ -40,8 +40,8 @@ const PLANS = [
     name: 'Program+',
     monthlyPrice: 39,
     annualPrice: 389,
-    monthlyId: 'price_1Tf5V2BzAEImpxa6NOVNecDO',
-    annualId: 'price_1Tf5VTBzAEImpxa6PSUFDI3o',
+    monthlyId: 'price_1Tg9tFJUmIvJqxFcXfLmtinA',
+    annualId: 'price_1Tg9teJUmIvJqxFc2r8oLsC6',
     programs: 1,
     description: 'One program, full staff',
     features: [
@@ -58,8 +58,8 @@ const PLANS = [
     name: 'School',
     monthlyPrice: 149,
     annualPrice: 1490,
-    monthlyId: 'price_1Tf5aUBzAEImpxa64FdUtiZY',
-    annualId: 'price_1Tdd0bBzAEImpxa6voXKjkUm',
+    monthlyId: 'price_1Tg9uVJUmIvJqxFcE1yCbTGK',
+    annualId: 'price_1Tg9uqJUmIvJqxFctvXyKW35',
     programs: 5,
     description: 'Multi-sport school',
     features: [
@@ -76,8 +76,8 @@ const PLANS = [
     name: 'School+',
     monthlyPrice: 299,
     annualPrice: 2990,
-    monthlyId: 'price_1Tdd1XBzAEImpxa6dlaquzPO',
-    annualId: 'price_1Tdd1rBzAEImpxa6NjhJBxV6',
+    monthlyId: 'price_1Tg9vDJUmIvJqxFcjWgwSRia',
+    annualId: 'price_1Tg9veJUmIvJqxFcEcsDCaiX',
     programs: 999,
     description: 'Full school, unlimited',
     features: [
