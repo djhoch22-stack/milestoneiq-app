@@ -712,8 +712,11 @@ begin
 end $$;
 
 drop trigger if exists gate_org_trial_trg on public.organizations;
-create trigger gate_org_trial_trg before insert on public.organizations
-  for each row execute function public.gate_org_trial();
+-- One-free-trial-per-email rule REMOVED 2026-06-08: every signup now gets a fresh 7-day trial (the
+-- organizations.trial_ends_at default of now()+7d applies to everyone). gate_org_trial() + trial_ledger
+-- are kept but INERT. To re-enable the rule, re-create the trigger:
+--   create trigger gate_org_trial_trg before insert on public.organizations
+--     for each row execute function public.gate_org_trial();
 NOTIFY pgrst, 'reload schema';
 
 -- ════════════════════════════════════════════════════════════════════════════
