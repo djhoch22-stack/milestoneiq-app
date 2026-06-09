@@ -257,20 +257,32 @@ export default function AppWrapper() {
       });
       const existing = updated.athletes.filter((a) => isUuid(a.id)).map((a) => ({ id: a.id, ...toRow(a) }));
       const fresh = updated.athletes.filter((a) => !isUuid(a.id)).map(toRow);
+      // A "fresh" athlete carries a TEMP id until the next reload, so re-saving the roster would re-INSERT
+      // it every time → duplicate rows. Match each fresh row to an existing same-name athlete and UPDATE
+      // that one (by its real id); only a genuinely new name gets inserted. Prevents the duplicate-player bug.
+      let toInsert = fresh;
+      if (fresh.length) {
+        const { data: have } = await supabase.from('athletes').select('id,name').eq('program_id', updated.id);
+        const byName = new Map((have || []).map((r) => [(r.name || '').toLowerCase().trim(), r.id]));
+        toInsert = [];
+        for (const r of fresh) {
+          const id = byName.get((r.name || '').toLowerCase().trim());
+          if (id) existing.push({ id, ...r }); else toInsert.push(r);
+        }
+      }
       if (existing.length) {
         const { error } = await supabase.from('athletes').upsert(existing, { onConflict: 'id' });
         if (error) console.error('Athlete save (update) failed:', error.message || error);
       }
-      if (fresh.length) {
-        const { error } = await supabase.from('athletes').insert(fresh);
+      if (toInsert.length) {
+        const { error } = await supabase.from('athletes').insert(toInsert);
         if (error) console.error('Athlete save (insert) failed:', error.message || error);
       }
     }
 
-    // All-time roster — full upsert so edited stats persist (not just HOF flags)
+    // All-time roster — full upsert so edited stats persist (not just HOF flags).
     if (updated.allTimeRoster?.length) {
-      const rows = updated.allTimeRoster.map((p) => ({
-        id: isUuid(p.id) ? p.id : undefined,
+      const toRow = (p) => ({
         program_id: updated.id,
         name: p.name,
         first_year: p.firstYear || null,
@@ -281,10 +293,24 @@ export default function AppWrapper() {
         school_hall_of_fame: p.schoolHallOfFame || false,
         state_hall_of_fame: p.stateHallOfFame || false,
         stats: p.stats || {},
-      }));
-      for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('all_time_players').upsert(rows.slice(i, i + 500), { onConflict: 'id' });
+      });
+      const existing = updated.allTimeRoster.filter((p) => isUuid(p.id)).map((p) => ({ id: p.id, ...toRow(p) }));
+      const fresh = updated.allTimeRoster.filter((p) => !isUuid(p.id)).map(toRow);
+      // Same duplicate-player guard as athletes: a fresh (temp-id) player gets matched to an existing
+      // same-name row and UPDATED, never re-inserted. (Without this, a hand-added player duplicated on
+      // every save — the 13-Randy-DeBoer bug.)
+      let toInsert = fresh;
+      if (fresh.length) {
+        const { data: have } = await supabase.from('all_time_players').select('id,name').eq('program_id', updated.id);
+        const byName = new Map((have || []).map((r) => [(r.name || '').toLowerCase().trim(), r.id]));
+        toInsert = [];
+        for (const r of fresh) {
+          const id = byName.get((r.name || '').toLowerCase().trim());
+          if (id) existing.push({ id, ...r }); else toInsert.push(r);
+        }
       }
+      for (let i = 0; i < existing.length; i += 500) await supabase.from('all_time_players').upsert(existing.slice(i, i + 500), { onConflict: 'id' });
+      for (let i = 0; i < toInsert.length; i += 500) await supabase.from('all_time_players').insert(toInsert.slice(i, i + 500));
     }
 
     // Records — update existing by id, INSERT new ones WITHOUT an id (let the DB generate the uuid).
