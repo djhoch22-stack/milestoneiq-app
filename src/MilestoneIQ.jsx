@@ -3717,27 +3717,36 @@ const PLAYER_AWARD_LABELS = { all_league:"All-League", all_state:"All-State" };
 PLAYER_HONORS.forEach(h => { PLAYER_AWARD_LABELS[h.kind] = h.label; });
 const COACH_AWARD_POINTS = { league: 5, state: 10 };    // per Coach-of-Year, by level
 function normName(n) { return String(n || "").toLowerCase().replace(/\s+/g, " ").trim(); }
-function playerAwardBonus(name, awards) {
-  const n = normName(name);
+// True if an award's holder name refers to `name`. Exact (normalized) match always wins; otherwise a
+// CONSERVATIVE fuzzy match (crossSportNameMatch — same last name + an initial or 3+char prefix), but ONLY
+// when it's unambiguous: among `names` (the roster), `name` must be the single one matching this holder, so
+// one award can never credit two similar people (e.g. an award for "J. Smith" with both John & James Smith on
+// the roster matches neither). With no `names` supplied, the conservative fuzzy match is accepted as-is.
+function awardHolderMatches(holder, name, names) {
+  if (normName(holder) === normName(name)) return true;
+  if (!crossSportNameMatch(holder, name)) return false;
+  if (!names || !names.length) return true;
+  const m = names.filter(nm => normName(nm) === normName(holder) || crossSportNameMatch(holder, nm));
+  return m.length === 1 && normName(m[0]) === normName(name);
+}
+function playerAwardBonus(name, awards, names) {
   let bonus = 0;
   for (const a of (awards || [])) {
-    if (a.scope !== "player" || normName(a.holder_name) !== n) continue;
+    if (a.scope !== "player" || !awardHolderMatches(a.holder_name, name, names)) continue;
     bonus += AWARD_POINTS[a.kind] || 2;
   }
   return Math.min(bonus, 20);
 }
-function coachAwardBonus(name, awards) {
-  const n = normName(name);
+function coachAwardBonus(name, awards, names) {
   let bonus = 0;
   for (const a of (awards || [])) {
-    if (a.scope !== "coach" || normName(a.holder_name) !== n) continue;
+    if (a.scope !== "coach" || !awardHolderMatches(a.holder_name, name, names)) continue;
     bonus += COACH_AWARD_POINTS[a.level] || COACH_AWARD_POINTS.league;
   }
   return Math.min(bonus, 20);
 }
-function awardsForHolder(name, scope, awards) {
-  const n = normName(name);
-  return (awards || []).filter(a => a.scope === scope && normName(a.holder_name) === n);
+function awardsForHolder(name, scope, awards, names) {
+  return (awards || []).filter(a => a.scope === scope && awardHolderMatches(a.holder_name, name, names));
 }
 function awardLabel(a) {
   if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
@@ -3786,10 +3795,11 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
     </div>
   );
 
+  const coachNames = coaches.map(c => c.name);
   const scored = coaches
     .map(coach => {
-      const ab = coachAwardBonus(coach.name, awards);
-      const coyCount = awardsForHolder(coach.name, "coach", awards).length;
+      const ab = coachAwardBonus(coach.name, awards, coachNames);
+      const coyCount = awardsForHolder(coach.name, "coach", awards, coachNames).length;
       return { ...coach, score: Math.min(calcCoachHofScore(coach, coaches) + ab, 100), coyCount, confirmed: inductedCoachNames.has(normName(coach.name)) };
     })
     .sort((a, b) => b.score - a.score);
@@ -3978,9 +3988,10 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
 
           {/* Coach of the Year honors */}
           {(() => {
-            const honors = awardsForHolder(coach.name, "coach", awards);
+            const coachNames = (allCoaches || []).map(c => c.name);
+            const honors = awardsForHolder(coach.name, "coach", awards, coachNames);
             if (!honors.length) return null;
-            const bonus = coachAwardBonus(coach.name, awards);
+            const bonus = coachAwardBonus(coach.name, awards, coachNames);
             return (
               <div style={{ marginBottom:18 }}>
                 <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:8 }}>
@@ -4168,9 +4179,10 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   });
 
   // Build scored athletes list — memoized so it only recalculates when roster changes
+  const hofPlayerNames = (roster || []).map(p => p.name);
   const scored = useMemo(() => roster.map(player => {
     try {
-      const ab = playerAwardBonus(player.name, awards);
+      const ab = playerAwardBonus(player.name, awards, hofPlayerNames);
       const programScore = Math.min(calcProgramHofScore(player, school) + ab, 100);
       const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools) : null;
       const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
@@ -4571,9 +4583,10 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
 
           {/* Honors (all-league / all-state) */}
           {(() => {
-            const honors = awardsForHolder(player.name, "player", awards);
+            const playerNames = (school.allTimeRoster || []).map(p => p.name);
+            const honors = awardsForHolder(player.name, "player", awards, playerNames);
             if (!honors.length) return null;
-            const bonus = playerAwardBonus(player.name, awards);
+            const bonus = playerAwardBonus(player.name, awards, playerNames);
             return (
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>
