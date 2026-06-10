@@ -454,22 +454,67 @@ function shootingPct(stats, made, att) {
   if (!a || a <= 0 || isNaN(m) || isNaN(a)) return null;
   return Math.round((m / a) * 1000) / 10; // one decimal, e.g. 47.3
 }
-// Auto record-holders for FG%/3P%/FT%: single-season (from player_seasons rows) and
-// career (from the career-totals pool). Returns record objects the Records tab renders.
+// ── Derived RATE stats (computed from raw stats; never stored / edited / imported) ─────────────
+// Basketball shooting %s (made÷att, shown as "47.3%") and baseball rate stats — AVG / OBP / SLG /
+// OPS / Fielding % (shown as ".305"). Each def computes from a stats GETTER, so the same code
+// drives a season row, a career-totals lookup, or a player object. `after` = the raw column the
+// rate renders behind; `qualStat` + min thresholds gate the auto record-holders.
+const RATE_FMT = {
+  "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
+  "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
+};
+// Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped). null → "—".
+function fmtRateVal(fmt, v) {
+  if (v == null || isNaN(v)) return "—";
+  if (fmt === "pct") return v + "%";
+  const s = Number(v).toFixed(3);
+  return s.charAt(0) === "0" ? s.slice(1) : s; // .305  (1.000+ keeps its leading digit)
+}
+const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
+function rateValue(def, stats) { return def.calc(statGetter(stats)); }
+// Basketball: derive the rate defs from PCT_DEFS so the % math stays identical (reuses shootingPct).
+const BBALL_RATE_DEFS = PCT_DEFS.map((d) => ({
+  name: d.name, short: d.short, after: d.att, fmt: "pct",
+  qualStat: d.att, minSeason: d.minSeasonAtt, minCareer: d.minCareerAtt, made: d.made, att: d.att,
+  calc: (g) => shootingPct({ [d.made]: g(d.made), [d.att]: g(d.att) }, d.made, d.att),
+  note: (g) => `${g(d.made).toLocaleString()}/${g(d.att).toLocaleString()}`,
+}));
+// Baseball: the rate stats. AVG/OBP/SLG/OPS render after "At Bats", Fielding % after "Total Chances"
+// (both raw columns are always present, so the rate always has an anchor). TB = H + 2B + 2·3B + 3·HR.
+const BASEBALL_RATE_DEFS = [
+  { name: "Batting Average", short: "AVG", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60,
+    calc: (g) => { const ab = g("At Bats"); return ab > 0 ? g("Hits") / ab : null; }, note: (g) => `${g("At Bats").toLocaleString()} AB` },
+  { name: "On Base Percentage", short: "OBP", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60,
+    calc: (g) => { const d = g("At Bats") + g("Walk (BB)") + g("Hit By Pitch") + g("Sacrifice Fly"); return d > 0 ? (g("Hits") + g("Walk (BB)") + g("Hit By Pitch")) / d : null; }, note: (g) => `${g("At Bats").toLocaleString()} AB` },
+  { name: "Slugging Percentage", short: "SLG", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60,
+    calc: (g) => { const ab = g("At Bats"); return ab > 0 ? (g("Hits") + g("Doubles") + 2 * g("Triples") + 3 * g("Home Runs")) / ab : null; }, note: (g) => `${g("At Bats").toLocaleString()} AB` },
+  { name: "OPS", short: "OPS", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60,
+    calc: (g) => { const ab = g("At Bats"); if (ab <= 0) return null; const od = ab + g("Walk (BB)") + g("Hit By Pitch") + g("Sacrifice Fly"); const obp = od > 0 ? (g("Hits") + g("Walk (BB)") + g("Hit By Pitch")) / od : 0; const slg = (g("Hits") + g("Doubles") + 2 * g("Triples") + 3 * g("Home Runs")) / ab; return obp + slg; }, note: (g) => `${g("At Bats").toLocaleString()} AB` },
+  { name: "Fielding Percentage", short: "FLD%", after: "Total Chances", fmt: "avg3", qualStat: "Total Chances", minSeason: 15, minCareer: 40,
+    calc: (g) => { const tc = g("Total Chances"); return tc > 0 ? (g("Put Outs") + g("Assists")) / tc : null; }, note: (g) => `${g("Total Chances").toLocaleString()} TC` },
+];
+function rateDefsFor(sport) {
+  if (sport === "baseball") return BASEBALL_RATE_DEFS;
+  if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
+  return [];
+}
+// Auto record-holders for the rate stats: single-season (from player_seasons rows) and career
+// (from the career-totals pool), gated by a minimum volume (att / AB / chances) so small samples
+// don't top the leaderboard. Returns record objects the Records tab renders.
 function pctRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  for (const d of PCT_DEFS) {
+  for (const d of rateDefsFor(sport)) {
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.[d.att]) < d.minSeasonAtt) continue;
-      const p = shootingPct(r.stats, d.made, d.att);
+      if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
+      const p = rateValue(d, r.stats);
       if (p != null && (!ss || p > ss.value)) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, auto: true, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.[d.att]) < d.minCareerAtt) continue;
-      const p = shootingPct(pl.stats, d.made, d.att);
+      if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
+      const p = rateValue(d, pl.stats);
       if (p != null && (!car || p > car.value)) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, auto: true, ...car });
@@ -827,8 +872,8 @@ function RecordsModal({ school, onClose, onSave }) {
   const statOptions = [...new Set([
     ...(DISPLAY_STATS[school.sport] || []),
     ...sportDef.statCategories.map(s => s.name),
-    // shooting %s (FG%/3P%/FT%) for sports that track the made/attempted stats, so they're editable
-    ...PCT_DEFS.filter(d => sportDef.statCategories.some(s => s.name === d.made)).map(d => d.name),
+    // derived rate stats (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %) for this sport, so they're editable
+    ...rateDefsFor(school.sport).map(d => d.name),
   ])].sort((a, b) => byStatOrder(a, b, school.sport));
   const [records, setRecords] = useState(school.records || []);
   const [editingId, setEditingId] = useState(null);
@@ -1856,7 +1901,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const careerOf = (c) => careerStats[c] != null ? Number(careerStats[c]) : (/^Longest /.test(c) ? (rows || []).reduce((m, r) => Math.max(m, Number(r.stats?.[c]) || 0), 0) : (rows || []).reduce((s, r) => s + (Number(r.stats?.[c]) || 0), 0));
   // Derived columns — shooting % (made÷att) and per-game (stat÷GP) — computed, shown only
   // when the program tracks the inputs so other sports stay unaffected.
-  const pctCols = PCT_DEFS.filter((d) => careerOf(d.att) > 0 || (rows || []).some((r) => Number(r.stats?.[d.att]) > 0));
+  const pctCols = rateDefsFor(sport).filter((d) => careerOf(d.qualStat) > 0 || (rows || []).some((r) => Number(r.stats?.[d.qualStat]) > 0));
   const hasGP = careerOf("Games Played") > 0 || (rows || []).some((r) => Number(r.stats?.["Games Played"]) > 0);
   const pgCols = hasGP ? PERGAME_DEFS.filter((d) => careerOf(d.stat) > 0 || (rows || []).some((r) => Number(r.stats?.[d.stat]) > 0)) : [];
   // Interleave per-game right after its stat, and % right after its "Attempted" column.
@@ -1866,8 +1911,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
     orderedCols.push({ col: c });
     const pg = pgCols.find((p) => p.stat === c);
     if (pg) orderedCols.push({ pg });
-    const d = pctCols.find((p) => p.att === c);
-    if (d) { orderedCols.push({ pct: d }); placedPct.add(d.name); }
+    for (const d of pctCols.filter((p) => p.after === c)) { orderedCols.push({ pct: d }); placedPct.add(d.name); }
   }
   for (const d of pctCols) if (!placedPct.has(d.name)) orderedCols.push({ pct: d });
 
@@ -1904,7 +1948,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                     {orderedCols.map(e => e.pg
                       ? <td key={"pg-" + e.pg.stat} style={td}>{(() => { const v = perGame(r.stats, e.pg.stat); return v != null ? v : "—"; })()}</td>
                       : e.pct
-                      ? <td key={"pct-" + e.pct.name} style={td}>{(() => { const v = shootingPct(r.stats, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
+                      ? <td key={"pct-" + e.pct.name} style={td}>{fmtRateVal(e.pct.fmt, rateValue(e.pct, r.stats))}</td>
                       : <td key={e.col} style={td}>{r.stats?.[e.col] != null ? Number(r.stats[e.col]).toLocaleString() : "—"}</td>)}
                   </tr>
                 ))}
@@ -1913,7 +1957,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                   {orderedCols.map(e => e.pg
                     ? <td key={"pg-" + e.pg.stat} style={{ ...td, fontWeight: 700 }}>{(() => { const v = perGame({ [e.pg.stat]: careerOf(e.pg.stat), "Games Played": careerOf("Games Played") }, e.pg.stat); return v != null ? v : "—"; })()}</td>
                     : e.pct
-                    ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{(() => { const v = shootingPct({ [e.pct.made]: careerOf(e.pct.made), [e.pct.att]: careerOf(e.pct.att) }, e.pct.made, e.pct.att); return v != null ? v + "%" : "—"; })()}</td>
+                    ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{fmtRateVal(e.pct.fmt, e.pct.calc(careerOf))}</td>
                     : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{careerOf(e.col).toLocaleString()}</td>)}
                 </tr>
               </tbody>
@@ -2112,8 +2156,7 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
               const out = [{ stat }];
               const pg = PERGAME_DEFS.find(p => p.stat === stat);
               if (pg) out.push({ pgDef: pg });
-              const d = PCT_DEFS.find(p => p.att === stat);
-              if (d) out.push({ pctDef: d });
+              for (const d of rateDefsFor(school.sport).filter(p => p.after === stat)) out.push({ pctDef: d });
               return out;
             }).map(entry => {
               if (entry.pgDef) {
@@ -2132,14 +2175,14 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
               }
               if (entry.pctDef) {
                 const d = entry.pctDef;
-                const v = shootingPct(player.stats, d.made, d.att);
+                const v = rateValue(d, player.stats);
                 if (v == null) return null;
                 return (
                   <div key={d.name} style={{background:"#f9fafb",borderRadius:10,padding:"10px 14px",border:"1px solid #f0eeea"}}>
                     <div style={{fontSize:11,color:"#9ca3af",fontWeight:600,marginBottom:3}}>{d.name.toUpperCase()}</div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-                      <div style={{fontSize:22,fontWeight:700,color:"#111"}}>{v}%</div>
-                      <div style={{fontSize:11,color:"#6b7280",textAlign:"right"}}>{(player.stats[d.made]||0).toLocaleString()}/{(player.stats[d.att]||0).toLocaleString()}</div>
+                      <div style={{fontSize:22,fontWeight:700,color:"#111"}}>{fmtRateVal(d.fmt, v)}</div>
+                      <div style={{fontSize:11,color:"#6b7280",textAlign:"right"}}>{d.note(statGetter(player.stats))}</div>
                     </div>
                   </div>
                 );
@@ -4616,8 +4659,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                       const out = [row];
                       const pg = PERGAME_DEFS.find(p => p.stat === row.stat);
                       if (pg) { const v = perGame(pl.stats, pg.stat); if (v != null) out.push({ derived:true, label:pg.name, value:String(v), note:"per game" }); }
-                      const d = PCT_DEFS.find(p => p.att === row.stat);
-                      if (d) { const v = shootingPct(pl.stats, d.made, d.att); if (v != null) out.push({ derived:true, label:d.name, value:v+"%", note:`${(pl.stats[d.made]||0).toLocaleString()}/${(pl.stats[d.att]||0).toLocaleString()}` }); }
+                      for (const d of rateDefsFor(s.sport).filter(p => p.after === row.stat)) { const v = rateValue(d, pl.stats); if (v != null) out.push({ derived:true, label:d.name, value:fmtRateVal(d.fmt, v), note:d.note(statGetter(pl.stats)) }); }
                       return out;
                     }).map(entry => {
                       if (entry.derived) return (
@@ -4695,7 +4737,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                         <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:8, padding:"7px 12px", fontSize:13 }}>
                           <span style={{ fontWeight:600, color:"#111" }}>{r.statName}</span>
                           <span style={{ color:"#6b7280" }}>{r.variant}</span>
-                          <span style={{ fontWeight:700, color:"#b45309" }}>{(r.value||0).toLocaleString()} {SPORTS[s.sport]?.icon || "🏆"}</span>
+                          <span style={{ fontWeight:700, color:"#b45309" }}>{RATE_FMT[r.statName] ? fmtRateVal(RATE_FMT[r.statName], r.value) : (r.value||0).toLocaleString()} {SPORTS[s.sport]?.icon || "🏆"}</span>
                         </div>
                       ))}
                     </div>
@@ -4982,7 +5024,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
               const baseCols = statsToDisplay(activeAthletes, school.sport);
               const ovCols = [];
-              for (const c of baseCols) { ovCols.push({ stat: c }); const d = PCT_DEFS.find(p => p.att === c); if (d) ovCols.push({ pct: d }); }
+              for (const c of baseCols) { ovCols.push({ stat: c }); for (const d of rateDefsFor(school.sport).filter(p => p.after === c)) ovCols.push({ pct: d }); }
               const rows = [...activeAthletes].sort((a, b) => a.name.localeCompare(b.name));
               const cellBg = (i) => i % 2 === 0 ? "#fff" : "#fafaf8";
               return (
@@ -5013,8 +5055,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                 <div style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>{a.position}{a.gradYear ? ` · Class of ${a.gradYear}` : ""}</div>
                               </td>
                               {ovCols.map(col => {
-                                const v = col.pct ? shootingPct(a.stats, col.pct.made, col.pct.att) : a.stats[col.stat];
-                                const display = col.pct ? (v != null ? v + "%" : "—") : (v != null ? Number(v).toLocaleString() : "—");
+                                const v = col.pct ? rateValue(col.pct, a.stats) : a.stats[col.stat];
+                                const display = col.pct ? fmtRateVal(col.pct.fmt, v) : (v != null ? Number(v).toLocaleString() : "—");
                                 return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"center", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
                               })}
                             </tr>
@@ -5152,15 +5194,16 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                               </div>
                             );
                             const out = [tile];
-                            // After an "…Attempted" stat show its shooting %.
-                            const d = PCT_DEFS.find(p => p.att === k);
-                            const pctVal = d ? shootingPct(athlete.stats, d.made, d.att) : null;
-                            if (d && pctVal != null) out.push(
-                              <div key={d.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{d.name}</div>
-                                <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{pctVal}%</div>
-                              </div>
-                            );
+                            // After its anchor column, each derived rate (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %).
+                            for (const d of rateDefsFor(school.sport).filter(p => p.after === k)) {
+                              const rv = rateValue(d, athlete.stats);
+                              if (rv != null) out.push(
+                                <div key={d.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
+                                  <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{d.name}</div>
+                                  <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{fmtRateVal(d.fmt, rv)}</div>
+                                </div>
+                              );
+                            }
                             return out;
                           })}
                       </div>
@@ -5214,7 +5257,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const groupOrder = (sport.groups || []).map(g => g.group);
                   const grpIdx = (name) => { if (name === "Coaching") return 99999; const i = groupOrder.indexOf(name); return i === -1 ? 999 : i; };
 
-                  const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage"];
+                  const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage", "Batting Average", "On Base Percentage", "Slugging Percentage", "OPS", "Fielding Percentage"];
                   const recStatIdx = (n) => {
                     const so = SPORT_ORDER[school.sport];
                     if (so) { const fi = so.indexOf(n); if (fi !== -1) return fi; }
@@ -5281,15 +5324,15 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                 });
                                 return groups.map(group => {
                                   const rec = group[0];
-                                  const isPct = !!PCT_PARENT[rec.statName];
+                                  const isPct = !!RATE_FMT[rec.statName]; // "is a derived rate" (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %)
                                   const leaderVal = leader?.stats[statName];
                                   // % records aren't a "chase the leader" progress bar — only counting records show one.
                                   const p = (!isPct && leaderVal && rec.variant==="Career total") ? pct(leaderVal, rec.value) : null;
                                   return (
                                     <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
                                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
-                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best %" : rec.variant === "Single season" ? "Season best %" : `Best % (${rec.variant})`) : rec.variant}</span>
-                                        <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? `${rec.value}%` : rec.value.toLocaleString()}</span>
+                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : `Best (${rec.variant})`) : rec.variant}</span>
+                                        <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? fmtRateVal(RATE_FMT[rec.statName], rec.value) : rec.value.toLocaleString()}</span>
                                       </div>
                                       {(() => {
                                         // Show ALL players tied at this record's value (team stats like Wins
