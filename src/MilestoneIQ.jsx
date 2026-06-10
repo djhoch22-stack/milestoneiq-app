@@ -1756,7 +1756,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["basketball_boys", "basketball_girls", "soccer"];
+const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
