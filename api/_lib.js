@@ -206,21 +206,29 @@ export function rateDefsFor(sport) {
   return [];
 }
 export function rateValue(d, stats) { return evalRateSpec(d.spec, stats); }
+// Per-program qualifying minimums: programs.record_minimums (keyed by stat name → {season, career})
+// overrides the def's defaults; anything unset falls back. Mirrors MilestoneIQ.jsx minsFor.
+export function minsFor(d, recordMins) {
+  const o = (recordMins || {})[d.name] || {};
+  const s = Number(o.season), c = Number(o.career);
+  return { season: s > 0 ? s : d.minSeason, career: c > 0 ? c : d.minCareer };
+}
 // Auto record-holders for the rate stats (career + single-season), gated by minimum volume.
-export function pctRecordsFrom(seasonRows, careerPlayers, sport) {
+export function pctRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
   const out = [];
   for (const d of rateDefsFor(sport)) {
     const beats = (a, b) => d.lowerIsBetter ? a < b : a > b; // ERA: the record is the LOWEST qualified
+    const mn = minsFor(d, recordMins);
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
+      if (Number(r.stats?.[d.qualStat]) < mn.season) continue;
       const p = rateValue(d, r.stats);
       if (p != null && (!ss || beats(p, ss.value))) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
+      if (Number(pl.stats?.[d.qualStat]) < mn.career) continue;
       const p = rateValue(d, pl.stats);
       if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
