@@ -2868,6 +2868,10 @@ function ImportSeasons({ school, roster = [] }) {
 
 function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
+  // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
+  // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
+  const RATE_DEFS = rateDefsFor(school?.sport);
+  const SORT_OPTIONS = ALL_STATS.flatMap(s => [s, ...RATE_DEFS.filter(d => d.after === s).map(d => d.name)]);
 
   const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Completions") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
@@ -2899,6 +2903,13 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const effectiveIsActive = makeEffectiveIsActive(athletes);
   const rankFor = makeRankFor(roster);
 
+  // Ranked value for the selected category: a counting stat reads straight off the career stats;
+  // a derived rate computes from them and requires the career qualifying volume (else null → hidden).
+  const rateDef = RATE_DEFS.find(d => d.name === sortStat) || null;
+  const valOf = (p) => rateDef
+    ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateDef.minCareer ? rateValue(rateDef, p.stats) : null)
+    : (p.stats[sortStat] || 0);
+
   const filtered = roster
     .filter(p => {
       const active = effectiveIsActive(p);
@@ -2907,10 +2918,10 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
-    .filter(p => (p.stats[sortStat]||0) > 0)
-    .sort((a,b) => (b.stats[sortStat]||0) - (a.stats[sortStat]||0));
+    .filter(p => (valOf(p) || 0) > 0)
+    .sort((a,b) => (valOf(b)||0) - (valOf(a)||0));
 
-  const maxVal = filtered[0]?.stats[sortStat] || 1;
+  const maxVal = valOf(filtered[0]) || 1;
 
   return (
     <div>
@@ -2938,8 +2949,9 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
         <select value={sortStat} onChange={e=>{setSortStat(e.target.value);setPage(0);}}
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,background:"#fff",color:"#111"}}>
-          {ALL_STATS.map(s=><option key={s} value={s}>{s}</option>)}
+          {SORT_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
+        {rateDef && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {rateDef.minCareer} {rateDef.qualStat} (career)</span>}
         <div style={{display:"flex",gap:0,border:"1px solid #e5e7eb",borderRadius:8,overflow:"hidden"}}>
           {[["all","All players"],["current","Active"],["alumni","Alumni"]].map(([val,label])=>(
             <button key={val} onClick={()=>{setFilterActive(val);setPage(0);}}
@@ -2970,7 +2982,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           <tbody>
             {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((p,i)=>{
               const rank = page * PAGE_SIZE + i;
-              const val = p.stats[sortStat]||0;
+              const val = valOf(p) || 0;
               const barPct = Math.round((val/maxVal)*100);
               const active = effectiveIsActive(p);
               return (
@@ -2991,7 +3003,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
                   <td style={{padding:"9px 16px",color:"#9ca3af",fontSize:12,whiteSpace:"nowrap"}}>
                     {p.firstYear===p.lastYear ? p.firstYear : p.firstYear && p.lastYear ? p.firstYear+" – "+p.lastYear : p.gradYear ? "Class of "+p.gradYear : ""}
                   </td>
-                  <td style={{padding:"9px 16px",textAlign:"right",fontWeight:700,color:"#111",fontSize:15}}>{val.toLocaleString()}</td>
+                  <td style={{padding:"9px 16px",textAlign:"right",fontWeight:700,color:"#111",fontSize:15}}>{rateDef ? fmtRateVal(rateDef.fmt, val) : val.toLocaleString()}</td>
                   <td style={{padding:"9px 16px 9px 0"}}>
                     <div style={{height:6,background:"#f0f0ee",borderRadius:3,overflow:"hidden"}}>
                       <div style={{width:barPct+"%",height:"100%",background:active?"#1a56db":"#94a3b8",borderRadius:3}} />
