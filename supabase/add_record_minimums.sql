@@ -12,9 +12,13 @@ alter table public.programs
 
 -- Public record book reads the same minimums so raftersiq.com/teams/<slug>
 -- shows the identical qualified record holders + leaderboards.
-create or replace view public.public_teams as
+-- DROP + recreate (not "create or replace"): the live view's column set/order drifted from the repo
+-- over time, and "create or replace" forbids reordering/removing columns. A clean recreate is safe —
+-- public_teams is a leaf view (only the Vercel SSR reads it via REST; no DB object depends on it).
+drop view if exists public.public_teams;
+create view public.public_teams as
   select p.id, p.slug, p.name, p.mascot, p.sport, p.primary_color, p.logo_url, p.coach_hof,
-         p.record_minimums,
+         p.coach_prior, p.record_minimums,
          o.id as org_id, o.name as school_name, o.city, o.state, o.level
   from public.programs p
   join public.organizations o on o.id = p.org_id
