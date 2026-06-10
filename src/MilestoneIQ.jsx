@@ -42,6 +42,19 @@ const SOCCER_STAT_CATEGORIES = [
   { name: "Coach Wins", variants: ["Career total","Single season"] },
 ];
 
+// Baseball — raw counting stats in order (hitting, then fielding, then pitching). Rate stats
+// (AVG / OBP / SLG / OPS / Fielding %) are DERIVED and added later; these raw inputs drive the
+// columns, player cards, records, and sort order. Defined before SPORTS so it can build the categories.
+const BASEBALL_DISPLAY = [
+  "Games Played", "Wins",
+  "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs",
+  "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error",
+  "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays",
+  "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games",
+  "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched",
+  "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches",
+];
+
 const SPORTS = {
   football: {
     label: "Football", icon: "🏈",
@@ -130,18 +143,7 @@ const SPORTS = {
   },
   baseball: {
     label: "Baseball", icon: "⚾",
-    statCategories: [
-      { name: "Home Runs", variants: ["Career total","Single season","Single game"] },
-      { name: "RBIs", variants: ["Career total","Single season","Single game"] },
-      { name: "Hits", variants: ["Career total","Single season","Single game"] },
-      { name: "Batting Average", variants: ["Single season","Career total"] },
-      { name: "Stolen Bases", variants: ["Career total","Single season"] },
-      { name: "Strikeouts (Pitching)", variants: ["Career total","Single season","Single game"] },
-      { name: "Wins (Pitching)", variants: ["Career total","Single season"] },
-      { name: "ERA", variants: ["Single season","Career total"] },
-      { name: "Innings Pitched", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    statCategories: [...BASEBALL_DISPLAY, "Coach Wins"].map(name => ({ name, variants: ["Career total", "Single season"] })),
   },
   softball: {
     label: "Softball", icon: "🥎",
@@ -239,7 +241,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -286,7 +288,7 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
-  football: FOOTBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
 // the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
