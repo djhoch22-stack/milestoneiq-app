@@ -47,6 +47,7 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awar
     incomingCoach: prog.incoming_coach,
     coachHof: prog.coach_hof || {},
     coachPrior: prog.coach_prior || {},
+    recordMins: prog.record_minimums || {},
     dismissedAlerts: prog.dismissed_alerts || [],
     slug: prog.slug || null,
     // Public record book (SEO). Default true to mirror the DB default (public-by-default).
@@ -237,6 +238,7 @@ export default function AppWrapper() {
         incoming_coach: updated.incomingCoach || null,
         coach_hof: updated.coachHof || {},
         coach_prior: updated.coachPrior || {},
+        record_minimums: updated.recordMins || {},
         dismissed_alerts: updated.dismissedAlerts || [],
         is_public: updated.isPublic !== false,
       })
