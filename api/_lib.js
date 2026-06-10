@@ -78,13 +78,13 @@ export const STAT_ORDER = [
   "All-Purpose Yards",
   "Coach Wins",
   // Derived rate stats — ordered after the counting stats when they appear as standalone record cards
-  "Batting Average","On Base Percentage","Slugging Percentage","OPS","Fielding Percentage",
+  "Batting Average","On Base Percentage","Slugging Percentage","OPS","Fielding Percentage","ERA",
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
-const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
+const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -142,12 +142,20 @@ export function shootingPct(stats, made, att) {
 export const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
+  "ERA": "era2",
 };
 export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
   if (fmt === "pct") return v + "%";
+  if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305 (1.000+ keeps its leading digit)
+}
+// Innings Pitched notation (36.2 = 36⅔): tenths digit counts THIRDS of an inning. Numeric season
+// sums keep that property (every .1 = one out), so this converts season AND career totals.
+function ipInnings(v) {
+  const n = Number(v); if (isNaN(n) || n < 0) return 0;
+  return Math.floor(n) + Math.round((n - Math.floor(n)) * 10) / 3;
 }
 const statG = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
 // spec kinds: pct (made÷att → 47.3) · ratio (Σnum ÷ Σden, weighted) · ops (OBP + SLG)
@@ -167,6 +175,10 @@ export function evalRateSpec(spec, stats) {
     const slg = (g("Hits") + g("Doubles") + 2 * g("Triples") + 3 * g("Home Runs")) / ab;
     return obp + slg;
   }
+  if (spec.kind === "era") {
+    const ip = ipInnings(g("Innings Pitched"));
+    return ip > 0 ? (7 * g("Earned Runs")) / ip : null; // 7-inning HS games (matches MaxPreps)
+  }
   return null;
 }
 const BBALL_RATE_DEFS = PCT_DEFS.map((d) => ({
@@ -185,6 +197,8 @@ const BASEBALL_RATE_DEFS = [
     spec: { kind: "ops" } },
   { name: "Fielding Percentage", short: "FLD%", after: "Total Chances", fmt: "avg3", qualStat: "Total Chances", minSeason: 15, minCareer: 40, noteAbbr: "TC",
     spec: { kind: "ratio", num: [["Put Outs", 1], ["Assists", 1]], den: [["Total Chances", 1]] } },
+  { name: "ERA", short: "ERA", after: "Innings Pitched", fmt: "era2", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40, noteAbbr: "IP", lowerIsBetter: true,
+    spec: { kind: "era" } },
 ];
 export function rateDefsFor(sport) {
   if (sport === "baseball") return BASEBALL_RATE_DEFS;
@@ -196,18 +210,19 @@ export function rateValue(d, stats) { return evalRateSpec(d.spec, stats); }
 export function pctRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
   for (const d of rateDefsFor(sport)) {
+    const beats = (a, b) => d.lowerIsBetter ? a < b : a > b; // ERA: the record is the LOWEST qualified
     let ss = null;
     for (const r of (seasonRows || [])) {
       if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
       const p = rateValue(d, r.stats);
-      if (p != null && (!ss || p > ss.value)) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
+      if (p != null && (!ss || beats(p, ss.value))) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
       if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
       const p = rateValue(d, pl.stats);
-      if (p != null && (!car || p > car.value)) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+      if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, ...car });
   }
