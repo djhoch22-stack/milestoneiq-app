@@ -52,7 +52,7 @@ const BASEBALL_DISPLAY = [
   "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays",
   "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games",
   "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched",
-  "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches",
+  "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches",
 ];
 
 const SPORTS = {
@@ -462,13 +462,22 @@ function shootingPct(stats, made, att) {
 const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
+  "ERA": "era2",
 };
-// Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped). null → "—".
+// Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped); era2 → "4.20". null → "—".
 function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
   if (fmt === "pct") return v + "%";
+  if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305  (1.000+ keeps its leading digit)
+}
+// Innings Pitched uses baseball notation (36.2 = 36⅔ innings): the tenths digit counts THIRDS of an
+// inning. Numeric season sums keep that property (every .1 = one out), so this converts season AND
+// career totals to true innings for the ERA math.
+function ipInnings(v) {
+  const n = Number(v); if (isNaN(n) || n < 0) return 0;
+  return Math.floor(n) + Math.round((n - Math.floor(n)) * 10) / 3;
 }
 const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
 function rateValue(def, stats) { return def.calc(statGetter(stats)); }
@@ -492,6 +501,10 @@ const BASEBALL_RATE_DEFS = [
     calc: (g) => { const ab = g("At Bats"); if (ab <= 0) return null; const od = ab + g("Walk (BB)") + g("Hit By Pitch") + g("Sacrifice Fly"); const obp = od > 0 ? (g("Hits") + g("Walk (BB)") + g("Hit By Pitch")) / od : 0; const slg = (g("Hits") + g("Doubles") + 2 * g("Triples") + 3 * g("Home Runs")) / ab; return obp + slg; }, note: (g) => `${g("At Bats").toLocaleString()} AB` },
   { name: "Fielding Percentage", short: "FLD%", after: "Total Chances", fmt: "avg3", qualStat: "Total Chances", minSeason: 15, minCareer: 40,
     calc: (g) => { const tc = g("Total Chances"); return tc > 0 ? (g("Put Outs") + g("Assists")) / tc : null; }, note: (g) => `${g("Total Chances").toLocaleString()} TC` },
+  // ERA = 7 × Earned Runs ÷ Innings Pitched (7-inning HS games; matches MaxPreps). LOWER is better —
+  // records and leaderboards rank ascending. IP converted from .1/.2 thirds notation by ipInnings.
+  { name: "ERA", short: "ERA", after: "Innings Pitched", fmt: "era2", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40, lowerIsBetter: true,
+    calc: (g) => { const ip = ipInnings(g("Innings Pitched")); return ip > 0 ? (7 * g("Earned Runs")) / ip : null; }, note: (g) => `${g("Innings Pitched").toLocaleString()} IP` },
 ];
 function rateDefsFor(sport) {
   if (sport === "baseball") return BASEBALL_RATE_DEFS;
@@ -504,18 +517,19 @@ function rateDefsFor(sport) {
 function pctRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
   for (const d of rateDefsFor(sport)) {
+    const beats = (a, b) => d.lowerIsBetter ? a < b : a > b; // ERA: the record is the LOWEST qualified
     let ss = null;
     for (const r of (seasonRows || [])) {
       if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
       const p = rateValue(d, r.stats);
-      if (p != null && (!ss || p > ss.value)) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
+      if (p != null && (!ss || beats(p, ss.value))) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, auto: true, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
       if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
       const p = rateValue(d, pl.stats);
-      if (p != null && (!car || p > car.value)) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+      if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, auto: true, ...car });
   }
@@ -2906,6 +2920,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   // Ranked value for the selected category: a counting stat reads straight off the career stats;
   // a derived rate computes from them and requires the career qualifying volume (else null → hidden).
   const rateDef = RATE_DEFS.find(d => d.name === sortStat) || null;
+  const lowerBetter = !!(rateDef && rateDef.lowerIsBetter); // ERA: rank ascending; 0.00 is a valid (best) value
   const valOf = (p) => rateDef
     ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateDef.minCareer ? rateValue(rateDef, p.stats) : null)
     : (p.stats[sortStat] || 0);
@@ -2918,10 +2933,10 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     })
-    .filter(p => (valOf(p) || 0) > 0)
-    .sort((a,b) => (valOf(b)||0) - (valOf(a)||0));
+    .filter(p => lowerBetter ? valOf(p) != null : (valOf(p) || 0) > 0)
+    .sort((a,b) => lowerBetter ? (valOf(a) ?? Infinity) - (valOf(b) ?? Infinity) : (valOf(b)||0) - (valOf(a)||0));
 
-  const maxVal = valOf(filtered[0]) || 1;
+  const maxVal = valOf(filtered[0]) ?? 1; // best value either way (max desc / min asc) — drives the bars; desc list is >0-filtered so never 0
 
   return (
     <div>
@@ -2982,8 +2997,9 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           <tbody>
             {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((p,i)=>{
               const rank = page * PAGE_SIZE + i;
-              const val = valOf(p) || 0;
-              const barPct = Math.round((val/maxVal)*100);
+              const val = valOf(p) ?? 0;
+              // Bar = closeness to the leader. Ascending stats (ERA) invert: leader's (lowest) value over yours.
+              const barPct = lowerBetter ? (val > 0 ? Math.round((maxVal / val) * 100) : 100) : Math.round((val/maxVal)*100);
               const active = effectiveIsActive(p);
               return (
                 <tr key={p.id}
@@ -5269,7 +5285,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const groupOrder = (sport.groups || []).map(g => g.group);
                   const grpIdx = (name) => { if (name === "Coaching") return 99999; const i = groupOrder.indexOf(name); return i === -1 ? 999 : i; };
 
-                  const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage", "Batting Average", "On Base Percentage", "Slugging Percentage", "OPS", "Fielding Percentage"];
+                  const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage", "Batting Average", "On Base Percentage", "Slugging Percentage", "OPS", "Fielding Percentage", "ERA"];
                   const recStatIdx = (n) => {
                     const so = SPORT_ORDER[school.sport];
                     if (so) { const fi = so.indexOf(n); if (fi !== -1) return fi; }
