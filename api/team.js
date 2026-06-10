@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
-  RATE_FMT, fmtRateVal, rateDefsFor, rateValue,
+  RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName,
 } from "./_lib.js";
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
   const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)", "Longest"];
   const vIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i === -1 ? 999 : i; };
   const autoRecs = [
-    ...pctRecordsFrom(seasonRows, careerPool, team.sport),
+    ...pctRecordsFrom(seasonRows, careerPool, team.sport, team.record_minimums),
     ...pergameRecordsFrom(seasonRows, careerPool, team.sport),
     ...longestRecordsFrom(seasonRows, team.sport),
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport).filter(s => !/^Longest /.test(s)), team.sport),
@@ -373,7 +373,9 @@ export default async function handler(req, res) {
   const soJson = JSON.stringify((SPORT_ORDER[team.sport] || []).concat(STAT_ORDER));
   const pgJson = JSON.stringify(PERGAME_DEFS.map((d) => ({ n: d.name, stat: d.stat })));
   // Derived-rate defs with their serializable formula specs — evaluated in-browser by rv().
-  const rdJson = JSON.stringify(rateDefsFor(team.sport).map((d) => ({ n: d.name, s: d.short, after: d.after, fmt: d.fmt, q: d.qualStat, mc: d.minCareer, ab: d.noteAbbr, lo: !!d.lowerIsBetter, spec: d.spec })));
+  // `mc` carries the program's effective CAREER minimum (override or default) so the in-browser
+  // leaderboard qualifies players with the same cutoff the records use.
+  const rdJson = JSON.stringify(rateDefsFor(team.sport).map((d) => ({ n: d.name, s: d.short, after: d.after, fmt: d.fmt, q: d.qualStat, mc: minsFor(d, team.record_minimums).career, ab: d.noteAbbr, lo: !!d.lowerIsBetter, spec: d.spec })));
   const dsJson = JSON.stringify(DISPLAY_STATS[team.sport] || []);
   const pColor = JSON.stringify(logoColor);
   const script =
