@@ -1048,8 +1048,14 @@ grant execute on function public.public_program_ids() to anon, authenticated, se
 -- 5) Safe public view: ONLY athletic / non-sensitive columns, ONLY public programs,
 --    joined to the school's directory info. SSR reads this for the page header.
 --    (A plain view runs as its owner → bypasses RLS; the WHERE is the public gate.)
-create or replace view public.public_teams as
+-- Per-program "minimum to qualify" overrides for rate-stat records (v4.0); see add_record_minimums.sql.
+alter table public.programs
+  add column if not exists record_minimums jsonb not null default '{}'::jsonb;
+
+drop view if exists public.public_teams;
+create view public.public_teams as
   select p.id, p.slug, p.name, p.mascot, p.sport, p.primary_color, p.logo_url, p.coach_hof,
+         p.coach_prior, p.record_minimums,
          o.id as org_id, o.name as school_name, o.city, o.state, o.level
   from public.programs p
   join public.organizations o on o.id = p.org_id
