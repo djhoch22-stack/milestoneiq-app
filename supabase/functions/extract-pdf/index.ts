@@ -45,7 +45,16 @@ FOOTBALL — use these EXACT stat names (the coach's set), mapping the column wi
 - "Kickoff and Punt Returns" section: "KO Rets"→"Kick Off Returns", the Yds right after KO Rets→"Kick Off Return Yards", any TD there→"Kick Off Return TDs"; "P Rets"→"Punt Returns", the Yds right after P Rets→"Punt Return Yards", any TD there→"Punt Return TDs", the KO Ret Lng→"Longest Kick Off Return", the P Ret Lng→"Longest Punt Return" (ignore Avg/FC and the combined "KR Yds" total)
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
-For non-football sports (basketball, soccer, etc.) there is usually one table — use the exact stat names shown.
+BASEBALL — a MaxPreps printout has SEVERAL sections in this order: Batting (two tables), Baserunning, Fielding, Pitching (three tables). The SAME player (match by jersey # + last name) appears in many tables — COMBINE every table into that one player object. Map ONLY the columns below to these EXACT stat names; IGNORE all rate/derived columns (Avg, OBP, SLG, OPS, FP, ERA, W%, OBA, CS%) and any counting column not listed here (GS in batting, K in batting, FC, LOB, SBA, E, PB, CS, L, WP, BK):
+- Games Played (GP). Wins: read the team's OVERALL win total from the "Overall W-L" line near the top of the sheet (e.g. "Overall 20-10" → 20) and set "Wins" to that number for EVERY athlete — there is no per-player team-wins column, so never leave it blank or guess.
+- BATTING tables: PA→"Plate Appearances", AB→"At Bats", R→"Runs", H→"Hits", RBI→"RBIs", 2B→"Doubles", 3B→"Triples", HR→"Home Runs", SF→"Sacrifice Fly", "SH/B"→"Sacrifice Bunt", BB→"Walk (BB)", HBP→"Hit By Pitch", ROE→"Reached on Error"
+- BASERUNNING table: SB→"Stolen Base" (take SB from the BASERUNNING table ONLY — the SB columns in the Fielding/Pitching tables are stolen-bases-ALLOWED; ignore those)
+- FIELDING table: TC→"Total Chances", PO→"Put Outs", A→"Assists", DP→"Double Plays", TP→"Triple Plays"
+- PITCHING tables: W→"Pitcher Wins", APP→"Pitcher Appearances", GS→"Pitcher Games Started", CG→"Pitcher Complete Games", "SO"→"Pitcher Shut Outs", SV→"Pitcher Saves", NH→"No Hitters", PG→"Perfect Games", IP→"Innings Pitched", "K"→"Pitcher Strikeouts", BF→"Batters Faced", AB→"At Bats Pitcher", "#P"→"# of Pitches"
+- SAME-HEADER WARNING — qualify every value by the table it came from: "AB" in a Batting table = "At Bats", but "AB" in a Pitching table = "At Bats Pitcher". In a PITCHING table the H, R, ER, BB, 2B, 3B, HR, HBP, SF, SH/B columns are what the pitcher ALLOWED — IGNORE them (only the Batting versions are kept). In pitching, "SO" means shutouts (→"Pitcher Shut Outs"), NOT strikeouts — pitcher strikeouts are the "K" column. Take "PO" only from the Fielding table (the pitching "PO" is pickoffs — ignore it).
+- A player's name may carry a grade like "G. Gunnett (So)" — use the name WITHOUT the grade ("G. Gunnett"); if a season year is shown (e.g. "2025-26") set gradYear from the grade (Sr = the season's ending year, Jr +1, So +2, Fr +3).
+
+For other sports (basketball, soccer, volleyball, etc.) there is usually one table — use the exact stat names shown.
 Include every athlete and every stat you find. Omit zero/blank stats.`;
 
 Deno.serve(async (req) => {
