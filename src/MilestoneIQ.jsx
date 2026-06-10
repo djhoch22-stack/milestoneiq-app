@@ -511,23 +511,31 @@ function rateDefsFor(sport) {
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   return [];
 }
+// Per-program qualifying minimums: the program's saved overrides (programs.record_minimums,
+// keyed by stat name → {season, career}) win; anything unset falls back to the def's defaults.
+function minsFor(d, recordMins) {
+  const o = (recordMins || {})[d.name] || {};
+  const s = Number(o.season), c = Number(o.career);
+  return { season: s > 0 ? s : d.minSeason, career: c > 0 ? c : d.minCareer };
+}
 // Auto record-holders for the rate stats: single-season (from player_seasons rows) and career
 // (from the career-totals pool), gated by a minimum volume (att / AB / chances) so small samples
 // don't top the leaderboard. Returns record objects the Records tab renders.
-function pctRecordsFrom(seasonRows, careerPlayers, sport) {
+function pctRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
   const out = [];
   for (const d of rateDefsFor(sport)) {
     const beats = (a, b) => d.lowerIsBetter ? a < b : a > b; // ERA: the record is the LOWEST qualified
+    const mn = minsFor(d, recordMins);
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
+      if (Number(r.stats?.[d.qualStat]) < mn.season) continue;
       const p = rateValue(d, r.stats);
       if (p != null && (!ss || beats(p, ss.value))) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, auto: true, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
+      if (Number(pl.stats?.[d.qualStat]) < mn.career) continue;
       const p = rateValue(d, pl.stats);
       if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
@@ -872,6 +880,66 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
             style={{ flex:1,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:11,fontWeight:600,fontSize:14,cursor:"pointer" }}>
             Save milestone settings
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Record Minimums Modal ──────────────────────────────────────────────────────
+// Per-program qualifying volume for the RATE stats (AVG/OBP/SLG/OPS/FLD%/ERA · FG%/3P%/FT%):
+// how many At Bats / Innings Pitched / attempts a player needs before that stat can hold a
+// record or rank on the leaderboard. Saves ONLY values that differ from the defaults.
+function RecordMinimumsModal({ school, onClose, onSave }) {
+  const defs = rateDefsFor(school.sport);
+  const [vals, setVals] = useState(() => {
+    const o = {};
+    for (const d of defs) { const m = minsFor(d, school.recordMins); o[d.name] = { season: String(m.season), career: String(m.career) }; }
+    return o;
+  });
+  const set = (name, key, v) => setVals(prev => ({ ...prev, [name]: { ...prev[name], [key]: v } }));
+  const save = () => {
+    const out = {};
+    for (const d of defs) {
+      const v = vals[d.name] || {};
+      const s = Math.round(Number(v.season)), c = Math.round(Number(v.career));
+      const e = {};
+      if (s > 0 && s !== d.minSeason) e.season = s;
+      if (c > 0 && c !== d.minCareer) e.career = c;
+      if (Object.keys(e).length) out[d.name] = e;
+    }
+    onSave(out); onClose();
+  };
+  const inp = { width: 76, border: "1px solid #d1d5db", borderRadius: 7, padding: "6px 8px", fontSize: 13, textAlign: "right" };
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background:"#fff", borderRadius:16, width:"100%", maxWidth:560, maxHeight:"86vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.18)", padding:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#111" }}>⚙️ Record minimums</h2>
+          <button onClick={onClose} style={{ background:"#f3f4f6", border:"none", borderRadius:8, width:30, height:30, cursor:"pointer", fontSize:15 }}>✕</button>
+        </div>
+        <p style={{ margin:"0 0 16px", fontSize:13, color:"#6b7280" }}>
+          The fewest a player needs to qualify for a percentage / average record or leaderboard — so a hot 2-for-3 doesn't top the record book. Applies to records, the All-Time rankings, and your public page.
+        </p>
+        <div style={{ border:"1px solid #f0eeea", borderRadius:10, overflow:"hidden" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 100px 100px", gap:8, padding:"8px 14px", background:"#f9fafb", fontSize:11, fontWeight:700, color:"#9ca3af" }}>
+            <span>STAT</span><span style={{ textAlign:"right" }}>SEASON MIN</span><span style={{ textAlign:"right" }}>CAREER MIN</span>
+          </div>
+          {defs.map(d => (
+            <div key={d.name} style={{ display:"grid", gridTemplateColumns:"1fr 100px 100px", gap:8, padding:"10px 14px", borderTop:"1px solid #f6f4f0", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:600, color:"#111" }}>{d.name}</div>
+                <div style={{ fontSize:11, color:"#9ca3af" }}>counted by {d.qualStat}{(Number(vals[d.name]?.season) !== d.minSeason || Number(vals[d.name]?.career) !== d.minCareer) ? ` · default ${d.minSeason} / ${d.minCareer}` : ""}</div>
+              </div>
+              <div style={{ textAlign:"right" }}><input type="number" min="1" value={vals[d.name]?.season ?? ""} onChange={e => set(d.name, "season", e.target.value)} style={inp} /></div>
+              <div style={{ textAlign:"right" }}><input type="number" min="1" value={vals[d.name]?.career ?? ""} onChange={e => set(d.name, "career", e.target.value)} style={inp} /></div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", gap:10, marginTop:16 }}>
+          <button onClick={() => { onSave({}); onClose(); }} style={{ background:"#fff", color:"#6b7280", border:"1px solid #d1d5db", borderRadius:8, padding:"9px 14px", fontSize:13, fontWeight:600, cursor:"pointer" }}>Reset to defaults</button>
+          <button onClick={save} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"9px 20px", fontSize:13, fontWeight:700, cursor:"pointer" }}>Save minimums</button>
         </div>
       </div>
     </div>
@@ -2043,7 +2111,7 @@ function programRecordCount(school) {
   const recPool = [...(school.athletes || []), ...(school.allTimeRoster || [])];
   const statNames = statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s));
   const autoRecs = [
-    ...pctRecordsFrom(seasonRows, recPool, school.sport),
+    ...pctRecordsFrom(seasonRows, recPool, school.sport, school.recordMins),
     ...pergameRecordsFrom(seasonRows, recPool, school.sport),
     ...longestRecordsFrom(seasonRows, school.sport),
     ...autoStatRecords(seasonRows, (school.allTimeRoster || []), statNames, school.sport),
@@ -2921,8 +2989,9 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   // a derived rate computes from them and requires the career qualifying volume (else null → hidden).
   const rateDef = RATE_DEFS.find(d => d.name === sortStat) || null;
   const lowerBetter = !!(rateDef && rateDef.lowerIsBetter); // ERA: rank ascending; 0.00 is a valid (best) value
+  const rateMins = rateDef ? minsFor(rateDef, school?.recordMins) : null; // program's qualifying minimums
   const valOf = (p) => rateDef
-    ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateDef.minCareer ? rateValue(rateDef, p.stats) : null)
+    ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins.career ? rateValue(rateDef, p.stats) : null)
     : (p.stats[sortStat] || 0);
 
   const filtered = roster
@@ -2966,7 +3035,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,background:"#fff",color:"#111"}}>
           {SORT_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
-        {rateDef && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {rateDef.minCareer} {rateDef.qualStat} (career)</span>}
+        {rateDef && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {rateMins.career} {rateDef.qualStat} (career)</span>}
         <div style={{display:"flex",gap:0,border:"1px solid #e5e7eb",borderRadius:8,overflow:"hidden"}}>
           {[["all","All players"],["current","Active"],["alumni","Alumni"]].map(([val,label])=>(
             <button key={val} onClick={()=>{setFilterActive(val);setPage(0);}}
@@ -4573,7 +4642,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
     const seasonRows = sch.id === school.id ? (allSeasonRows || []) : [];
     const recPool = [...(sch.athletes || []), ...(sch.allTimeRoster || [])];
     const auto = [
-      ...pctRecordsFrom(seasonRows, recPool, sch.sport),
+      ...pctRecordsFrom(seasonRows, recPool, sch.sport, sch.recordMins),
       ...pergameRecordsFrom(seasonRows, recPool, sch.sport),
       ...longestRecordsFrom(seasonRows, sch.sport),
       ...autoStatRecords(seasonRows, (sch.allTimeRoster || []), statsToDisplay(recPool, sch.sport).filter(s => !/^Longest /.test(s)), sch.sport),
@@ -4841,6 +4910,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const [showImport, setShowImport] = useState(false);
   const [showAddAthlete, setShowAddAthlete] = useState(false);
   const [showRecords, setShowRecords] = useState(false);
+  const [showRecMins, setShowRecMins] = useState(false);
   const [showMilestoneSettings, setShowMilestoneSettings] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState(null);
@@ -4947,6 +5017,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
       {showImport && <ImportModal school={school} onClose={()=>setShowImport(false)} onImport={handleImport} />}
       {showAddAthlete && <AddAthleteModal onClose={()=>setShowAddAthlete(false)} sport={school.sport} existingNames={[...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name)} onAdd={a=>{ const upd = withAddedPlayer(school, a); if (upd) onUpdate(upd); }} />}
       {showRecords && <RecordsModal school={school} onClose={()=>setShowRecords(false)} onSave={recs=>onUpdate({...school,records:recs})} />}
+      {showRecMins && <RecordMinimumsModal school={school} onClose={()=>setShowRecMins(false)} onSave={mins=>onUpdate({...school, recordMins: mins})} />}
       {showMilestoneSettings && <MilestoneSettingsModal school={school} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
       {showEmailPreview && <EmailPreviewModal allAlerts={allAlerts} school={school} onClose={()=>setShowEmailPreview(false)} />}
 
@@ -5301,7 +5372,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   // record holders (single-season from player_seasons, career from the roster pool).
                   const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
                   const autoRecs = [
-                    ...pctRecordsFrom(allSeasonRows, recPool, school.sport),
+                    ...pctRecordsFrom(allSeasonRows, recPool, school.sport, school.recordMins),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...longestRecordsFrom(allSeasonRows, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s)), school.sport),
