@@ -1,11 +1,11 @@
 -- ────────────────────────────────────────────────────────────────────────────
 -- Football: fix the remaining initials-only names (from the 2013-2014 + 2008-2009 rosters)
 -- ────────────────────────────────────────────────────────────────────────────
--- Full names from "13-14 fb roster.pdf" (10) and the 2008-2009 roster (A. Kastens = Andrew "Drew" Kastens).
--- Uses rename_player(), so each abbreviated player's season rows are renamed, careers rebuilt, and any
--- existing full-name match is merged in (the uniqueness index prevents duplicates). Re-runnable: once a
--- name is full, there's nothing left matching the abbreviated form. (J. Anema still pending its roster;
--- "J. Jay Lim" is intentionally left as-is — that's how he was listed.)
+-- Full names from "13-14 fb roster.pdf" (10), the 2008-2009 roster (A. Kastens = Andrew "Drew" Kastens),
+-- and "9-10 fb roster.pdf" (J. Anema = Justin Anema). Uses rename_player(), so each abbreviated player's
+-- season rows are renamed, careers rebuilt, and any existing full-name match is merged in (the uniqueness
+-- index prevents duplicates). Re-runnable: once a name is full, nothing matches the abbreviated form.
+-- ("J. Jay Lim" is intentionally left as-is — that's how he was listed on the roster.)
 
 do $$
 declare pid uuid; m record;
@@ -27,6 +27,7 @@ begin
     ('M. Adams','Myles Adams'),
     ('M. Stallings','Myles Stallings'),
     ('N. Hayes','Nate Hayes'),
+    ('J. Anema','Justin Anema'),
     ('A. Kastens','Drew Kastens')
   ) as t(abbr, fullname) loop
     perform public.rename_player(pid, m.abbr, m.fullname);
