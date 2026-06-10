@@ -1,14 +1,13 @@
 -- ────────────────────────────────────────────────────────────────────────────
--- Football: fix the remaining initials-only names (from the 2013-2014 + 2008-2009 rosters)
+-- Football: fix the remaining initials-only names (self-contained — no RPC dependency)
 -- ────────────────────────────────────────────────────────────────────────────
--- Full names from "13-14 fb roster.pdf" (10), the 2008-2009 roster (A. Kastens = Andrew "Drew" Kastens),
--- and "9-10 fb roster.pdf" (J. Anema = Justin Anema). Uses rename_player(), so each abbreviated player's
--- season rows are renamed, careers rebuilt, and any existing full-name match is merged in (the uniqueness
--- index prevents duplicates). Re-runnable: once a name is full, nothing matches the abbreviated form.
--- ("J. Jay Lim" is intentionally left as-is — that's how he was listed on the roster.)
+-- Full names from "13-14 fb roster.pdf" (10), "9-10 fb roster.pdf" (J. Anema = Justin Anema),
+-- and the 2008-2009 roster (A. Kastens = Andrew "Drew" Kastens). For each: rename the season rows to the
+-- full name (jsonb-merge if that season already exists), carry records/awards, drop the orphaned abbreviated
+-- all-time/roster rows, then rebuild careers. ("J. Jay Lim" is intentionally left as-is.)
 
 do $$
-declare pid uuid; m record;
+declare pid uuid; m record; s record;
 begin
   select id into pid from public.programs
    where sport = 'football'
@@ -30,9 +29,23 @@ begin
     ('J. Anema','Justin Anema'),
     ('A. Kastens','Drew Kastens')
   ) as t(abbr, fullname) loop
-    perform public.rename_player(pid, m.abbr, m.fullname);
-    raise notice 'Renamed "%" -> "%"', m.abbr, m.fullname;
+    for s in select season, stats from public.player_seasons where program_id = pid and player_name = m.abbr loop
+      if exists (select 1 from public.player_seasons where program_id = pid and lower(player_name) = lower(m.fullname) and season = s.season) then
+        update public.player_seasons set stats = coalesce(stats, '{}'::jsonb) || coalesce(s.stats, '{}'::jsonb)
+         where program_id = pid and lower(player_name) = lower(m.fullname) and season = s.season;
+        delete from public.player_seasons where program_id = pid and player_name = m.abbr and season = s.season;
+      else
+        update public.player_seasons set player_name = m.fullname where program_id = pid and player_name = m.abbr and season = s.season;
+      end if;
+    end loop;
+    update public.records set holder_name = m.fullname where program_id = pid and holder_name = m.abbr;
+    update public.awards  set holder_name = m.fullname where program_id = pid and holder_name = m.abbr;
+    delete from public.athletes         where program_id = pid and name = m.abbr;   -- orphaned roster row
+    delete from public.all_time_players where program_id = pid and name = m.abbr;   -- orphaned all-time row (recompute rebuilds the full name)
+    raise notice 'Fixed "%" -> "%"', m.abbr, m.fullname;
   end loop;
+
+  perform public.recompute_career_from_seasons(pid);
 end $$;
 
 NOTIFY pgrst, 'reload schema';
