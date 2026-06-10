@@ -5333,7 +5333,13 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>School records</h2>
                 <p style={{ margin:"4px 0 0",fontSize:13,color:"#6b7280" }}>Each record is tracked by stat, variant, record holder, and year set. Alerts fire at 85%, 95%, and 100%.</p>
               </div>
-              <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
+              <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+                {rateDefsFor(school.sport).length > 0 && (
+                  <button onClick={()=>setShowRecMins(true)} title="Set the minimum at-bats / innings / attempts a player needs to qualify for a percentage or average record"
+                    style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>⚙️ Record minimums</button>
+                )}
+                <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
+              </div>
             </div>
 
             {((school.records||[]).length===0 && allStatsFor([...(school.athletes||[]), ...(school.allTimeRoster||[])]).length===0 && (allSeasonRows||[]).length===0)
