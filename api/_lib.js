@@ -77,11 +77,15 @@ export const STAT_ORDER = [
   "Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return",
   "All-Purpose Yards",
   "Coach Wins",
+  // Derived rate stats — ordered after the counting stats when they appear as standalone record cards
+  "Batting Average","On Base Percentage","Slugging Percentage","OPS","Fielding Percentage",
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY };
+// Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
+const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
+export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
   if (so) {
@@ -107,7 +111,7 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 export const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
-  football: FOOTBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY,
 };
 // Canonical display stats UNION any stat with data, in canonical order.
 export function statsToDisplay(roster, sport) {
@@ -130,20 +134,79 @@ export function shootingPct(stats, made, att) {
   if (!a || a <= 0 || isNaN(m) || isNaN(a)) return null;
   return Math.round((m / a) * 1000) / 10;
 }
+
+// ── Derived RATE stats (ported from MilestoneIQ.jsx — computed, never stored) ─
+// Basketball shooting %s ("47.3%") and baseball AVG/OBP/SLG/OPS/Fielding % (".305").
+// Each def carries a serializable `spec` so the SAME formula runs server-side here
+// AND inside the page's inline JS (leaderboard re-sort + profile modal).
+export const RATE_FMT = {
+  "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
+  "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
+};
+export function fmtRateVal(fmt, v) {
+  if (v == null || isNaN(v)) return "—";
+  if (fmt === "pct") return v + "%";
+  const s = Number(v).toFixed(3);
+  return s.charAt(0) === "0" ? s.slice(1) : s; // .305 (1.000+ keeps its leading digit)
+}
+const statG = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
+// spec kinds: pct (made÷att → 47.3) · ratio (Σnum ÷ Σden, weighted) · ops (OBP + SLG)
+export function evalRateSpec(spec, stats) {
+  const g = statG(stats);
+  if (spec.kind === "pct") return shootingPct(stats, spec.made, spec.att);
+  if (spec.kind === "ratio") {
+    let n = 0, d = 0;
+    for (const [k, w] of spec.num) n += w * g(k);
+    for (const [k, w] of spec.den) d += w * g(k);
+    return d > 0 ? n / d : null;
+  }
+  if (spec.kind === "ops") {
+    const ab = g("At Bats"); if (ab <= 0) return null;
+    const od = ab + g("Walk (BB)") + g("Hit By Pitch") + g("Sacrifice Fly");
+    const obp = od > 0 ? (g("Hits") + g("Walk (BB)") + g("Hit By Pitch")) / od : 0;
+    const slg = (g("Hits") + g("Doubles") + 2 * g("Triples") + 3 * g("Home Runs")) / ab;
+    return obp + slg;
+  }
+  return null;
+}
+const BBALL_RATE_DEFS = PCT_DEFS.map((d) => ({
+  name: d.name, short: d.short, after: d.att, fmt: "pct", qualStat: d.att,
+  minSeason: d.minSeasonAtt, minCareer: d.minCareerAtt, noteAbbr: "att",
+  spec: { kind: "pct", made: d.made, att: d.att },
+}));
+const BASEBALL_RATE_DEFS = [
+  { name: "Batting Average", short: "AVG", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60, noteAbbr: "AB",
+    spec: { kind: "ratio", num: [["Hits", 1]], den: [["At Bats", 1]] } },
+  { name: "On Base Percentage", short: "OBP", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60, noteAbbr: "AB",
+    spec: { kind: "ratio", num: [["Hits", 1], ["Walk (BB)", 1], ["Hit By Pitch", 1]], den: [["At Bats", 1], ["Walk (BB)", 1], ["Hit By Pitch", 1], ["Sacrifice Fly", 1]] } },
+  { name: "Slugging Percentage", short: "SLG", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60, noteAbbr: "AB",
+    spec: { kind: "ratio", num: [["Hits", 1], ["Doubles", 1], ["Triples", 2], ["Home Runs", 3]], den: [["At Bats", 1]] } },
+  { name: "OPS", short: "OPS", after: "At Bats", fmt: "avg3", qualStat: "At Bats", minSeason: 20, minCareer: 60, noteAbbr: "AB",
+    spec: { kind: "ops" } },
+  { name: "Fielding Percentage", short: "FLD%", after: "Total Chances", fmt: "avg3", qualStat: "Total Chances", minSeason: 15, minCareer: 40, noteAbbr: "TC",
+    spec: { kind: "ratio", num: [["Put Outs", 1], ["Assists", 1]], den: [["Total Chances", 1]] } },
+];
+export function rateDefsFor(sport) {
+  if (sport === "baseball") return BASEBALL_RATE_DEFS;
+  if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
+  return [];
+}
+export function rateValue(d, stats) { return evalRateSpec(d.spec, stats); }
+// Auto record-holders for the rate stats (career + single-season), gated by minimum volume.
 export function pctRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  for (const d of PCT_DEFS) {
+  for (const d of rateDefsFor(sport)) {
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.[d.att]) < d.minSeasonAtt) continue;
-      const p = shootingPct(r.stats, d.made, d.att);
+      if (Number(r.stats?.[d.qualStat]) < d.minSeason) continue;
+      const p = rateValue(d, r.stats);
       if (p != null && (!ss || p > ss.value)) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.[d.att]) < d.minCareerAtt) continue;
-      const p = shootingPct(pl.stats, d.made, d.att);
+      if (Number(pl.stats?.[d.qualStat]) < d.minCareer) continue;
+      const p = rateValue(d, pl.stats);
       if (p != null && (!car || p > car.value)) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
     if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, ...car });
