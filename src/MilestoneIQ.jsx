@@ -1560,9 +1560,20 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 }
 
 // ── Add Athlete Modal ──────────────────────────────────────────────────────────
+// Whether a graduation year is a CURRENT student, so a manually-added player is only auto-marked
+// active when actually enrolled (an alumnus stays inactive). The senior class rolls over in July
+// (matches the rest of the app); blank/unknown year → not current (don't auto-activate).
+function isCurrentGradYear(gradYear) {
+  const y = Number(gradYear);
+  if (!y) return false;
+  const now = new Date();
+  const currentClass = now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
+  return y >= currentClass;
+}
 function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
   const sportDef = SPORTS[sport] || SPORTS.football;
-  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n)))];
+  // Coach Wins is a COACHING stat (auto-computed from the Seasons tab) — never an enterable player stat.
+  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n) && n !== "Coach Wins"))];
   const [form, setForm] = useState({ name:"", position:"", gradYear: new Date().getFullYear()+2 });
   const [stats, setStats] = useState({});
   const [err, setErr] = useState("");
@@ -1572,7 +1583,7 @@ function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
     const nm = form.name.trim();
     if (!nm) { setErr("Enter a name."); return; }
     if (taken.has(norm(nm))) { setErr(`"${nm}" is already in this program — open them to edit instead.`); return; }
-    onAdd({ id:`a${Date.now()}`, isActive:true, ...form, name: nm, gradYear: Number(form.gradYear), stats });
+    onAdd({ id:`a${Date.now()}`, ...form, name: nm, gradYear: Number(form.gradYear), isActive: isCurrentGradYear(form.gradYear), stats });
     onClose();
   };
   return (
@@ -2013,7 +2024,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
 
   // Edit grid shows EVERY stat for the sport (so any stat is enterable); the view
   // table shows only stats that actually have values (career or any season).
-  const sportCols = (SPORTS[sport]?.groups || []).flatMap(g => (g.stats || []).map(s => s.name));
+  const sportCols = (SPORTS[sport]?.groups || []).filter(g => g.group !== "Coaching").flatMap(g => (g.stats || []).map(s => s.name));
   const editCols = sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []));
   const hasVal = (c) => Number(careerStats?.[c]) > 0 || (rows || []).some(r => Number(r.stats?.[c]) > 0);
   const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c));
@@ -2858,7 +2869,7 @@ function ImportSeasons({ school, roster = [] }) {
       // (other seasons untouched). Season comes from the filename, else we ask.
       if (pdfFiles.length) {
         const seasonValid = new Set([
-          ...(SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)),
+          ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
           ...(SPORTS[school.sport]?.statCategories || []).map((s) => s.name), // sport record stats (soccer: Goals/Assists/Saves/Shutouts)
           ...(DISPLAY_STATS[school.sport] || []),                             // canonical display stats (soccer: incl Shots & Shutouts)
           ...(roster || []).flatMap((p) => Object.keys(p.stats || {})),       // the program's ACTUAL stat names
@@ -5059,7 +5070,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
     // Non-stat columns to exclude
     const metaCols = new Set([nameCol, posCol, gradCol].filter(Boolean));
     const validStats = new Set([
-      ...(SPORTS[school.sport]?.groups || []).flatMap((g) => (g.stats || []).map((s) => s.name)),
+      ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
       ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
     ]);
     const imported = parsed.rows.map((row, i) => {
