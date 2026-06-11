@@ -384,12 +384,25 @@ const FOOTBALL_THRESHOLDS = {
   "Kick Off Returns":[10,25,50,75], "Kick Off Return Yards":[100,250,500,1000], "Kick Off Return TDs":[1,3,5,10],
   "All-Purpose Yards":[500,1000,2500,5000],
 };
+// Baseball career milestone thresholds (HS-scaled): hitting, fielding, pitching. Earned Runs is
+// intentionally omitted — it's lower-is-better, so accumulating it isn't an achievement.
+const BASEBALL_THRESHOLDS = {
+  "Games Played":[25,50,75,100], "Wins":[25,50,75,100],
+  "At Bats":[100,250,500], "Hits":[25,50,100,150], "Doubles":[10,25,50], "Triples":[5,10,15],
+  "Home Runs":[5,10,20,30], "Runs":[25,50,100,150], "RBIs":[25,50,100,150],
+  "Stolen Base":[10,25,50,75], "Walk (BB)":[25,50,100],
+  "Put Outs":[50,100,250,500], "Assists":[25,50,100,200], "Double Plays":[10,25,50],
+  "Pitcher Wins":[5,10,20,30], "Pitcher Appearances":[10,25,50,75], "Pitcher Games Started":[5,10,25,50],
+  "Pitcher Complete Games":[5,10,20], "Pitcher Shut Outs":[1,3,5,10], "Pitcher Saves":[5,10,20],
+  "No Hitters":[1,2,3], "Perfect Games":[1,2],
+  "Innings Pitched":[50,100,200,300], "Pitcher Strikeouts":[50,100,200,300],
+};
 // Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
 // those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : sport === "baseball" ? BASEBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
   const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
