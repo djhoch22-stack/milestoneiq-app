@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -6081,7 +6081,20 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
     setProgramOrder(ids);
     try { localStorage.setItem(orderKey, JSON.stringify(ids)); } catch (e) {}
+    if (authed && userId) updateProfile(userId, { program_order: ids }).catch(() => {}); // durable per-user save
   };
+  // On load, pull the durable per-user order from the user's profile (survives cache clears, private
+  // browsing, and other devices). localStorage gave the instant value above; the DB copy wins when set.
+  useEffect(() => {
+    if (!authed || !userId) return;
+    let cancelled = false;
+    getProgramOrder(userId).then(order => {
+      if (cancelled || !Array.isArray(order) || !order.length) return;
+      setProgramOrder(order);
+      try { localStorage.setItem(orderKey, JSON.stringify(order)); } catch (e) {}
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [userId, authed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setSchools = useCallback((updater) => {
     setSchoolsRaw(prev => {
