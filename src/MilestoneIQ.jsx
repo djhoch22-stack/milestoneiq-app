@@ -561,14 +561,14 @@ function pctRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
     const mn = minsFor(d, recordMins);
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.[d.qualStat]) < mn.season) continue;
+      if ((Number(r.stats?.[d.qualStat]) || 0) < mn.season) continue; // missing/NaN volume → 0 → never qualifies
       const p = rateValue(d, r.stats);
       if (p != null && (!ss || beats(p, ss.value))) ss = { value: p, holderName: r.player_name, holderYear: r.season || "" };
     }
     if (ss) out.push({ id: `auto-ss-${d.name}`, statName: d.name, variant: "Single season", sport, auto: true, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.[d.qualStat]) < mn.career) continue;
+      if ((Number(pl.stats?.[d.qualStat]) || 0) < mn.career) continue; // missing/NaN volume → 0 → never qualifies
       const p = rateValue(d, pl.stats);
       if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
