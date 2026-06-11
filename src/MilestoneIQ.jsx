@@ -686,6 +686,15 @@ function lowCountingRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
   }
   return out;
 }
+// Every stat with a tunable qualifying minimum, for the ⚙️ Record minimums editor: the derived rates
+// PLUS the lower-is-better counting records (e.g. Earned Runs). Shaped like a rate def
+// ({name, qualStat, minSeason, minCareer}) so the editor + minsFor treat them identically.
+function recordMinDefsFor(sport) {
+  return [
+    ...rateDefsFor(sport),
+    ...(LOW_RECORD_DEFS[sport] || []).map(d => ({ name: d.stat, qualStat: d.qualStat, minSeason: d.minSeason, minCareer: d.minCareer })),
+  ];
+}
 function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   const out = [];
   for (const stat of (statNames || [])) {
@@ -954,7 +963,7 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
 // how many At Bats / Innings Pitched / attempts a player needs before that stat can hold a
 // record or rank on the leaderboard. Saves ONLY values that differ from the defaults.
 function RecordMinimumsModal({ school, onClose, onSave }) {
-  const defs = rateDefsFor(school.sport);
+  const defs = recordMinDefsFor(school.sport);
   const [vals, setVals] = useState(() => {
     const o = {};
     for (const d of defs) { const m = minsFor(d, school.recordMins); o[d.name] = { season: String(m.season), career: String(m.career) }; }
@@ -983,7 +992,7 @@ function RecordMinimumsModal({ school, onClose, onSave }) {
           <button onClick={onClose} style={{ background:"#f3f4f6", border:"none", borderRadius:8, width:30, height:30, cursor:"pointer", fontSize:15 }}>✕</button>
         </div>
         <p style={{ margin:"0 0 16px", fontSize:13, color:"#6b7280" }}>
-          The fewest a player needs to qualify for a percentage / average record or leaderboard — so a hot 2-for-3 doesn't top the record book. Applies to records, the All-Time rankings, and your public page.
+          The minimum volume a player needs before a rate (AVG, ERA…) or fewest-is-best (Earned Runs) record or leaderboard counts — so a tiny sample can't top the record book. Applies to records, the All-Time rankings, and your public page.
         </p>
         <div style={{ border:"1px solid #f0eeea", borderRadius:10, overflow:"hidden" }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 100px 100px", gap:8, padding:"8px 14px", background:"#f9fafb", fontSize:11, fontWeight:700, color:"#9ca3af" }}>
@@ -5419,8 +5428,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 <p style={{ margin:"4px 0 0",fontSize:13,color:"#6b7280" }}>Each record is tracked by stat, variant, record holder, and year set. Alerts fire at 85%, 95%, and 100%.</p>
               </div>
               <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
-                {rateDefsFor(school.sport).length > 0 && (
-                  <button onClick={()=>setShowRecMins(true)} title="Set the minimum at-bats / innings / attempts a player needs to qualify for a percentage or average record"
+                {recordMinDefsFor(school.sport).length > 0 && (
+                  <button onClick={()=>setShowRecMins(true)} title="Set the minimum at-bats / innings / attempts a player needs to qualify for a percentage, average, or fewest-is-best record"
                     style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>⚙️ Record minimums</button>
                 )}
                 <button onClick={()=>setShowRecords(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add / edit records</button>
