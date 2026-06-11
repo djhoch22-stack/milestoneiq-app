@@ -54,6 +54,16 @@ const BASEBALL_DISPLAY = [
   "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched",
   "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches",
 ];
+// Baseball record/display CATEGORIES (Batting / Fielding / Pitching), the way football uses `groups`.
+// Same 35 stats as BASEBALL_DISPLAY, organized so the Records tab + player profiles section them.
+// Derived rates (AVG/ERA/…) aren't listed here — they inherit their anchor stat's group at render.
+const BASEBALL_GROUPS = [
+  { group: "General",  names: ["Games Played", "Wins"] },
+  { group: "Batting",  names: ["Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error"] },
+  { group: "Fielding", names: ["Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays"] },
+  { group: "Pitching", names: ["Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"] },
+  { group: "Coaching", names: ["Coach Wins"] },
+];
 
 const SPORTS = {
   football: {
@@ -143,7 +153,8 @@ const SPORTS = {
   },
   baseball: {
     label: "Baseball", icon: "⚾",
-    statCategories: [...BASEBALL_DISPLAY, "Coach Wins"].map(name => ({ name, variants: ["Career total", "Single season"] })),
+    groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   softball: {
     label: "Softball", icon: "🥎",
@@ -518,6 +529,28 @@ function minsFor(d, recordMins) {
   const s = Number(o.season), c = Number(o.career);
   return { season: s > 0 ? s : d.minSeason, career: c > 0 ? c : d.minCareer };
 }
+// ── Stat grouping (Batting/Fielding/Pitching for baseball; Passing/Rushing/… for football) ──────
+// The section a stat belongs to, for sectioned display on the records tab + player profiles. Raw
+// stats come from the sport's `groups`; a derived rate inherits the group of its anchor column
+// (AVG→At Bats→Batting, ERA→Innings Pitched→Pitching). null when the sport isn't grouped.
+function groupOfStat(sport, statName) {
+  const def = SPORTS[sport];
+  if (!def || !def.groups) return null;
+  const direct = def.groups.find(g => g.stats.some(s => s.name === statName));
+  if (direct) return direct.group;
+  const rd = rateDefsFor(sport).find(d => d.name === statName);
+  if (rd) { const anc = def.groups.find(g => g.stats.some(s => s.name === rd.after)); if (anc) return anc.group; }
+  return null;
+}
+function groupOrderFor(sport) { const def = SPORTS[sport]; return def && def.groups ? def.groups.map(g => g.group) : []; }
+// Section-label colors shared by the records tab, profile grid, and athlete card.
+const GROUP_STYLE = {
+  General: { bg: "#f1f5f9", fg: "#334155" }, Batting: { bg: "#dbeafe", fg: "#1e40af" },
+  Fielding: { bg: "#dcfce7", fg: "#166534" }, Pitching: { bg: "#f3e8ff", fg: "#6b21a8" },
+  Coaching: { bg: "#f1f5f9", fg: "#334155" },
+  Passing: { bg: "#dbeafe", fg: "#1e40af" }, Rushing: { bg: "#dcfce7", fg: "#166534" }, Receiving: { bg: "#fef3c7", fg: "#92400e" },
+  Offense: { bg: "#f3e8ff", fg: "#6b21a8" }, Defense: { bg: "#fee2e2", fg: "#991b1b" }, "Special Teams": { bg: "#ffedd5", fg: "#c2410c" },
+};
 // Auto record-holders for the rate stats: single-season (from player_seasons rows) and career
 // (from the career-totals pool), gated by a minimum volume (att / AB / chances) so small samples
 // don't top the leaderboard. Returns record objects the Records tab renders.
@@ -2233,14 +2266,25 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           {/* Stats grid with rankings */}
           <h3 style={{margin:"0 0 12px",fontSize:14,fontWeight:700,color:"#374151"}}>Career statistics & all-time rank</h3>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
-            {statsToShow.flatMap(stat => {
-              // After each stat show its per-game avg; after each "…Attempted" its shooting %.
-              const out = [{ stat }];
-              const pg = PERGAME_DEFS.find(p => p.stat === stat);
-              if (pg) out.push({ pgDef: pg });
-              for (const d of rateDefsFor(school.sport).filter(p => p.after === stat)) out.push({ pctDef: d });
-              return out;
-            }).map(entry => {
+            {(() => {
+              const grouped = groupOrderFor(school.sport).length > 0; let lastG = null;
+              return statsToShow.flatMap(stat => {
+                // Section header when the group changes (Batting/Fielding/Pitching), then the stat,
+                // its per-game avg, and its rate(s). Headers only appear for sports that declare groups.
+                const out = [];
+                if (grouped) { const gp = groupOfStat(school.sport, stat); if (gp && gp !== lastG) { out.push({ header: gp }); lastG = gp; } }
+                out.push({ stat });
+                const pg = PERGAME_DEFS.find(p => p.stat === stat);
+                if (pg) out.push({ pgDef: pg });
+                for (const d of rateDefsFor(school.sport).filter(p => p.after === stat)) out.push({ pctDef: d });
+                return out;
+              });
+            })().map(entry => {
+              if (entry.header) return (
+                <div key={"h-"+entry.header} style={{gridColumn:"1 / -1",marginTop:4}}>
+                  <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:(GROUP_STYLE[entry.header]||{}).fg||"#334155",background:(GROUP_STYLE[entry.header]||{}).bg||"#f1f5f9",borderRadius:4,padding:"2px 8px"}}>{entry.header}</span>
+                </div>
+              );
               if (entry.pgDef) {
                 const pg = entry.pgDef;
                 const v = perGame(player.stats, pg.stat);
@@ -5283,16 +5327,19 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                       </div>
                     ) : (
                       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
-                        {statsToDisplay([athlete], school.sport)
+                        {(() => {
+                          const grouped = groupOrderFor(school.sport).length > 0; let lastG = null;
+                          return statsToDisplay([athlete], school.sport)
                           .flatMap((k)=>{
+                            const out = [];
+                            if (grouped) { const gp = groupOfStat(school.sport, k); if (gp && gp !== lastG) { out.push(<div key={"h-"+gp} style={{gridColumn:"1 / -1",marginTop:2}}><span style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:(GROUP_STYLE[gp]||{}).fg||"#334155",background:(GROUP_STYLE[gp]||{}).bg||"#f1f5f9",borderRadius:4,padding:"1px 6px"}}>{gp}</span></div>); lastG = gp; } }
                             const v = athlete.stats?.[k];
-                            const tile = (
+                            out.push(
                               <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
                                 <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
                                 <div style={{ fontSize:13,fontWeight:600,color: v==null?"#d1d5db":"#111" }}>{v==null?"—":(typeof v==="number"?v.toLocaleString():v)}</div>
                               </div>
                             );
-                            const out = [tile];
                             // After its anchor column, each derived rate (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %).
                             for (const d of rateDefsFor(school.sport).filter(p => p.after === k)) {
                               const rv = rateValue(d, athlete.stats);
@@ -5304,7 +5351,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                               );
                             }
                             return out;
-                          })}
+                          });
+                          })()}
                       </div>
                     )}
                   </div>
@@ -5350,13 +5398,16 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   <button onClick={()=>setShowRecords(true)} style={{ marginTop:12,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontWeight:600,fontSize:13,cursor:"pointer" }}>Add records</button>
                 </div>
               : (()=>{
-                  const groupColors = { "Passing":"#dbeafe","Rushing":"#dcfce7","Receiving":"#fef3c7","Other Offense":"#f3e8ff","Special Teams":"#ffedd5","Defense":"#fee2e2","General":"#f1f5f9" };
-                  const groupTextColors = { "Passing":"#1e40af","Rushing":"#166534","Receiving":"#92400e","Other Offense":"#6b21a8","Special Teams":"#c2410c","Defense":"#991b1b","General":"#334155" };
+                  const groupColors = { "Passing":"#dbeafe","Rushing":"#dcfce7","Receiving":"#fef3c7","Other Offense":"#f3e8ff","Special Teams":"#ffedd5","Defense":"#fee2e2","General":"#f1f5f9","Batting":"#dbeafe","Fielding":"#dcfce7","Pitching":"#f3e8ff","Coaching":"#f1f5f9" };
+                  const groupTextColors = { "Passing":"#1e40af","Rushing":"#166534","Receiving":"#92400e","Other Offense":"#6b21a8","Special Teams":"#c2410c","Defense":"#991b1b","General":"#334155","Batting":"#1e40af","Fielding":"#166534","Pitching":"#6b21a8","Coaching":"#334155" };
 
                   const getGroup = (statName) => {
                     if (!sport.groups) return "Other";
                     const g = sport.groups.find(g => g.stats.some(s => s.name === statName));
-                    return g ? g.group : "Other";
+                    if (g) return g.group;
+                    const rd = rateDefsFor(school.sport).find(d => d.name === statName); // a rate sits in its anchor's group
+                    if (rd) { const a = sport.groups.find(g => g.stats.some(s => s.name === rd.after)); if (a) return a.group; }
+                    return "Other";
                   };
                   // Render groups in the sport's declared group order (not record-insertion order).
                   const groupOrder = (sport.groups || []).map(g => g.group);
