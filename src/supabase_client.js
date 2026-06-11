@@ -45,6 +45,18 @@ export const updateProfile = async (userId, updates) => {
   return { data, error };
 };
 
+// Per-user home-page program order (durable, stored in the user's profile). Returns [] if unset.
+export const getProgramOrder = async (userId) => {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('program_order')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return [];
+  return Array.isArray(data.program_order) ? data.program_order : [];
+};
+
 // Change the signed-in user's password. Verifies the current password by
 // re-authenticating first (Supabase's updateUser doesn't check it otherwise).
 export const changePassword = async (email, currentPassword, newPassword) => {
