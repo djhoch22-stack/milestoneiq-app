@@ -657,9 +657,39 @@ function longestRecordsFrom(seasonRows, sport) {
 // matches the All-Time tab (Wins, Goals, Assists, Saves, Points, Shutouts, …). For each
 // stat: career = the most over the all-time roster; single-season = the best player_seasons
 // row. Returned once PER tied holder so the Records tile lists everyone sharing the value.
+// Counting stats whose RECORD is the FEWEST (lower is better, golf-style), qualified by a volume
+// stat so a tiny sample can't "win" with 0. Baseball: fewest Earned Runs among real pitchers.
+const LOW_RECORD_DEFS = {
+  baseball: [{ stat: "Earned Runs", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40 }],
+};
+function isLowRecordStat(sport, stat) { return (LOW_RECORD_DEFS[sport] || []).some(d => d.stat === stat); }
+// Fewest-value records (career + single-season) for the lower-is-better counting stats, gated by the
+// volume minimum (innings) — tunable through record minimums, same as the rate records.
+function lowCountingRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
+  const out = [];
+  for (const d of (LOW_RECORD_DEFS[sport] || [])) {
+    const mn = minsFor({ name: d.stat, minSeason: d.minSeason, minCareer: d.minCareer }, recordMins);
+    let ss = null;
+    for (const r of (seasonRows || [])) {
+      if ((Number(r.stats?.[d.qualStat]) || 0) < mn.season) continue;
+      const v = Number(r.stats?.[d.stat]); if (isNaN(v)) continue;
+      if (!ss || v < ss.value) ss = { value: v, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (ss) out.push({ id: `auto-low-ss-${d.stat}`, statName: d.stat, variant: "Single season", sport, auto: true, lowerBetter: true, ...ss });
+    let car = null;
+    for (const pl of (careerPlayers || [])) {
+      if ((Number(pl.stats?.[d.qualStat]) || 0) < mn.career) continue;
+      const v = Number(pl.stats?.[d.stat]); if (isNaN(v)) continue;
+      if (!car || v < car.value) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+    }
+    if (car) out.push({ id: `auto-low-c-${d.stat}`, statName: d.stat, variant: "Career total", sport, auto: true, lowerBetter: true, ...car });
+  }
+  return out;
+}
 function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   const out = [];
   for (const stat of (statNames || [])) {
+    if (isLowRecordStat(sport, stat)) continue; // shown as a "fewest" record by lowCountingRecordsFrom instead
     let mc = 0;
     for (const p of (careerPlayers || [])) { const v = Number(p.stats?.[stat]); if (v > mc) mc = v; }
     if (mc > 0) {
@@ -2145,6 +2175,7 @@ function programRecordCount(school) {
   const statNames = statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s));
   const autoRecs = [
     ...pctRecordsFrom(seasonRows, recPool, school.sport, school.recordMins),
+    ...lowCountingRecordsFrom(seasonRows, recPool, school.sport, school.recordMins),
     ...pergameRecordsFrom(seasonRows, recPool, school.sport),
     ...longestRecordsFrom(seasonRows, school.sport),
     ...autoStatRecords(seasonRows, (school.allTimeRoster || []), statNames, school.sport),
@@ -3032,10 +3063,15 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   // Ranked value for the selected category: a counting stat reads straight off the career stats;
   // a derived rate computes from them and requires the career qualifying volume (else null → hidden).
   const rateDef = RATE_DEFS.find(d => d.name === sortStat) || null;
-  const lowerBetter = !!(rateDef && rateDef.lowerIsBetter); // ERA: rank ascending; 0.00 is a valid (best) value
+  // Lower-is-better COUNTING stat (e.g. fewest Earned Runs), qualified by innings — ranks ascending too.
+  const lowDef = !rateDef ? (LOW_RECORD_DEFS[school?.sport] || []).find(d => d.stat === sortStat) : null;
+  const lowMins = lowDef ? minsFor({ name: lowDef.stat, minSeason: lowDef.minSeason, minCareer: lowDef.minCareer }, school?.recordMins) : null;
+  const lowerBetter = !!(rateDef && rateDef.lowerIsBetter) || !!lowDef; // ERA / fewest-ER: rank ascending; 0 is a valid (best) value
   const rateMins = rateDef ? minsFor(rateDef, school?.recordMins) : null; // program's qualifying minimums
   const valOf = (p) => rateDef
     ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins.career ? rateValue(rateDef, p.stats) : null)
+    : lowDef
+    ? ((Number(p.stats?.[lowDef.qualStat]) || 0) >= lowMins.career ? (Number(p.stats?.[lowDef.stat]) || 0) : null)
     : (p.stats[sortStat] || 0);
 
   const filtered = roster
@@ -3079,7 +3115,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,background:"#fff",color:"#111"}}>
           {SORT_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
-        {rateDef && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {rateMins.career} {rateDef.qualStat} (career)</span>}
+        {(rateDef || lowDef) && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {(rateDef ? rateMins : lowMins).career} {(rateDef || lowDef).qualStat} (career){lowerBetter ? " · lower is better" : ""}</span>}
         <div style={{display:"flex",gap:0,border:"1px solid #e5e7eb",borderRadius:8,overflow:"hidden"}}>
           {[["all","All players"],["current","Active"],["alumni","Alumni"]].map(([val,label])=>(
             <button key={val} onClick={()=>{setFilterActive(val);setPage(0);}}
@@ -4687,6 +4723,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
     const recPool = [...(sch.athletes || []), ...(sch.allTimeRoster || [])];
     const auto = [
       ...pctRecordsFrom(seasonRows, recPool, sch.sport, sch.recordMins),
+      ...lowCountingRecordsFrom(seasonRows, recPool, sch.sport, sch.recordMins),
       ...pergameRecordsFrom(seasonRows, recPool, sch.sport),
       ...longestRecordsFrom(seasonRows, sch.sport),
       ...autoStatRecords(seasonRows, (sch.allTimeRoster || []), statsToDisplay(recPool, sch.sport).filter(s => !/^Longest /.test(s)), sch.sport),
@@ -5430,6 +5467,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   const recPool = [...(school.athletes||[]), ...(school.allTimeRoster||[])];
                   const autoRecs = [
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport, school.recordMins),
+                    ...lowCountingRecordsFrom(allSeasonRows, recPool, school.sport, school.recordMins),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
                     ...longestRecordsFrom(allSeasonRows, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s)), school.sport),
@@ -5466,7 +5504,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                           <div key={statName} style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",marginBottom:8,overflow:"hidden" }}>
                             <div style={{ padding:"10px 16px",borderBottom:"1px solid #f3f0ea",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                               <div style={{ fontWeight:700,fontSize:14,color:"#111" }}>{statName}</div>
-                              {leader&&<div style={{ fontSize:12,color:"#6b7280" }}>Current leader: <strong>{leader.name}</strong> ({leader.stats[statName].toLocaleString()})</div>}
+                              {leader && !isLowRecordStat(school.sport, statName) && <div style={{ fontSize:12,color:"#6b7280" }}>Current leader: <strong>{leader.name}</strong> ({leader.stats[statName].toLocaleString()})</div>}
                             </div>
                             <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8 }}>
                               {(() => {
@@ -5481,13 +5519,14 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                                 return groups.map(group => {
                                   const rec = group[0];
                                   const isPct = !!RATE_FMT[rec.statName]; // "is a derived rate" (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %)
+                                  const isLow = !!rec.lowerBetter;        // fewest-is-best counting record (e.g. Earned Runs)
                                   const leaderVal = leader?.stats[statName];
-                                  // % records aren't a "chase the leader" progress bar — only counting records show one.
-                                  const p = (!isPct && leaderVal && rec.variant==="Career total") ? pct(leaderVal, rec.value) : null;
+                                  // % + fewest records aren't a "chase the leader" progress bar — only normal counting records show one.
+                                  const p = (!isPct && !isLow && leaderVal && rec.variant==="Career total") ? pct(leaderVal, rec.value) : null;
                                   return (
                                     <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
                                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
-                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : `Best (${rec.variant})`) : rec.variant}</span>
+                                        <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : `Best (${rec.variant})`) : isLow ? (rec.variant === "Career total" ? "Career fewest" : "Season fewest") : rec.variant}</span>
                                         <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? fmtRateVal(RATE_FMT[rec.statName], rec.value) : rec.value.toLocaleString()}</span>
                                       </div>
                                       {(() => {
