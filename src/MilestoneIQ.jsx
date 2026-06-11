@@ -3101,11 +3101,14 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const lowMins = lowDef ? minsFor({ name: lowDef.stat, minSeason: lowDef.minSeason, minCareer: lowDef.minCareer }, school?.recordMins) : null;
   const lowerBetter = !!(rateDef && rateDef.lowerIsBetter) || !!lowDef; // ERA / fewest-ER: rank ascending; 0 is a valid (best) value
   const rateMins = rateDef ? minsFor(rateDef, school?.recordMins) : null; // program's qualifying minimums
-  const valOf = (p) => rateDef
-    ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins.career ? rateValue(rateDef, p.stats) : null)
-    : lowDef
-    ? ((Number(p.stats?.[lowDef.qualStat]) || 0) >= lowMins.career ? (Number(p.stats?.[lowDef.stat]) || 0) : null)
-    : (p.stats[sortStat] || 0);
+  const valOf = (p) => {
+    if (!p || !p.stats) return null; // no player (e.g. empty search result) → no value; never deref undefined
+    return rateDef
+      ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins.career ? rateValue(rateDef, p.stats) : null)
+      : lowDef
+      ? ((Number(p.stats?.[lowDef.qualStat]) || 0) >= lowMins.career ? (Number(p.stats?.[lowDef.stat]) || 0) : null)
+      : (p.stats[sortStat] || 0);
+  };
 
   const filtered = roster
     .filter(p => {
@@ -3118,7 +3121,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
     .filter(p => lowerBetter ? valOf(p) != null : (valOf(p) || 0) > 0)
     .sort((a,b) => lowerBetter ? (valOf(a) ?? Infinity) - (valOf(b) ?? Infinity) : (valOf(b)||0) - (valOf(a)||0));
 
-  const maxVal = valOf(filtered[0]) ?? 1; // best value either way (max desc / min asc) — drives the bars; desc list is >0-filtered so never 0
+  const maxVal = filtered.length ? (valOf(filtered[0]) ?? 1) : 1; // guard empty results — valOf(undefined) would crash the tab
 
   return (
     <div>
