@@ -3919,12 +3919,28 @@ function crossSportNameMatch(a, b) {
   const [short, long] = fa.length <= fb.length ? [fa, fb] : [fb, fa];
   return short.length >= 3 && long.startsWith(short);                // Jon ↔ Jonathan
 }
-function calcCrossSportScore(playerName, allSchools) {
+// Gender of a sport for cross-sport linking: "F" girls/women's, "M" boys/men's, "X" football — which
+// links across ALL genders (the program owner's choice). Gates name-linking so a boy and a girl with
+// the same name are never merged into one multi-sport athlete.
+function sportGender(sport) {
+  const s = String(sport || "").toLowerCase();
+  if (s.includes("football")) return "X"; // football bridges every gender
+  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball" || s.includes("volleyball")) return "F";
+  return "M"; // _boys / soccer / baseball / basketball / wrestling / men's
+}
+// A same-name player links across two sports only when same gender — OR either side is football.
+function sportsLinkable(a, b) {
+  if (a === b) return true;
+  const ga = sportGender(a), gb = sportGender(b);
+  return ga === "X" || gb === "X" || ga === gb;
+}
+function calcCrossSportScore(playerName, allSchools, homeSport) {
   const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
   const nameLower = norm(playerName);
   const programScores = [];
 
   allSchools.forEach(school => {
+    if (homeSport && !sportsLinkable(homeSport, school.sport)) return; // gender-gate (football links across all)
     const roster = school.allTimeRoster || [];
     // Exact (normalized) match first; otherwise a conservative fuzzy match, but ONLY when it is unambiguous
     // (exactly one candidate) so "J. Smith" never links when both "John" and "James Smith" exist.
@@ -4550,7 +4566,7 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
     try {
       const ab = playerAwardBonus(player.name, awards, hofPlayerNames);
       const programScore = Math.min(calcProgramHofScore(player, school) + ab, 100);
-      const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools) : null;
+      const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools, school.sport) : null;
       const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
       const nm = normName(player.name);
       const xState = hofStateNames.has(nm);
