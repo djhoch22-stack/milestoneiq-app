@@ -3056,7 +3056,7 @@ function ImportSeasons({ school, roster = [] }) {
   );
 }
 
-function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
+function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [] }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
   // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
   // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
@@ -3070,6 +3070,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const [page, setPage] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [season, setSeason] = useState("all"); // "all" = career totals; or a specific season label
   const PAGE_SIZE = 25;
   const addPlayerModal = (showAdd && school && onUpdate) ? (
     <AddAthleteModal sport={school.sport} existingNames={[...(roster || []), ...(athletes || [])].map(p => p.name)}
@@ -3090,6 +3091,22 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
     </div>
   );
 
+  // Season selector: "all" = career totals (the default); a specific season swaps each player's stats
+  // to THAT season's row, so the leaderboard reflects just that year. Seasons come from player_seasons.
+  const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const seasonOpts = [...new Set((allSeasonRows || []).map(r => r.season).filter(Boolean))].sort((a, b) => String(b).localeCompare(String(a)));
+  const seasonView = season !== "all";
+  const qualKey = seasonView ? "season" : "career"; // rate / fewest qualifying minimum scope
+  const displayRoster = seasonView
+    ? (() => {
+        const byName = new Map((roster || []).map(p => [norm(p.name), p]));
+        return (allSeasonRows || []).filter(r => r.season === season).map(r => {
+          const base = byName.get(norm(r.player_name)); // career record → keep gradYear/active/years + open full profile
+          return base ? { ...base, stats: r.stats || {}, _career: base } : { id: "s-" + norm(r.player_name), name: r.player_name, stats: r.stats || {} };
+        });
+      })()
+    : roster;
+
   const effectiveIsActive = makeEffectiveIsActive(athletes);
   const rankFor = makeRankFor(roster);
 
@@ -3104,13 +3121,13 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
   const valOf = (p) => {
     if (!p || !p.stats) return null; // no player (e.g. empty search result) → no value; never deref undefined
     return rateDef
-      ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins.career ? rateValue(rateDef, p.stats) : null)
+      ? ((Number(p.stats?.[rateDef.qualStat]) || 0) >= rateMins[qualKey] ? rateValue(rateDef, p.stats) : null)
       : lowDef
-      ? ((Number(p.stats?.[lowDef.qualStat]) || 0) >= lowMins.career ? (Number(p.stats?.[lowDef.stat]) || 0) : null)
+      ? ((Number(p.stats?.[lowDef.qualStat]) || 0) >= lowMins[qualKey] ? (Number(p.stats?.[lowDef.stat]) || 0) : null)
       : (p.stats[sortStat] || 0);
   };
 
-  const filtered = roster
+  const filtered = displayRoster
     .filter(p => {
       const active = effectiveIsActive(p);
       if (filterActive==="current" && !active) return false;
@@ -3141,7 +3158,9 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
         <div>
           <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#111"}}>All-time program history</h2>
           <p style={{margin:"4px 0 0",fontSize:13,color:"#6b7280"}}>
-            {roster.length} players · {roster.filter(p=>effectiveIsActive(p)).length} currently active · records since 1977
+            {seasonView
+              ? `${displayRoster.length} player${displayRoster.length!==1?"s":""} · ${season} season`
+              : `${roster.length} players · ${roster.filter(p=>effectiveIsActive(p)).length} currently active · records since 1977`}
           </p>
         </div>
         {addPlayerBtn}
@@ -3151,7 +3170,14 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,background:"#fff",color:"#111"}}>
           {SORT_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
-        {(rateDef || lowDef) && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {(rateDef ? rateMins : lowMins).career} {(rateDef || lowDef).qualStat} (career){lowerBetter ? " · lower is better" : ""}</span>}
+        {seasonOpts.length > 0 && (
+          <select value={season} onChange={e=>{setSeason(e.target.value);setPage(0);}} title="View just one season's players & stats"
+            style={{border:`1px solid ${seasonView?"#bfdbfe":"#e5e7eb"}`,borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,background:seasonView?"#eff6ff":"#fff",color:seasonView?"#1a56db":"#111"}}>
+            <option value="all">All-time (career)</option>
+            {seasonOpts.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        {(rateDef || lowDef) && <span style={{fontSize:12,color:"#9ca3af",whiteSpace:"nowrap"}}>min {(rateDef ? rateMins : lowMins)[qualKey]} {(rateDef || lowDef).qualStat} ({seasonView ? "season" : "career"}){lowerBetter ? " · lower is better" : ""}</span>}
         <div style={{display:"flex",gap:0,border:"1px solid #e5e7eb",borderRadius:8,overflow:"hidden"}}>
           {[["all","All players"],["current","Active"],["alumni","Alumni"]].map(([val,label])=>(
             <button key={val} onClick={()=>{setFilterActive(val);setPage(0);}}
@@ -3188,7 +3214,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate }) {
               const active = effectiveIsActive(p);
               return (
                 <tr key={p.id}
-                  onClick={()=>setSelectedPlayer(p)}
+                  onClick={()=>setSelectedPlayer(p._career || p)}
                   style={{borderBottom:"1px solid #f9f7f4",background:i%2===0?"#fff":"#fafaf8",cursor:"pointer",transition:"background 0.1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f7ff"}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafaf8"}>
@@ -5798,7 +5824,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
 
 
         {/* ALL-TIME TAB */}
-        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} />}
+        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} allSeasonRows={allSeasonRows} />}
 
         {/* SEASONS TAB */}
         {activeTab==="seasons" && (
