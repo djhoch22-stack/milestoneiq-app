@@ -1573,6 +1573,8 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 }
 
 // ── Add Athlete Modal ──────────────────────────────────────────────────────────
+// Soccer "Points" is auto-computed in the DB (Goals×2 + Assists), so it's NOT enterable in the forms below.
+const SOCCER_SPORTS = new Set(["soccer", "soccer_girls"]);
 // Whether a graduation year is a CURRENT student, so a manually-added player is only auto-marked
 // active when actually enrolled (an alumnus stays inactive). The senior class rolls over in July
 // (matches the rest of the app); blank/unknown year → not current (don't auto-activate).
@@ -1586,7 +1588,7 @@ function isCurrentGradYear(gradYear) {
 function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
   const sportDef = SPORTS[sport] || SPORTS.football;
   // Coach Wins is a COACHING stat (auto-computed from the Seasons tab) — never an enterable player stat.
-  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n) && n !== "Coach Wins"))];
+  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n) && n !== "Coach Wins" && !(SOCCER_SPORTS.has(sport) && n === "Points")))];
   const [form, setForm] = useState({ name:"", position:"", gradYear: new Date().getFullYear()+2 });
   const [stats, setStats] = useState({});
   const [err, setErr] = useState("");
@@ -2038,7 +2040,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   // Edit grid shows EVERY stat for the sport (so any stat is enterable); the view
   // table shows only stats that actually have values (career or any season).
   const sportCols = (SPORTS[sport]?.groups || []).filter(g => g.group !== "Coaching").flatMap(g => (g.stats || []).map(s => s.name));
-  const editCols = sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []));
+  const editCols = (sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []))).filter(c => !(SOCCER_SPORTS.has(sport) && c === "Points"));
   const hasVal = (c) => Number(careerStats?.[c]) > 0 || (rows || []).some(r => Number(r.stats?.[c]) > 0);
   const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c));
   const viewCols = [...editCols, ...extraKeys].filter(hasVal);
