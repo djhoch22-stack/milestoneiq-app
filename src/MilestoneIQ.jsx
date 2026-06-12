@@ -2200,7 +2200,18 @@ function activeAlerts(school) {
 }
 function activeAlertCount(school) { return activeAlerts(school).reduce((n, x) => n + x.alerts.length, 0); }
 // Inducted Hall-of-Fame members (school or state).
-function hofMemberCount(school) { return (school.allTimeRoster || []).filter(p => p.schoolHallOfFame || p.stateHallOfFame).length; }
+function hofMemberCount(school, allSchools) {
+  // Count this program's roster players who are HOF members in THIS sport OR any gender-compatible one
+  // (girls↔girls, boys↔boys, football bridges) — matches the HOF tab's cross-sport recognition, so a
+  // multi-sport inductee (e.g. inducted in girls basketball) is counted on her girls-soccer tile too.
+  const schools = (allSchools && allSchools.length) ? allSchools : [school];
+  const inducted = new Set();
+  schools.forEach(p => {
+    if (!sportsLinkable(school.sport, p.sport)) return;
+    (p.allTimeRoster || []).forEach(pl => { if (pl.schoolHallOfFame || pl.stateHallOfFame) inducted.add(normName(pl.name)); });
+  });
+  return (school.allTimeRoster || []).filter(p => inducted.has(normName(p.name))).length;
+}
 // Total records a program shows on the Records tab = stored records + every auto-computed record
 // (career / single-season / per-game / % / longest / coach-wins), minus auto rows a manual record overrides.
 // Needs the program's season rows in school.allSeasonRows; with none it still counts career/coach records.
@@ -4553,6 +4564,7 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   const hofSchoolNames = new Set();
   const hofStateNames = new Set();
   ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
+    if (!sportsLinkable(school.sport, p.sport)) return; // gender-gate cross-sport HOF recognition (football bridges)
     (p.allTimeRoster || []).forEach(pl => {
       const nm = normName(pl.name);
       if (pl.schoolHallOfFame) hofSchoolNames.add(nm);
@@ -6442,7 +6454,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                   <div style={{ padding:16 }}>
                     <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12 }}>
                       {[[school.athletes.filter(a=>a.isActive!==false).length,"athletes"],
-                    [hofMemberCount(school),"HOF"],[alerts,"alerts"],[recordCounts[school.id] ?? (school.records||[]).length,"records"]].map(([v,l])=>(
+                    [hofMemberCount(school, orderedSchools),"HOF"],[alerts,"alerts"],[recordCounts[school.id] ?? (school.records||[]).length,"records"]].map(([v,l])=>(
                         <div key={l} style={{ textAlign:"center",background:"#f9fafb",borderRadius:8,padding:"8px 4px" }}>
                           <div style={{ fontWeight:700,fontSize:18,color:"#111" }}>{v}</div>
                           <div style={{ fontSize:11,color:"#9ca3af" }}>{l}</div>
