@@ -54,7 +54,16 @@ BASEBALL — a MaxPreps printout has SEVERAL sections in this order: Batting (tw
 - SAME-HEADER WARNING — qualify every value by the table it came from: "AB" in a Batting table = "At Bats", but "AB" in a Pitching table = "At Bats Pitcher". In a PITCHING table the H, R, BB, 2B, 3B, HR, HBP, SF, SH/B columns are what the pitcher ALLOWED — IGNORE them (only the Batting versions are kept) — EXCEPT ER, which you DO keep as "Earned Runs" (it computes ERA). In pitching, "SO" means shutouts (→"Pitcher Shut Outs"), NOT strikeouts — pitcher strikeouts are the "K" column. Take "PO" only from the Fielding table (the pitching "PO" is pickoffs — ignore it).
 - A player's name may carry a grade like "G. Gunnett (So)" — use the name WITHOUT the grade ("G. Gunnett"); if a season year is shown (e.g. "2025-26") set gradYear from the grade (Sr = the season's ending year, Jr +1, So +2, Fr +3).
 
-For other sports (basketball, soccer, volleyball, etc.) there is usually one table — use the exact stat names shown.
+BASKETBALL — a MaxPreps printout has SEVERAL sections in this order: "Game Stats", "Shooting", a 3PT/Free-Throw table, "Totals", and "Misc Totals". The SAME player (match by jersey # + last name) appears in every section — COMBINE them into one object. Read TOTALS only — never per-game or rate columns.
+- ⛔ IGNORE the ENTIRE "Game Stats" section. Every column in it (MPG, PPG, DEFR, OFFR, RPG, APG, SPG, BPG, TPG, PFPG) is a PER-GAME AVERAGE, not a total — using it produces wrong decimals like 0.6. Pull stats ONLY from the "Shooting", 3PT/FT, and "Totals" sections.
+- Games Played (GP). Wins: read the team's OVERALL win total from the "Overall W-L" line near the top (e.g. "Overall 17-8" → 17) and set "Wins" to that number for EVERY athlete.
+- "Totals" section (header GP Min Pts OReb DReb Reb Ast Stl Blk TO PF): Pts→"Points", OReb→"Offensive Rebounds", DReb→"Defensive Rebounds", Reb→"Total Rebounds", Ast→"Assists", Stl→"Steals", Blk→"Blocks" (ignore Min, TO, PF).
+- "Shooting" section (header GP Min Pts FGM FGA FG% PPS AFG%): FGM→"Field Goals Made", FGA→"Field Goals Attempted" (ignore FG%, PPS, AFG%, Min).
+- 3PT/Free-Throw table (header GP Min Pts 3PM 3PA 3P% FTM FTA FT% 2FGM 2FGA 2FG%): 3PM→"Three Pointers Made", 3PA→"Three Pointers Attempted", FTM→"Free Throws Made", FTA→"Free Throws Attempted". IGNORE 2FGM/2FGA/2FG% (those are 2-pointers only — TOTAL field goals are the FGM/FGA from the Shooting section, NOT 2FGM+3PM).
+- IGNORE every percentage, per-game, and ratio column anywhere (FG%, 3P%, FT%, 2FG%, PPS, AFG%, MPG, PPG, RPG, APG, SPG, BPG, and the Misc-Totals ratios like Ast:TO). Counting TOTALS only — a "Made" total can NEVER exceed its "Attempted" total.
+- SKIP the "Season Totals" team row at the top of each section. A name may carry a grade like "J. Beijer (Jr)" — use the name without the grade; if a season year is shown set gradYear from the grade (Sr = season's ending year, Jr +1, So +2, Fr +3).
+
+For other sports (soccer, volleyball, etc.) there is usually one table — use the exact stat names shown.
 Include every athlete and every stat you find. Omit zero/blank stats.`;
 
 Deno.serve(async (req) => {
