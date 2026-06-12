@@ -353,14 +353,20 @@ export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
 
 // ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
 const HOF_STAT_WEIGHTS = {
-  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 8, "Games Played": 3,
+  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 0, "Games Played": 3,
   "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
   "Total Tackles": 8, "Tackles": 8, "Solo Tackles": 4, "Assist Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
   "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
   "Goals": 10, "Saves": 8, "Shutouts": 7, "Coach Wins": 0,
+  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
+  "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
+  "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
 };
+// TEAM / participation stats — given to every roster player, so NOT individual achievements
+// (excluded from impact scoring AND the record bonus).
+const TEAM_STATS = new Set(["Wins", "Coach Wins"]);
 function getSeasonSuccessScore(notes) {
   if (!notes) return 0;
   const n = notes.toLowerCase(); let score = 0;
@@ -396,14 +402,16 @@ export function calcProgramHofScore(player, school) {
     else if (rank / total <= 0.50) rankPct = 0.20; else rankPct = 0.05;
     statScore += weight * rankPct;
   });
-  const statNorm = totalWeight > 0 ? (statScore / totalWeight) * 70 : 0;
+  const impact = totalWeight > 0 ? statScore / totalWeight : 0; // individual-impact factor 0–1 (team Wins excluded)
+  const statNorm = impact * 70;
   let teamScore = 0;
   (school.seasons || []).forEach((s) => { if (playerSeasonOverlap(player, s)) teamScore += getSeasonSuccessScore(s.notes); });
-  const teamNorm = Math.min(teamScore / 3, 30);
+  const teamNorm = Math.min(teamScore / 3, 30) * (0.2 + 0.8 * impact); // team success scaled by the player's impact
   const pn = (player.name || "").toLowerCase().trim(); let recordBonus = 0;
   (school.records || []).forEach((rec) => {
     const h = (rec.holderName || "").toLowerCase().trim();
     if (!h || h === "multiple players") return;
+    if (TEAM_STATS.has(rec.statName)) return; // team records (Wins) aren't individual achievements
     if (h === pn) recordBonus += (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
   });
   return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
