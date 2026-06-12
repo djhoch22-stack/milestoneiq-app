@@ -3737,7 +3737,7 @@ const HOF_STAT_WEIGHTS = {
   "Total Rebounds":            6,
   "Steals":                    6,
   "Blocks":                    5,
-  "Wins":                      8,
+  "Wins":                      0,  // TEAM stat — given to every roster player; never an individual rank/record
   "Games Played":              3,
   "Field Goals Made":          4,
   "Field Goals Attempted":     2,
@@ -3771,9 +3771,17 @@ const HOF_STAT_WEIGHTS = {
   "Goals":                    10,
   "Saves":                     8,
   "Shutouts":              7,
+  // Baseball — hitting + pitching impact (fielding Put Outs/Assists count too; "Assists" is shared above)
+  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
+  "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
+  "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
   // Generic
   "Coach Wins":                0,  // excluded from player scoring
 };
+// TEAM / participation stats are assigned to every roster player, so they are NOT individual
+// achievements — excluded from the impact score AND the record bonus (a benchwarmer must not rank
+// #1 on "team wins" or hold the team-wins record).
+const TEAM_STATS = new Set(["Wins", "Coach Wins"]);
 
 // Postseason / team success weight per season
 function getSeasonSuccessScore(notes) {
@@ -3853,8 +3861,11 @@ function calcProgramHofScore(player, school) {
     statScore += weight * rankPct;
   });
 
-  // Normalize stat score to 0–70 (leaves room for team success bonus)
-  const statNorm = totalWeight > 0 ? (statScore / totalWeight) * 70 : 0;
+  // Individual-impact factor (0–1): the player's weighted-average rank across their OWN stats. Team
+  // stats (Wins) are weight 0, so a bench player on a winning team can't inflate it. Drives statNorm
+  // AND scaffolds the team-success bonus below.
+  const impact = totalWeight > 0 ? statScore / totalWeight : 0;
+  const statNorm = impact * 70;
 
   // Team success score: sum success of seasons player was active
   const seasons = school.seasons || [];
@@ -3864,8 +3875,10 @@ function calcProgramHofScore(player, school) {
       teamScore += getSeasonSuccessScore(s.notes);
     }
   });
-  // Cap team score contribution at 30 points (0–30 range)
-  const teamNorm = Math.min(teamScore / 3, 30);
+  // Team success counts, but SCALED BY THE PLAYER'S IMPACT — a key contributor on a deep playoff run
+  // earns far more than a benchwarmer on the same team (0.2 baseline keeps role players non-zero).
+  const teamSuccessNorm = Math.min(teamScore / 3, 30);
+  const teamNorm = teamSuccessNorm * (0.2 + 0.8 * impact);
 
   // Record-holder bonus: +5 per career record held, +3 per single-season record
   const records = school.records || [];
@@ -3874,6 +3887,7 @@ function calcProgramHofScore(player, school) {
   records.forEach(rec => {
     const holderLower = (rec.holderName || "").toLowerCase().trim();
     if (!holderLower || holderLower === "multiple players") return;
+    if (TEAM_STATS.has(rec.statName)) return; // team records (e.g. Wins) aren't individual achievements
     if (holderLower === playerNameLower) {
       recordBonus += (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
     }
@@ -4796,7 +4810,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
     const nameLower = (pl.name || "").toLowerCase().trim();
     return all.filter(r => {
       const h = (r.holderName || "").toLowerCase().trim();
-      return h && h !== "multiple players" && h === nameLower;
+      return h && h !== "multiple players" && h === nameLower && !TEAM_STATS.has(r.statName); // team records (Wins) aren't personal
     });
   };
 
