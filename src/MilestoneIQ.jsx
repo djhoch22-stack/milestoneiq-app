@@ -3771,6 +3771,7 @@ const HOF_STAT_WEIGHTS = {
   "Goals":                    10,
   "Saves":                     8,
   "Shutouts":              7,
+  "Shots":                     4,  // attacking involvement — below Goals/Assists (a shot isn't a goal)
   // Baseball — hitting + pitching impact (fielding Put Outs/Assists count too; "Assists" is shared above)
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
