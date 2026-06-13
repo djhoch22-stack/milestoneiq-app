@@ -525,6 +525,34 @@ export function awardLabel(a) {
   return PLAYER_AWARD_LABELS[a.kind] || a.kind;
 }
 
+// ── Team success ("during career") — ported from MilestoneIQ.jsx so public cards match the app ──
+// Postseason / league weight per season from its free-text notes.
+export function seasonSuccessScore(notes) {
+  if (!notes) return 0;
+  const n = String(notes).toLowerCase(); let s = 0;
+  if (/state champ/.test(n)) s += 30;
+  else if (/state runner.?up/.test(n)) s += 22;
+  else if (/final.?four|final 4/.test(n)) s += 16;
+  else if (/elite.?8/.test(n)) s += 12;
+  else if (/sweet.?16/.test(n)) s += 8;
+  else if (/round of|first round|playoff/.test(n)) s += 4;
+  if (/league champ/.test(n)) s += 10;
+  return s;
+}
+// Years a player was active: from "YYYY-YYYY" range strings (uses each range's END year) or a 4-yr gradYear span.
+export function activeYears(firstYear, lastYear, gradYear) {
+  if (firstYear && lastYear) {
+    const a = parseInt(String(firstYear).split("-")[1] || String(firstYear), 10);
+    const b = parseInt(String(lastYear).split("-")[1] || String(lastYear), 10);
+    if (!isNaN(a) && !isNaN(b)) { const ys = []; for (let y = a; y <= b; y++) ys.push(y); return ys; }
+  }
+  const g = parseInt(gradYear, 10);
+  return isNaN(g) ? [] : [g - 3, g - 2, g - 1, g];
+}
+export function seasonEndYear(seasonStr) {
+  return parseInt(String(seasonStr || "").split("-")[1] || String(seasonStr || ""), 10);
+}
+
 // Full HTML document shell with SEO meta + JSON-LD + app-matching styles +
 // JS-free CSS tabs. `body` is the page content (may include the .tabs markup).
 export function htmlShell({ title, description, canonical, image, jsonld, body, noindex }) {
