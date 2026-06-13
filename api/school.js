@@ -7,7 +7,7 @@ import {
   statsToDisplay, rateDefsFor, rateValue, fmtRateVal, RATE_FMT,
   pctRecordsFrom, pergameRecordsFrom, longestRecordsFrom, autoStatRecords,
   awardsForHolder, awardLabel, buildCoachStats, normName,
-  seasonSuccessScore, activeYears, seasonEndYear,
+  seasonSuccessScore, activeYears, seasonEndYear, coachPostseason,
 } from "./_lib.js";
 
 export default async function handler(req, res) {
@@ -126,8 +126,11 @@ export default async function handler(req, res) {
     const lt = (c.leagueWins || 0) + (c.leagueLosses || 0) + (c.leagueTies || 0);
     const tiles = tile("Record", c.wins + "–" + c.losses + (c.ties ? "–" + c.ties : ""), pct != null ? pct + "% win" : "")
       + (lt > 0 ? tile("League", (c.leagueWins || 0) + "–" + (c.leagueLosses || 0) + (c.leagueTies ? "–" + c.leagueTies : ""), "") : "")
-      + tile("Seasons", c.seasons, yrs) + (c.titles ? tile("League titles", "🏆 " + c.titles, "") : "");
-    const body = `<h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${honRows("Coach of the Year", coy, m.ic)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p>`;
+      + tile("Seasons", c.seasons, yrs);
+    const ps = coachPostseason(c.name, orgSeasons);
+    const psItems = [["🏆", "League titles", ps.leagueTitles], ["🏅", "State titles", ps.stateChamps], ["🥈", "State runner-up", ps.runnerUp], ["🎯", "Final Fours", ps.finalFours], ["🎖️", "Elite 8s", ps.eliteEights], ["⭐", "Sweet 16s", ps.sweetSixteens], ["🏟️", "Playoff apps", ps.playoffs]].filter((x) => x[2] > 0);
+    const psHtml = psItems.length ? `<h3 style="margin:16px 0 8px;font-size:14px">Postseason / team success</h3><div class="ptiles">${psItems.map((x) => tile(x[0] + " " + x[1], x[2], "")).join("")}</div>` : "";
+    const body = `<h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${psHtml}${honRows("Coach of the Year", coy, m.ic)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p>`;
     return { hd: head(c.name, "🎓", m, "Head coach" + (year ? " · Inducted " + year : "")), tabs: [{ ic: m.ic, lbl: shortLbl(m.sport), body }] };
   };
 
