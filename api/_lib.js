@@ -457,7 +457,7 @@ export function buildCoachStats(seasons) {
     if (/state champ/.test(notes)) co.stateChamps += 1;
     if (/runner.?up|runner-up/.test(notes)) co.stateRunnerUp += 1;
     if (/final.?four|final 4/.test(notes)) co.finalFours += 1;
-    if (/elite.?8/.test(notes)) co.eliteEights += 1;
+    if (/elite.?8|final 8\b/.test(notes)) co.eliteEights += 1;
     if (/sweet.?16/.test(notes)) co.sweetSixteens += 1;
     if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
     if (/league champ/.test(notes)) co.leagueChamps += 1;
@@ -533,7 +533,7 @@ export function seasonSuccessScore(notes) {
   if (/state champ/.test(n)) s += 30;
   else if (/state runner.?up/.test(n)) s += 22;
   else if (/final.?four|final 4/.test(n)) s += 16;
-  else if (/elite.?8/.test(n)) s += 12;
+  else if (/elite.?8|final 8\b/.test(n)) s += 12;
   else if (/sweet.?16/.test(n)) s += 8;
   else if (/round of|first round|playoff/.test(n)) s += 4;
   if (/league champ/.test(n)) s += 10;
@@ -562,7 +562,7 @@ export function coachPostseason(coachName, seasons) {
   const runnerUp = cnt(/runner.?up|runner up|2nd place/i);
   const third = cnt(/3rd place|3rd/i);
   const finalFours = cnt(/final.?4|final four/i) + stateChamps + runnerUp + third;
-  const eliteEights = cnt(/elite.?8|elite eight/i) + finalFours;
+  const eliteEights = cnt(/elite.?8|elite eight|final 8\b/i) + finalFours;
   const sweetSixteens = cnt(/sweet.?16|sweet sixteen/i) + eliteEights;
   const playoffs = cnt(/playoff|round of|first round|state first/i) + sweetSixteens;
   const leagueTitles = cnt(/league champion|league champ/i);
