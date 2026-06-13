@@ -2347,7 +2347,37 @@ function withAddedPlayer(school, a) {
     athletes: active ? [...(school.athletes || []), athlete] : (school.athletes || []),
   };
 }
-function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effectiveIsActive, rankFor }) {
+function PlayerProfileModal({ player: player0, school: school0, allSchools = [], onClose, onUpdate }) {
+  // Every sport this kid plays — each gender-compatible program where the same name appears — so the
+  // profile can toggle between them with sport emojis. Entry sport (the one you opened from) goes first.
+  const sports = (() => {
+    const nm = normName(player0.name);
+    const findEntry = (s) => {
+      const r = s.allTimeRoster || [];
+      const exact = r.find(p => normName(p.name) === nm);
+      if (exact) return exact;
+      const fuzzy = r.filter(p => crossSportNameMatch(p.name, player0.name));
+      return fuzzy.length === 1 ? fuzzy[0] : null;
+    };
+    const list = [];
+    ((allSchools && allSchools.length) ? allSchools : [school0]).forEach(s => {
+      if (!sportsLinkable(school0.sport, s.sport)) return;
+      const e = s.id === school0.id ? player0 : findEntry(s);
+      if (e) list.push({ school: s, player: e });
+    });
+    if (!list.some(x => x.school.id === school0.id)) list.unshift({ school: school0, player: player0 });
+    const i = list.findIndex(x => x.school.id === school0.id);
+    if (i > 0) list.unshift(list.splice(i, 1)[0]);
+    return list;
+  })();
+  const [activeId, setActiveId] = useState(school0.id);
+  useEffect(() => { setActiveId(school0.id); }, [school0.id, player0.name]); // reset toggle when a new player opens
+  const active = sports.find(x => x.school.id === activeId) || { school: school0, player: player0 };
+  const school = active.school, player = active.player;
+  // Per-sport helpers — stats grid, all-time rank, and active flag are computed for the ACTIVE program.
+  const ALL_STATS = statsToDisplay(school.allTimeRoster || [], school.sport);
+  const effectiveIsActive = makeEffectiveIsActive(school.athletes || []);
+  const rankFor = makeRankFor(school.allTimeRoster || []);
   const isActive = effectiveIsActive(player);
   const canManage = !!(school && school.id);
   const [editName, setEditName] = useState(player.name);
@@ -2420,6 +2450,20 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
               </div>
             </div>
           </div>
+          {sports.length > 1 && (
+            <div style={{display:"flex",gap:6,marginTop:14,flexWrap:"wrap"}}>
+              {sports.map(({ school: s }) => {
+                const on = s.id === activeId;
+                return (
+                  <button key={s.id} onClick={() => setActiveId(s.id)} title={SPORTS[s.sport]?.label || s.sport}
+                    style={{display:"flex",alignItems:"center",gap:5,background:on?"#fff":"rgba(255,255,255,0.18)",color:on?(school.primaryColor||"#1a3a6b"):"#fff",border:"none",borderRadius:8,padding:"5px 11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    <span style={{fontSize:15}}>{SPORTS[s.sport]?.icon || "•"}</span>
+                    {(SPORTS[s.sport]?.label || s.sport).replace(/^(Boys|Girls) /, "")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -2522,6 +2566,7 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
           })()}
 
           <PlayerSeasons
+            key={school.id + "|" + player.name}
             programId={school.id}
             playerName={player.name}
             sport={school.sport}
@@ -3173,7 +3218,7 @@ function ImportSeasons({ school, roster = [] }) {
   );
 }
 
-function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [] }) {
+function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [], allSchools = [] }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
   // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
   // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
@@ -3273,6 +3318,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
         <PlayerProfileModal
           player={selectedPlayer}
           school={school}
+          allSchools={allSchools}
           onClose={()=>setSelectedPlayer(null)}
           onUpdate={(updated)=>{ onUpdate(updated); setSelectedPlayer(null); }}
           ALL_STATS={ALL_STATS}
@@ -5655,6 +5701,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
               <PlayerProfileModal
                 player={selectedAthlete}
                 school={school}
+                allSchools={allSchools}
                 onClose={()=>setSelectedAthlete(null)}
                 onUpdate={(updated)=>{ onUpdate(updated); setSelectedAthlete(null); }}
                 ALL_STATS={atAllStats}
@@ -6040,7 +6087,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
 
 
         {/* ALL-TIME TAB */}
-        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} allSeasonRows={allSeasonRows} />}
+        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} allSeasonRows={allSeasonRows} allSchools={allSchools} />}
 
         {/* SEASONS TAB */}
         {activeTab==="seasons" && (
