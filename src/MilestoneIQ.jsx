@@ -3338,7 +3338,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
                     </div>
                   </td>
                   <td style={{padding:"9px 16px",color:"#9ca3af",fontSize:12,whiteSpace:"nowrap"}}>
-                    {p.firstYear===p.lastYear ? p.firstYear : p.firstYear && p.lastYear ? p.firstYear+" – "+p.lastYear : p.gradYear ? "Class of "+p.gradYear : ""}
+                    {(p.firstYear && p.lastYear) ? (p.firstYear===p.lastYear ? p.firstYear : p.firstYear+" – "+p.lastYear) : p.gradYear ? "Class of "+p.gradYear : ""}
                   </td>
                   <td style={{padding:"9px 16px",textAlign:"right",fontWeight:700,color:"#111",fontSize:15}}>{rateDef ? fmtRateVal(rateDef.fmt, val) : val.toLocaleString()}</td>
                   <td style={{padding:"9px 16px 9px 0"}}>
