@@ -113,6 +113,21 @@ export const DISPLAY_STATS = {
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY,
 };
+// Sport emoji for the multi-sport profile toggle (mirrors the app's SPORTS icons).
+export const SPORT_ICON = { football: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", wrestling: "🤼", track: "🏃" };
+// Gender of a sport for cross-sport linking: "F" girls, "M" boys, "X" football (links across all genders).
+export function sportGender(sport) {
+  const s = String(sport || "").toLowerCase();
+  if (s.includes("football")) return "X";
+  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball" || s.includes("volleyball")) return "F";
+  return "M";
+}
+// A kid's two sports link only when same gender — or either is football (matches the app's rule).
+export function sportsLinkable(a, b) {
+  if (a === b) return true;
+  const ga = sportGender(a), gb = sportGender(b);
+  return ga === "X" || gb === "X" || ga === gb;
+}
 // Canonical display stats UNION any stat with data, in canonical order.
 export function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
