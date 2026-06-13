@@ -235,7 +235,7 @@ export default async function handler(req, res) {
     const stRU = seasonsList.filter((s) => rx(s, /runner.?up|runner up|2nd place/i)).length;
     const third = seasonsList.filter((s) => rx(s, /3rd place|3rd/i)).length;
     const ff0 = seasonsList.filter((s) => rx(s, /final.?4|final four/i)).length;
-    const ee0 = seasonsList.filter((s) => rx(s, /elite.?8|elite eight/i)).length;
+    const ee0 = seasonsList.filter((s) => rx(s, /elite.?8|elite eight|final 8\b/i)).length;
     const ss0 = seasonsList.filter((s) => rx(s, /sweet.?16|sweet sixteen/i)).length;
     const po0 = seasonsList.filter((s) => rx(s, /playoff|round of|first round|state first/i)).length;
     const finalFours = ff0 + stChamp + stRU + third;
