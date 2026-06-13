@@ -4734,12 +4734,14 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   // ALL their sports (mirrors coach cross-sport induction). Name-matched case-insensitively.
   const hofSchoolNames = new Set();
   const hofStateNames = new Set();
+  const hofYearByName = {}; // induction year per inducted name from ANY gender-compatible program → editable from any sport
   ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
     if (!sportsLinkable(school.sport, p.sport)) return; // gender-gate cross-sport HOF recognition (football bridges)
     (p.allTimeRoster || []).forEach(pl => {
       const nm = normName(pl.name);
       if (pl.schoolHallOfFame) hofSchoolNames.add(nm);
       if (pl.stateHallOfFame) hofStateNames.add(nm);
+      if ((pl.schoolHallOfFame || pl.stateHallOfFame) && pl.hofYear && hofYearByName[nm] == null) hofYearByName[nm] = pl.hofYear;
     });
   });
 
@@ -4792,8 +4794,18 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   // Edit a player's HOF induction year (inline year box on inducted athletes).
   const setHofYear = (player, year) => {
     const y = String(year).trim() === "" ? null : Number(year);
-    const updated = (school.allTimeRoster || []).map(p => p.id === player.id ? { ...p, hofYear: y } : p);
-    onUpdate({ ...school, allTimeRoster: updated });
+    const nm = normName(player.name);
+    // Set the induction year in EVERY gender-compatible program where this athlete is inducted, so it's
+    // consistent and editable from any of their sports (e.g. set a basketball inductee's year from soccer).
+    ((allSchools && allSchools.length) ? allSchools : [school]).forEach(s => {
+      if (!sportsLinkable(school.sport, s.sport)) return;
+      let touched = false;
+      const updated = (s.allTimeRoster || []).map(p => {
+        if (normName(p.name) === nm && (p.schoolHallOfFame || p.stateHallOfFame)) { touched = true; return { ...p, hofYear: y }; }
+        return p;
+      });
+      if (touched) onUpdate({ ...s, allTimeRoster: updated });
+    });
   };
 
   return (
@@ -4945,9 +4957,9 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
                       border:"none", borderRadius:6, padding:"5px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>
                     ⭐ State
                   </button>
-                  {(player.schoolHallOfFame || player.stateHallOfFame) && (
-                    <input type="number" value={player.hofYear || ""} onChange={e => setHofYear(player, e.target.value)}
-                      title="Induction year" placeholder="Year"
+                  {(player.schoolHallOfFame || player.stateHallOfFame || hofSchoolNames.has(normName(player.name)) || hofStateNames.has(normName(player.name))) && (
+                    <input type="number" value={hofYearByName[normName(player.name)] || player.hofYear || ""} onChange={e => setHofYear(player, e.target.value)}
+                      title="Induction year — edits this athlete's induction across all their sports" placeholder="Year"
                       style={{ width:60, border:"1px solid #d1d5db", borderRadius:6, padding:"5px 6px", fontSize:11, textAlign:"center" }} />
                   )}
                 </div>
