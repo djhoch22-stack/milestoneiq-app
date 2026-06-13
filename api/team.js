@@ -7,7 +7,7 @@ import {
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
-  buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON,
+  buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
 } from "./_lib.js";
 
 export default async function handler(req, res) {
@@ -439,7 +439,7 @@ export default async function handler(req, res) {
     `var ov=document.getElementById("pmodal");document.addEventListener("click",function(ev){var t=ev.target;if(!t)return;if(t.closest&&t.closest(".pmx")){if(ov)ov.style.display="none";return;}if(t===ov){ov.style.display="none";return;}var tb=t.closest&&t.closest(".psptab");if(tb&&CURP){var si=+tb.getAttribute("data-si");var bd=document.getElementById("psbody");if(bd)bd.innerHTML=spBody(CURP,si);var tabs=document.querySelectorAll(".psptab");for(var i=0;i<tabs.length;i++){var o2=(+tabs[i].getAttribute("data-si"))===si;tabs[i].style.background=o2?"#111":"#f0f0ee";tabs[i].style.color=o2?"#fff":"#374151";}return;}var el=t.closest&&t.closest("[data-p]");if(el){openP(el.getAttribute("data-p"));}});})();`;
 
   const body = `
-    <div class="phead">${logoBox}<div><h1 style="margin:0;font-size:26px">${esc(school)}</h1><div class="meta">${counts}</div></div></div>
+    <div class="phead">${logoBox}<div><a href="/school/${esc(slugify(school))}" style="font-size:12px;color:#6b7280;text-decoration:none">← All ${esc(school)} programs</a><h1 style="margin:0;font-size:26px">${esc(school)}</h1><div class="meta">${counts}</div></div></div>
     <div class="tabs">
       <input type="radio" name="tab" id="t-overview" class="tabin" checked>
       <input type="radio" name="tab" id="t-athletes" class="tabin">
