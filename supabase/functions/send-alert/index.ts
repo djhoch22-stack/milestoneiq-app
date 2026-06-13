@@ -28,6 +28,7 @@ const json = (body: unknown, status = 200) =>
 type Alert = {
   athlete_id: string; athlete_name: string; stat_name: string;
   kind: string; current: number; target: number; holder_name?: string | null;
+  variant?: string | null;
 };
 
 const n = (v: number) => (typeof v === "number" ? v.toLocaleString("en-US") : String(v));
@@ -35,13 +36,14 @@ const n = (v: number) => (typeof v === "number" ? v.toLocaleString("en-US") : St
 function lineFor(a: Alert): string {
   const who = a.athlete_name || "An athlete";
   const stat = (a.stat_name || "").toLowerCase();
+  const scope = a.variant === "Single season" ? "single-season " : "";
   switch (a.kind) {
     case "record_broken":
-      return `🏆 <b>${who}</b> broke the ${stat} record — now at ${n(a.current)}${a.holder_name ? ` (past ${a.holder_name}'s ${n(a.target)})` : ` (was ${n(a.target)})`}.`;
+      return `🏆 <b>${who}</b> broke the ${scope}${stat} record — now at ${n(a.current)}${a.holder_name ? ` (past ${a.holder_name}'s ${n(a.target)})` : ` (was ${n(a.target)})`}.`;
     case "milestone_hit":
       return `🎉 <b>${who}</b> reached the ${n(a.target)} career ${stat} milestone (${n(a.current)}).`;
     case "near_record":
-      return `📈 <b>${who}</b> is closing in on the ${stat} record — ${n(a.current)} of ${n(a.target)}${a.holder_name ? ` (${a.holder_name})` : ""}.`;
+      return `📈 <b>${who}</b> is closing in on the ${scope}${stat} record — ${n(a.current)} of ${n(a.target)}${a.holder_name ? ` (${a.holder_name})` : ""}.`;
     case "near_milestone":
       return `📈 <b>${who}</b> is approaching ${n(a.target)} career ${stat} — now at ${n(a.current)}.`;
     default:
