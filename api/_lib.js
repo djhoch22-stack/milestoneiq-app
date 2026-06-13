@@ -113,6 +113,8 @@ export const DISPLAY_STATS = {
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY,
 };
+// URL slug from a school name — shared by the public school hub (/school/:slug) and per-program links.
+export function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 // Sport emoji for the multi-sport profile toggle (mirrors the app's SPORTS icons).
 export const SPORT_ICON = { football: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", wrestling: "🤼", track: "🏃" };
 // Gender of a sport for cross-sport linking: "F" girls, "M" boys, "X" football (links across all genders).
