@@ -114,15 +114,17 @@ export default async function handler(req, res) {
   }
   const activeSet = new Set(athletes.filter((a) => a.isActive).map((a) => normName(a.name)));
   const athByName = {}; athletes.forEach((a) => { athByName[normName(a.name)] = a; });
+  // A player's honors/awards (this program) → label strings with year, shown on their profile card.
+  const honorsArr = (name) => awardsForHolder(name, "player", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
   const profiles = {};
   careerPool.forEach((p) => {
     const k = normName(p.name); const ath = athByName[k];
     profiles[k] = { n: p.name, y: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? String(p.firstYear) : String(p.firstYear) + "–" + String(p.lastYear)) : (p.gradYear ? "Class of " + p.gradYear : ""),
-      pos: (ath && ath.position) ? ath.position : "", a: !!(p.isCurrent || activeSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [] };
+      pos: (ath && ath.position) ? ath.position : "", a: !!(p.isCurrent || activeSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(p.name) };
   });
   athletes.forEach((a) => {
     const k = normName(a.name); if (profiles[k]) return;
-    profiles[k] = { n: a.name, y: a.gradYear ? "Class of " + a.gradYear : "", pos: a.position || "", a: a.isActive !== false, sh: 0, st: 0, at: 0, s: a.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [] };
+    profiles[k] = { n: a.name, y: a.gradYear ? "Class of " + a.gradYear : "", pos: a.position || "", a: a.isActive !== false, sh: 0, st: 0, at: 0, s: a.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(a.name) };
   });
 
   // ── OVERVIEW ────────────────────────────────────────────────────────────────
@@ -305,6 +307,7 @@ export default async function handler(req, res) {
   const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof,sport`);
   const orgIds = orgTeams.map((p) => p.id).filter(Boolean);
   const sportById = {}; orgTeams.forEach((p) => { sportById[p.id] = prettySport(p.sport); });
+  const labelEmoji = {}; orgTeams.forEach((p) => { labelEmoji[prettySport(p.sport)] = SPORT_ICON[p.sport] || "🏅"; });
   // Sport-specific: this page's HOF shows only coaches inducted FOR THIS program (was a cross-org union).
   const inducted = new Set(Object.keys(team.coach_hof || {}).filter((n) => (team.coach_hof || {})[n]).map((n) => normName(n)));
   const orgSeasonsRaw = orgIds.length
@@ -332,7 +335,7 @@ export default async function handler(req, res) {
     coachProfiles[normName(c.name)] = {
       n: c.name, iy, yrs, ss: c.seasons, w: c.wins, l: c.losses, t: c.ties || 0, pct,
       lw: c.leagueWins || 0, ll: c.leagueLosses || 0, lt: c.leagueTies || 0, titles: c.titles || 0,
-      teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : "")); return { tm, w: b.wins, l: b.losses, t: b.ties || 0, aw }; }),
+      teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : "")); return { tm, ic: labelEmoji[tm] || "🏅", w: b.wins, l: b.losses, t: b.ties || 0, aw }; }),
       coy,
     };
     const iyHtml = iy ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:6px">Inducted ${esc(String(iy))}</div>` : "";
@@ -371,13 +374,21 @@ export default async function handler(req, res) {
     ],
   };
 
+  // Server-rendered honors + records rows for a cross-sport tab (mirror the in-browser hon()/recl() markup).
+  const honRowsHtml = (hons, emoji) => hons.length ? `<h3 style="margin:16px 0 8px;font-size:14px">Honors</h3><div>${hons.map((a) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} ${esc(a)}</div>`).join("")}</div>` : "";
+  const recRowsHtml = (recs, emoji) => recs.length ? `<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>${recs.map((r) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} <b>${esc(r.n)}</b> ${r.v ? `<span style="color:#9ca3af">(${esc(r.v)})</span> ` : ""}— ${esc(String(r.val))}</div>`).join("")}</div>` : "";
+
   // ── Cross-sport profiles: a kid's OTHER gender-compatible public programs in this org, so their
-  // profile can toggle between sports (career stats per sport) — mirrors the in-app multi-sport profile.
-  const xsTeams = (await sb(`public_teams?org_id=eq.${team.org_id}&select=id,sport,name,primary_color`))
+  // profile can toggle between sports (career stats + rank + records + honors per sport) — mirrors the app.
+  const xsTeams = (await sb(`public_teams?org_id=eq.${team.org_id}&select=id,sport,name,primary_color,record_minimums`))
     .filter((t) => t.id !== pid && sportsLinkable(team.sport, t.sport));
   if (xsTeams.length) {
-    const xsData = await Promise.all(xsTeams.map((t) =>
-      sb(`all_time_players?program_id=eq.${t.id}&select=name,stats`).then((rows) => ({ t, rows: rows || [] }))));
+    const xsData = await Promise.all(xsTeams.map((t) => Promise.all([
+      sb(`all_time_players?program_id=eq.${t.id}&select=name,stats,first_year,last_year,grad_year`),
+      sb(`player_seasons?program_id=eq.${t.id}&select=player_name,season,stats`),
+      sb(`records?program_id=eq.${t.id}`),
+      sb(`awards?program_id=eq.${t.id}&scope=eq.player&select=kind,holder_name,season`),
+    ]).then(([rows, pss, recs, aws]) => ({ t, rows: rows || [], pss: pss || [], recs: recs || [], aws: aws || [] }))));
     // Career-tile HTML for one of a kid's other sports (mirrors the in-browser tiles(): stat + rank + rates).
     const profTiles = (stats, sport, pool) => {
       const rankOf = (st, val) => { if (!(val > 0)) return null; let c = 1; for (const q of pool) if ((Number((q.stats || {})[st]) || 0) > val) c++; return c; };
@@ -394,12 +405,32 @@ export default async function handler(req, res) {
       }
       return html;
     };
-    xsData.forEach(({ t, rows }) => {
-      const meta = { ic: SPORT_ICON[t.sport] || "•", lbl: prettySport(t.sport) };
+    xsData.forEach(({ t, rows, pss, recs, aws }) => {
+      const ic = SPORT_ICON[t.sport] || "🏅", lbl = prettySport(t.sport);
+      // That program's full record book → which records each player holds (mirrors the main page).
+      const cp = rows.map((p) => ({ name: p.name, stats: p.stats || {}, firstYear: p.first_year, lastYear: p.last_year, gradYear: p.grad_year }));
+      const auto = [
+        ...pctRecordsFrom(pss, cp, t.sport, t.record_minimums),
+        ...pergameRecordsFrom(pss, cp, t.sport),
+        ...longestRecordsFrom(pss, t.sport),
+        ...autoStatRecords(pss, cp, statsToDisplay(cp, t.sport).filter((s) => !/^Longest /.test(s)), t.sport),
+      ];
+      const stored = recs.map((r) => ({ statName: r.stat_name, variant: r.variant, holderName: r.holder_name, value: r.value }));
+      const mk = new Set(stored.map((r) => r.statName + "|" + r.variant));
+      const recByHolder = {};
+      for (const r of [...stored, ...auto.filter((x) => !mk.has(x.statName + "|" + x.variant))]) {
+        if (!r.holderName) continue;
+        const k = normName(r.holderName);
+        const val = RATE_FMT[r.statName] ? fmtRateVal(RATE_FMT[r.statName], r.value) : (typeof r.value === "number" ? r.value.toLocaleString() : r.value);
+        (recByHolder[k] = recByHolder[k] || []).push({ n: r.statName, v: r.variant, val });
+      }
+      const honByName = {};
+      aws.forEach((a) => { const k = normName(a.holder_name); (honByName[k] = honByName[k] || []).push(awardLabel(a) + (a.season ? " (" + a.season + ")" : "")); });
       rows.forEach((p) => {
-        const prof = profiles[normName(p.name)];
+        const k = normName(p.name); const prof = profiles[k];
         if (!prof) return; // only attach to a kid already shown on THIS program's page
-        (prof.xs = prof.xs || []).push({ ic: meta.ic, lbl: meta.lbl, html: `<div class="ptiles">${profTiles(p.stats || {}, t.sport, rows)}</div>` });
+        const html = `<div class="ptiles">${profTiles(p.stats || {}, t.sport, rows)}</div>${honRowsHtml(honByName[k] || [], ic)}${recRowsHtml(recByHolder[k] || [], ic)}`;
+        (prof.xs = prof.xs || []).push({ ic, lbl, html });
       });
     });
   }
@@ -416,7 +447,7 @@ export default async function handler(req, res) {
   const dsJson = JSON.stringify(DISPLAY_STATS[team.sport] || []);
   const pColor = JSON.stringify(logoColor);
   const script =
-    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var RD=${rdJson};var DS=${dsJson};var CURMETA={ic:${JSON.stringify(SPORT_ICON[team.sport] || "•")},lbl:${JSON.stringify(prettySport(team.sport))}};var COACH=${JSON.stringify(coachProfiles).replace(/</g, "\\u003c")};` +
+    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var RD=${rdJson};var DS=${dsJson};var SE=${JSON.stringify(SPORT_ICON[team.sport] || "🏅")};var CURMETA={ic:${JSON.stringify(SPORT_ICON[team.sport] || "•")},lbl:${JSON.stringify(prettySport(team.sport))}};var COACH=${JSON.stringify(coachProfiles).replace(/</g, "\\u003c")};` +
     `(function(){function e(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}` +
     `function ord(ks){return ks.slice().sort(function(a,b){var i=SO.indexOf(a),j=SO.indexOf(b);if(i!==-1&&j!==-1)return i-j;if(i!==-1)return -1;if(j!==-1)return 1;return a<b?-1:a>b?1:0;});}` +
     `function pgv(s,k){var v=Number(s[k]),g=Number(s["Games Played"]);if(!g||g<=0||isNaN(v))return null;return Math.round(v/g*10)/10;}` +
@@ -434,13 +465,14 @@ export default async function handler(req, res) {
     `function tile(l,v,sub){return '<div class="ptile"><div class="pl">'+e(l)+'</div><div class="pv">'+e(String(v))+'</div><div class="psub">'+e(sub)+"</div></div>";}` +
     `function tiles(p){var pr=Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;});var ks=ord(DS.concat(pr).filter(function(k,i,a){return a.indexOf(k)===i;}));var out="";ks.forEach(function(stat){var raw=p.s[stat];var has=raw!=null&&Number(raw)>0;var val=Number(raw)||0;var r=has?rankOf(stat,val):null;var rs=r===1?"🥇 All-time leader":r===2?"🥈 #2 all-time":r===3?"🥉 #3 all-time":(r?("#"+r+" all-time"):"");out+=tile(stat.toUpperCase(),has?val.toLocaleString():"—",rs);var i;for(i=0;i<RD.length;i++){var d=RD[i];if(d.after!==stat)continue;var dv=rv(p.s,d);if(dv==null)continue;var nt=d.spec.kind==="pct"?(gv(p.s,d.spec.made).toLocaleString()+"/"+gv(p.s,d.spec.att).toLocaleString()):(gv(p.s,d.q).toLocaleString()+" "+d.ab);out+=tile(d.n.toUpperCase(),fmtR(d.fmt,dv),nt);}});return out;}` +
     `function seas(p){if(!p.ss||!p.ss.length)return "";var cols=ord(Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;}));var ents=[];cols.forEach(function(c){ents.push({c:c});for(var i=0;i<RD.length;i++)if(RD[i].after===c)ents.push({d:RD[i]});});var head="<th>Season</th>"+ents.map(function(en){return '<th class="num">'+e(en.d?en.d.s:en.c)+"</th>";}).join("");var rs=p.ss.slice().sort(function(a,b){return String(b.season)<String(a.season)?-1:1;}).map(function(r){return "<tr><td>"+e(r.season)+"</td>"+ents.map(function(en){if(en.d){var dv=rv(r.s,en.d);return '<td class="num">'+(dv!=null?fmtR(en.d.fmt,dv):"—")+"</td>";}var v=r.s[en.c];return '<td class="num">'+(v!=null&&v!==""?Number(v).toLocaleString():"—")+"</td>";}).join("")+"</tr>";}).join("");var tot='<tr style="font-weight:700;background:#fafaf8"><td>Career</td>'+ents.map(function(en){if(en.d){var dv=rv(p.s,en.d);return '<td class="num">'+(dv!=null?fmtR(en.d.fmt,dv):"—")+"</td>";}return '<td class="num">'+(Number(p.s[en.c])||0).toLocaleString()+"</td>";}).join("")+"</tr>";return '<h3 style="margin:18px 0 8px;font-size:14px">Season by season</h3><div style="overflow-x:auto"><table><thead><tr>'+head+"</tr></thead><tbody>"+rs+tot+"</tbody></table></div>";}` +
-    `function recl(p){if(!p.rec||!p.rec.length)return "";return '<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>'+p.rec.map(function(r){return '<div style="font-size:13px;color:#374151;padding:3px 0">🏅 <b>'+e(r.n)+"</b> "+(r.v?'<span style="color:#9ca3af">('+e(r.v)+")</span> ":"")+"— "+e(String(r.val))+"</div>";}).join("")+"</div>";}` +
-    `function curBody(p){var chips="";if(p.sh)chips+='<div class="hofchip" style="background:#fef9c3;border-color:#fde68a;color:#92400e">🏛️ School Hall of Fame</div>';if(p.st)chips+='<div class="hofchip" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">⭐ State Hall of Fame</div>';return (chips?'<div class="hofchips">'+chips+"</div>":"")+'<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank</h3><div class="ptiles">'+tiles(p)+"</div>"+seas(p)+recl(p);}` +
+    `function recl(p){if(!p.rec||!p.rec.length)return "";return '<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>'+p.rec.map(function(r){return '<div style="font-size:13px;color:#374151;padding:3px 0">'+SE+' <b>'+e(r.n)+"</b> "+(r.v?'<span style="color:#9ca3af">('+e(r.v)+")</span> ":"")+"— "+e(String(r.val))+"</div>";}).join("")+"</div>";}` +
+    `function hon(p){if(!p.hon||!p.hon.length)return "";return '<h3 style="margin:16px 0 8px;font-size:14px">Honors</h3><div>'+p.hon.map(function(a){return '<div style="font-size:13px;color:#374151;padding:3px 0">'+SE+' '+e(a)+"</div>";}).join("")+"</div>";}` +
+    `function curBody(p){var chips="";if(p.sh)chips+='<div class="hofchip" style="background:#fef9c3;border-color:#fde68a;color:#92400e">🏛️ School Hall of Fame</div>';if(p.st)chips+='<div class="hofchip" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">⭐ State Hall of Fame</div>';return (chips?'<div class="hofchips">'+chips+"</div>":"")+'<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank</h3><div class="ptiles">'+tiles(p)+"</div>"+hon(p)+recl(p)+seas(p);}` +
     `function spTabs(p,si){var xs=p.xs||[];if(!xs.length)return "";var a=[{ic:CURMETA.ic,lbl:CURMETA.lbl}].concat(xs);var o='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';for(var i=0;i<a.length;i++){var on=i===si;o+='<button type="button" class="psptab" data-si="'+i+'" style="display:flex;align-items:center;gap:5px;border:none;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?"#111":"#f0f0ee")+';color:'+(on?"#fff":"#374151")+'">'+e(a[i].ic)+" "+e(String(a[i].lbl).replace(/^(Boys|Girls) /,""))+"</button>";}return o+"</div>";}` +
-    `function spBody(p,si){if(si===0)return curBody(p);var x=(p.xs||[])[si-1]||{};return '<h3 style="margin:0 0 10px;font-size:14px">Career statistics — '+e(String(x.lbl||""))+'</h3>'+(x.html||"");}` +
+    `function spBody(p,si){if(si===0)return curBody(p);var x=(p.xs||[])[si-1]||{};return '<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank — '+e(String(x.lbl||""))+'</h3>'+(x.html||"");}` +
     `var CURP=null;` +
     `function openP(k){var p=PROF[k];if(!p)return;CURP=p;var ini=p.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var bdg=(p.a?'<span class="hbadge">Active</span> ':"")+(p.sh?"🏛️ ":"")+(p.st?"⭐":"");var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(p.n)+" "+bdg+'</div><div class="pmsub">'+(p.y?e(p.y):"")+(p.pos?" · "+e(p.pos):"")+"</div></div></div></div>"+'<div class="pmbody">'+spTabs(p,0)+'<div id="psbody">'+spBody(p,0)+'</div></div>';document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
-    `function openC(k){var c=COACH[k];if(!c)return;var ini=c.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var tl=function(l,v,s){return '<div class="ptile"><div class="pl">'+e(l)+'</div><div class="pv">'+e(String(v))+'</div><div class="psub">'+e(s||"")+"</div></div>";};var tiles='<div class="ptiles">'+tl("Record",c.w+"\\u2013"+c.l+(c.t?"\\u2013"+c.t:""),(c.pct!=null?c.pct+"% win":""))+((c.lw+c.ll+c.lt)>0?tl("League",c.lw+"\\u2013"+c.ll+(c.lt?"\\u2013"+c.lt:""),""):"")+tl("Seasons",c.ss,c.yrs)+(c.titles?tl("League titles","\\uD83C\\uDFC6 "+c.titles,""):"")+"</div>";var coy=(c.coy&&c.coy.length)?'<h3 style="margin:16px 0 8px;font-size:14px">Coach of the Year</h3><div>'+c.coy.map(function(a){return '<div style="font-size:13px;color:#374151;padding:3px 0">\\uD83C\\uDFC5 '+e(a)+"</div>";}).join("")+"</div>":"";var tm=(c.teams&&c.teams.length>1)?'<h3 style="margin:16px 0 8px;font-size:14px">By team</h3>'+c.teams.map(function(b){return '<div style="font-size:13px;color:#374151;padding:4px 0;display:flex;justify-content:space-between;gap:10px"><span>'+e(b.tm)+(b.aw&&b.aw.length?" \\uD83C\\uDFC5":"")+'</span><span style="font-weight:600;color:#111">'+b.w+"\\u2013"+b.l+(b.t?"\\u2013"+b.t:"")+"</span></div>";}).join(""):"";var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">\\u2715</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(c.n)+' \\uD83C\\uDF93</div><div class="pmsub">Head coach'+(c.iy?" \\u00b7 Inducted "+e(String(c.iy)):"")+'</div></div></div></div><div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3>'+tiles+coy+tm+"</div>";document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
+    `function openC(k){var c=COACH[k];if(!c)return;var ini=c.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var tl=function(l,v,s){return '<div class="ptile"><div class="pl">'+e(l)+'</div><div class="pv">'+e(String(v))+'</div><div class="psub">'+e(s||"")+"</div></div>";};var tiles='<div class="ptiles">'+tl("Record",c.w+"\\u2013"+c.l+(c.t?"\\u2013"+c.t:""),(c.pct!=null?c.pct+"% win":""))+((c.lw+c.ll+c.lt)>0?tl("League",c.lw+"\\u2013"+c.ll+(c.lt?"\\u2013"+c.lt:""),""):"")+tl("Seasons",c.ss,c.yrs)+(c.titles?tl("League titles","\\uD83C\\uDFC6 "+c.titles,""):"")+"</div>";var coy=(c.coy&&c.coy.length)?'<h3 style="margin:16px 0 8px;font-size:14px">Coach of the Year</h3><div>'+c.coy.map(function(a){return '<div style="font-size:13px;color:#374151;padding:3px 0">'+SE+' '+e(a)+"</div>";}).join("")+"</div>":"";var tm=(c.teams&&c.teams.length>1)?'<h3 style="margin:16px 0 8px;font-size:14px">By team</h3>'+c.teams.map(function(b){return '<div style="font-size:13px;color:#374151;padding:4px 0;display:flex;justify-content:space-between;gap:10px"><span>'+e(b.tm)+(b.aw&&b.aw.length?" "+(b.ic||SE):"")+'</span><span style="font-weight:600;color:#111">'+b.w+"\\u2013"+b.l+(b.t?"\\u2013"+b.t:"")+"</span></div>";}).join(""):"";var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">\\u2715</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(c.n)+' \\uD83C\\uDF93</div><div class="pmsub">Head coach'+(c.iy?" \\u00b7 Inducted "+e(String(c.iy)):"")+'</div></div></div></div><div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3>'+tiles+coy+tm+"</div>";document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
     `var ov=document.getElementById("pmodal");document.addEventListener("click",function(ev){var t=ev.target;if(!t)return;if(t.closest&&t.closest(".pmx")){if(ov)ov.style.display="none";return;}if(t===ov){ov.style.display="none";return;}var tb=t.closest&&t.closest(".psptab");if(tb&&CURP){var si=+tb.getAttribute("data-si");var bd=document.getElementById("psbody");if(bd)bd.innerHTML=spBody(CURP,si);var tabs=document.querySelectorAll(".psptab");for(var i=0;i<tabs.length;i++){var o2=(+tabs[i].getAttribute("data-si"))===si;tabs[i].style.background=o2?"#111":"#f0f0ee";tabs[i].style.color=o2?"#fff":"#374151";}return;}var ec=t.closest&&t.closest("[data-c]");if(ec){openC(ec.getAttribute("data-c"));return;}var el=t.closest&&t.closest("[data-p]");if(el){openP(el.getAttribute("data-p"));}});})();`;
 
   const body = `
