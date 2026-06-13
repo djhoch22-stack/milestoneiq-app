@@ -407,28 +407,60 @@ function defaultMilestonesFor(sport) {
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
 
-function getMilestoneAlerts(athlete, records = [], milestones = [], sport) {
+// Best single-season value per athlete per stat (name-lowercased → {stat: max}) from player_seasons —
+// feeds single-season record-break alerts. Only meaningful for higher-is-better counting stats.
+function bestSeasonByName(seasonRows) {
+  const out = {};
+  (seasonRows || []).forEach(r => {
+    const nm = (r.player_name || "").toLowerCase().trim();
+    if (!nm || !r.stats) return;
+    const m = out[nm] || (out[nm] = {});
+    for (const k in r.stats) {
+      const v = Number(r.stats[k]);
+      if (Number.isFinite(v) && (m[k] === undefined || v > m[k])) m[k] = v;
+    }
+  });
+  return out;
+}
+// Stats where a LOWER number is better (ERA, Earned Runs) — excluded from record-break alerts, which
+// only understand "exceeded the record". Those records are surfaced on the Records tab instead.
+function isLowerBetterStat(sport, statName) {
+  try { if ((rateDefsFor(sport) || []).some(d => d.name === statName && d.lowerIsBetter)) return true; } catch (e) {}
+  try { if ((LOW_RECORD_DEFS[sport] || []).some(d => d.stat === statName)) return true; } catch (e) {}
+  return false;
+}
+function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestByName = {}) {
   const alerts = [];
   const effectiveMilestones = milestones.length > 0 ? milestones : defaultMilestonesFor(sport);
+  const bestSeason = bestByName[(athlete.name || "").toLowerCase().trim()] || {};
 
   for (const rec of records) {
-    if (rec.variant !== "Career total") continue;
-    const val = athlete.stats[rec.statName];
+    // Career total → career stat; Single season → the athlete's best single season. Other variants
+    // (single game, per-game avg) aren't alertable; lower-is-better stats (ERA…) are skipped.
+    if (rec.variant !== "Career total" && rec.variant !== "Single season") continue;
+    if (isLowerBetterStat(sport, rec.statName)) continue;
+    const isSeason = rec.variant === "Single season";
+    const val = isSeason ? bestSeason[rec.statName] : athlete.stats[rec.statName];
     if (typeof val !== "number" || val <= 0) continue;
+    const scope = isSeason ? "single-season" : "career";
+    const holderPoss = rec.holderName ? rec.holderName + "'s" : "the";
+    const setIn = rec.holderYear ? ", set in " + rec.holderYear : "";
     const p = val / rec.value;
     if (p >= 0.85 && p < 1) {
       alerts.push({
         type: "near_record", statName: rec.statName, variant: rec.variant,
         current: val, target: rec.value, holderName: rec.holderName, holderYear: rec.holderYear, pct: p,
-        shortLabel: rec.statName + " record (" + val.toLocaleString() + "/" + rec.value.toLocaleString() + ")",
-        fullLabel: athlete.name + " needs " + (rec.value - val).toLocaleString() + " more " + rec.statName.toLowerCase() + " to break " + (rec.holderName ? rec.holderName + "'s" : "the") + " career record of " + rec.value.toLocaleString() + (rec.holderYear ? ", set in " + rec.holderYear : "")
+        shortLabel: rec.statName + " " + scope + " record (" + val.toLocaleString() + "/" + rec.value.toLocaleString() + ")",
+        fullLabel: isSeason
+          ? athlete.name + "'s best season (" + val.toLocaleString() + ") is closing in on " + holderPoss + " single-season " + rec.statName.toLowerCase() + " record of " + rec.value.toLocaleString() + setIn
+          : athlete.name + " needs " + (rec.value - val).toLocaleString() + " more " + rec.statName.toLowerCase() + " to break " + holderPoss + " career record of " + rec.value.toLocaleString() + setIn
       });
     } else if (p >= 1) {
       alerts.push({
         type: "record_broken", statName: rec.statName, variant: rec.variant,
         current: val, target: rec.value, holderName: rec.holderName, holderYear: rec.holderYear, pct: p,
-        shortLabel: rec.statName + " record BROKEN! (" + val.toLocaleString() + ")",
-        fullLabel: athlete.name + " has broken " + (rec.holderName ? rec.holderName + "'s" : "the") + " career " + rec.statName.toLowerCase() + " record of " + rec.value.toLocaleString() + (rec.holderYear ? " set in " + rec.holderYear : "") + ", now at " + val.toLocaleString()
+        shortLabel: rec.statName + " " + scope + " record BROKEN! (" + val.toLocaleString() + ")",
+        fullLabel: athlete.name + " has broken " + holderPoss + " " + scope + " " + rec.statName.toLowerCase() + " record of " + rec.value.toLocaleString() + (rec.holderYear ? " set in " + rec.holderYear : "") + ", now at " + val.toLocaleString()
       });
     }
   }
@@ -1516,7 +1548,7 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
     const payload = [];
     allAlerts.forEach(({ athlete, alerts }) => (alerts || []).forEach(al => payload.push({
       athlete_id: String(athlete.id), athlete_name: athlete.name,
-      stat_name: al.statName, kind: al.type,
+      stat_name: al.statName, kind: al.type, variant: al.variant || null,
       current: al.current, target: al.target, holder_name: al.holderName || null,
     })));
     if (!payload.length) { setResult({ sent: 0 }); setStatus("done"); return; }
@@ -2183,7 +2215,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
 // Active-roster milestone alerts. Milestones track CAREER totals, so each active athlete is enriched with
 // their all-time career stats before checking (the raw athletes-table stats undercount); dismissed alerts
 // are dropped. Mirrors the Alerts/Overview logic exactly so every surface agrees.
-function activeAlerts(school) {
+function activeAlerts(school, bestByName = {}) {
   const careerByName = {};
   (school.allTimeRoster || []).forEach(p => { if (p && p.name) careerByName[p.name.toLowerCase().trim()] = p.stats; });
   const dismissed = new Set(school.dismissedAlerts || []);
@@ -2192,13 +2224,13 @@ function activeAlerts(school) {
     .map(a => {
       const cs = careerByName[(a.name || "").toLowerCase().trim()];
       const athlete = cs ? { ...a, stats: cs } : a;
-      const alerts = getMilestoneAlerts(athlete, school.records || [], school.milestones || [], school.sport)
+      const alerts = getMilestoneAlerts(athlete, school.records || [], school.milestones || [], school.sport, bestByName)
         .filter(al => !dismissed.has(`${a.id}|${al.statName}|${al.target}`));
       return { athlete, alerts };
     })
     .filter(x => x.alerts.length > 0);
 }
-function activeAlertCount(school) { return activeAlerts(school).reduce((n, x) => n + x.alerts.length, 0); }
+function activeAlertCount(school, bestByName = {}) { return activeAlerts(school, bestByName).reduce((n, x) => n + x.alerts.length, 0); }
 // Inducted Hall-of-Fame members (school or state).
 function hofMemberCount(school, allSchools) {
   // Count this program's roster players who are HOF members in THIS sport OR any gender-compatible one
@@ -5114,6 +5146,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   // Full record total (auto + stored) for the header & Overview tile — memoized so it isn't recomputed
   // on every render (it builds the whole Records-tab record set).
   const recordTotal = useMemo(() => programRecordCount({ ...school, allSeasonRows }), [school, allSeasonRows]);
+  // Best single-season value per athlete — drives single-season record-break alerts.
+  const seasonBests = useMemo(() => bestSeasonByName(allSeasonRows), [allSeasonRows]);
   const dismissedSet = new Set(school.dismissedAlerts || []);
 
   const dismissAlert = (athleteId, statName, target) => {
@@ -5144,7 +5178,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   });
   const allAlerts = careerAthletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
-    alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [], school.sport)
+    alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [], school.sport, seasonBests)
       .filter(alert => !isAlertDismissed(a.id, alert.statName, alert.target))
   })).filter(x => x.alerts.length > 0);
 
@@ -5395,7 +5429,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   return true;
                 })
                 .map(athlete=>{
-                const ats = getMilestoneAlerts(athlete, school.records||[], school.milestones||[], school.sport)
+                const ats = getMilestoneAlerts(athlete, school.records||[], school.milestones||[], school.sport, seasonBests)
                   .filter(a => !isAlertDismissed(athlete.id, a.statName, a.target));
                 const isSelected = selectedAthlete?.id===athlete.id;
                 const isActive = athlete.isActive !== false;
@@ -6116,17 +6150,23 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   // page doesn't carry season rows, so fetch them per program once and compute the count; until the fetch
   // lands we show the stored-record count. Refetches when the set of programs changes (and on reload).
   const [recordCounts, setRecordCounts] = useState({});
+  // Best single-season values per program — keeps the home tile/header alert counts (which include
+  // single-season record breaks) consistent with the in-program Alerts tab.
+  const [seasonBestsByProgram, setSeasonBestsByProgram] = useState({});
   const schoolIdsKey = schools.map(s => s.id).join(",");
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
     (async () => {
       const entries = await Promise.all((schools || []).map(async (sc) => {
-        if (!sc.id) return [sc.id, (sc.records || []).length];
-        try { const { data } = await getAllPlayerSeasons(sc.id); return [sc.id, programRecordCount({ ...sc, allSeasonRows: data || [] })]; }
-        catch { return [sc.id, (sc.records || []).length]; }
+        if (!sc.id) return [sc.id, (sc.records || []).length, {}];
+        try { const { data } = await getAllPlayerSeasons(sc.id); return [sc.id, programRecordCount({ ...sc, allSeasonRows: data || [] }), bestSeasonByName(data || [])]; }
+        catch { return [sc.id, (sc.records || []).length, {}]; }
       }));
-      if (!cancelled) setRecordCounts(Object.fromEntries(entries));
+      if (!cancelled) {
+        setRecordCounts(Object.fromEntries(entries.map(e => [e[0], e[1]])));
+        setSeasonBestsByProgram(Object.fromEntries(entries.map(e => [e[0], e[2]])));
+      }
     })();
     return () => { cancelled = true; };
   }, [schoolIdsKey, authed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -6193,7 +6233,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} />;
   }
 
-  const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc), 0);
+  const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc, seasonBestsByProgram[sc.id] || {}), 0);
 
   // ── Settings page ─────────────────────────────────────────────────────────
   const SettingsPage = () => {
@@ -6417,7 +6457,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14 }}>
             {orderedSchools.map(school=>{
               const sport = SPORTS[school.sport]||SPORTS.football;
-              const alerts = activeAlertCount(school);
+              const alerts = activeAlertCount(school, seasonBestsByProgram[school.id] || {});
               const topAthlete = [...school.athletes].filter(a=>a.isActive!==false).sort((a,b)=>{
                 const at=Object.values(a.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
                 const bt=Object.values(b.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
