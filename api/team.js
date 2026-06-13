@@ -303,9 +303,8 @@ export default async function handler(req, res) {
   const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof,sport`);
   const orgIds = orgTeams.map((p) => p.id).filter(Boolean);
   const sportById = {}; orgTeams.forEach((p) => { sportById[p.id] = prettySport(p.sport); });
-  // A coach inducted in ANY program at the school counts as inducted everywhere (cross-sport).
-  const inducted = new Set();
-  orgTeams.forEach((p) => Object.keys(p.coach_hof || {}).forEach((n) => { if ((p.coach_hof || {})[n]) inducted.add(normName(n)); }));
+  // Sport-specific: this page's HOF shows only coaches inducted FOR THIS program (was a cross-org union).
+  const inducted = new Set(Object.keys(team.coach_hof || {}).filter((n) => (team.coach_hof || {})[n]).map((n) => normName(n)));
   const orgSeasonsRaw = orgIds.length
     ? await sb(`seasons?program_id=in.(${orgIds.join(",")})&select=program_id,season,wins,losses,ties,league_wins,league_losses,league_ties,coach,notes`)
     : [];
