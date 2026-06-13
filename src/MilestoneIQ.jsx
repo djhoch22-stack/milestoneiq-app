@@ -4358,8 +4358,14 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
     .sort((a, b) => b.score - a.score);
 
   const toggleCoachHof = (coachName) => {
-    const updated = { ...confirmedHof, [coachName]: !confirmedHof[coachName] };
-    if (!updated[coachName]) delete updated[coachName];
+    const updated = { ...confirmedHof };
+    if (updated[coachName]) delete updated[coachName];          // was inducted → remove
+    else updated[coachName] = new Date().getFullYear();         // induct with current year (editable)
+    onUpdate({ ...school, coachHof: updated });
+  };
+  // Edit a coach's HOF induction year (inline year box on inducted coaches).
+  const setCoachHofYear = (coachName, year) => {
+    const updated = { ...confirmedHof, [coachName]: String(year).trim() === "" ? true : Number(year) };
     onUpdate({ ...school, coachHof: updated });
   };
 
@@ -4428,6 +4434,11 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
                     border:"none", borderRadius:6, padding:"4px 10px", fontSize:11, fontWeight:700, cursor:"pointer", flexShrink:0 }}>
                   🏛️ HOF
                 </button>
+                {confirmedHof[coach.name] && (
+                  <input type="number" value={typeof confirmedHof[coach.name] === "number" ? confirmedHof[coach.name] : ""} onChange={e=>setCoachHofYear(coach.name, e.target.value)}
+                    onClick={e=>e.stopPropagation()} title="Induction year" placeholder="Year"
+                    style={{ width:56, border:"1px solid #d1d5db", borderRadius:6, padding:"4px 6px", fontSize:11, textAlign:"center", flexShrink:0 }} />
+                )}
               </div>
             </div>
           );
@@ -4769,9 +4780,19 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
 
   const toggleConfirmed = (player, type) => {
     const key = type === 'state' ? 'stateHallOfFame' : 'schoolHallOfFame';
-    const updated = (school.allTimeRoster || []).map(p =>
-      p.id === player.id ? { ...p, [key]: !p[key] } : p
-    );
+    const updated = (school.allTimeRoster || []).map(p => {
+      if (p.id !== player.id) return p;
+      const on = !p[key];
+      const np = { ...p, [key]: on };
+      if (on && !np.hofYear) np.hofYear = new Date().getFullYear(); // default induction year (editable)
+      return np;
+    });
+    onUpdate({ ...school, allTimeRoster: updated });
+  };
+  // Edit a player's HOF induction year (inline year box on inducted athletes).
+  const setHofYear = (player, year) => {
+    const y = String(year).trim() === "" ? null : Number(year);
+    const updated = (school.allTimeRoster || []).map(p => p.id === player.id ? { ...p, hofYear: y } : p);
     onUpdate({ ...school, allTimeRoster: updated });
   };
 
@@ -4924,6 +4945,11 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
                       border:"none", borderRadius:6, padding:"5px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>
                     ⭐ State
                   </button>
+                  {(player.schoolHallOfFame || player.stateHallOfFame) && (
+                    <input type="number" value={player.hofYear || ""} onChange={e => setHofYear(player, e.target.value)}
+                      title="Induction year" placeholder="Year"
+                      style={{ width:60, border:"1px solid #d1d5db", borderRadius:6, padding:"5px 6px", fontSize:11, textAlign:"center" }} />
+                  )}
                 </div>
               </div>
             </div>
