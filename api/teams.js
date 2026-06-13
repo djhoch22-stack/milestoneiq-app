@@ -1,5 +1,5 @@
 // GET /teams  → directory of every public record book (internal links for crawlers).
-import { sb, esc, prettySport, htmlShell, SITE } from "./_lib.js";
+import { sb, esc, prettySport, htmlShell, SITE, slugify } from "./_lib.js";
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     .map((t) => {
       const school = t.school_name || t.name || "Team";
       const place = [t.city, t.state].filter(Boolean).join(", ");
-      return `<tr><td><a href="/teams/${esc(t.slug)}">${esc(school)} — ${esc(prettySport(t.sport))}</a></td><td style="color:#6b7280">${esc(place)}</td></tr>`;
+      return `<tr><td><a href="/school/${esc(slugify(school))}">${esc(school)}</a> — <a href="/teams/${esc(t.slug)}">${esc(prettySport(t.sport))}</a></td><td style="color:#6b7280">${esc(place)}</td></tr>`;
     })
     .join("");
 
