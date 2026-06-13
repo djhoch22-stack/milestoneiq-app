@@ -429,10 +429,12 @@ function isLowerBetterStat(sport, statName) {
   try { if ((LOW_RECORD_DEFS[sport] || []).some(d => d.stat === statName)) return true; } catch (e) {}
   return false;
 }
-function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestByName = {}) {
+function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestByName = {}, opts = {}) {
   const alerts = [];
   const effectiveMilestones = milestones.length > 0 ? milestones : defaultMilestonesFor(sport);
   const bestSeason = bestByName[(athlete.name || "").toLowerCase().trim()] || {};
+  const recThresh = (Number(opts.recordPct) || 85) / 100;   // % of a school record that triggers an alert
+  const msGlobalPct = Number(opts.milestonePct) || 0;       // 0 → fall back to each milestone's own alertPct
 
   for (const rec of records) {
     // Career total → career stat; Single season → the athlete's best single season. Other variants
@@ -449,7 +451,7 @@ function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestB
     const holderPoss = rec.holderName ? rec.holderName + "'s" : "the";
     const setIn = rec.holderYear ? ", set in " + rec.holderYear : "";
     const p = val / rec.value;
-    if (p >= 0.85 && p < 1) {
+    if (p >= recThresh && p < 1) {
       alerts.push({
         type: "near_record", statName: rec.statName, variant: rec.variant,
         current: val, target: rec.value, holderName: rec.holderName, holderYear: rec.holderYear, pct: p,
@@ -471,7 +473,7 @@ function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestB
   for (const ms of effectiveMilestones) {
     const val = athlete.stats[ms.statName];
     if (typeof val !== "number" || val <= 0) continue;
-    const threshold = (ms.alertPct || 90) / 100;
+    const threshold = (msGlobalPct > 0 ? msGlobalPct : (ms.alertPct || 90)) / 100;
     const sortedVals = [...ms.values].sort((a,b) => a - b);
     for (const target of sortedVals) {
       const p = val / target;
@@ -827,6 +829,53 @@ function AlertBadge({ alert, mode = "short" }) {
   );
 }
 
+
+// ── Notification Settings Modal ────────────────────────────────────────────────
+// Per-program: auto-email toggle + the % of a record / milestone that triggers an "approaching" alert.
+function NotifySettingsModal({ school, onClose, onSave }) {
+  const ns = school.notifySettings || {};
+  const [auto, setAuto] = useState(!!ns.auto);
+  const [recordPct, setRecordPct] = useState(ns.recordPct || 85);
+  const [milestonePct, setMilestonePct] = useState(ns.milestonePct || 90);
+  const clampPct = (v) => Math.max(50, Math.min(99, Math.round(Number(v) || 0)));
+  const save = () => { onSave({ auto, recordPct: clampPct(recordPct), milestonePct: clampPct(milestonePct) }); onClose(); };
+  const pctRow = (label, hint, val, set) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontWeight: 600, fontSize: 14, color: "#111", marginBottom: 4 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input type="number" min={50} max={99} value={val} onChange={e => set(e.target.value)}
+          style={{ width: 72, padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14 }} />
+        <span style={{ fontSize: 14, color: "#6b7280" }}>%</span>
+      </div>
+      <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{hint}</div>
+    </div>
+  );
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 480, boxSizing: "border-box", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Notification settings</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: "#6b7280" }}>{school.name} — when to flag an athlete approaching a record or milestone, and whether to email automatically.</p>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: 14, border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 18, background: "#f9fafb", cursor: "pointer" }}>
+          <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} style={{ width: 18, height: 18, marginTop: 1, cursor: "pointer" }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: "#111" }}>Email automatically</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+              {auto ? "Coaches + AD are emailed on their own when a player crosses a threshold (each alert sends once)." : "Off — you send emails manually with the 📧 Send alerts button."}
+            </div>
+          </div>
+        </label>
+        {pctRow("Record alert at", "Flag a player once they reach this % of a school record (career or single-season).", recordPct, setRecordPct)}
+        {pctRow("Milestone alert at", "Flag a player once they reach this % of a milestone.", milestonePct, setMilestonePct)}
+        <button onClick={save} style={{ width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 6 }}>
+          Save notification settings
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Milestone Settings Modal ───────────────────────────────────────────────────
 function MilestoneSettingsModal({ school, onClose, onSave }) {
@@ -2219,6 +2268,8 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
 // their all-time career stats before checking (the raw athletes-table stats undercount); dismissed alerts
 // are dropped. Mirrors the Alerts/Overview logic exactly so every surface agrees.
 function activeAlerts(school, bestByName = {}, records = (school.records || [])) {
+  const ns = school.notifySettings || {};
+  const opts = { recordPct: ns.recordPct, milestonePct: ns.milestonePct };
   const careerByName = {};
   (school.allTimeRoster || []).forEach(p => { if (p && p.name) careerByName[p.name.toLowerCase().trim()] = p.stats; });
   const dismissed = new Set(school.dismissedAlerts || []);
@@ -2227,7 +2278,7 @@ function activeAlerts(school, bestByName = {}, records = (school.records || []))
     .map(a => {
       const cs = careerByName[(a.name || "").toLowerCase().trim()];
       const athlete = cs ? { ...a, stats: cs } : a;
-      const alerts = getMilestoneAlerts(athlete, records, school.milestones || [], school.sport, bestByName)
+      const alerts = getMilestoneAlerts(athlete, records, school.milestones || [], school.sport, bestByName, opts)
         .filter(al => !dismissed.has(`${a.id}|${al.statName}|${al.target}`));
       return { athlete, alerts };
     })
@@ -5147,6 +5198,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const [showRecMins, setShowRecMins] = useState(false);
   const [showMilestoneSettings, setShowMilestoneSettings] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showNotifySettings, setShowNotifySettings] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   // Every season row for this program — feeds the single-season shooting-% record holders.
@@ -5165,6 +5217,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   // Stored + auto-computed (career & single-season) records — so "about to break a record" alerts cover
   // every school record, not just the manually stored ones.
   const alertRecords = useMemo(() => recordsForAlerts(school, allSeasonRows), [school, allSeasonRows]);
+  // Configurable alert thresholds (Notification settings): % of a record / milestone that triggers an alert.
+  const notifyOpts = useMemo(() => ({ recordPct: (school.notifySettings || {}).recordPct, milestonePct: (school.notifySettings || {}).milestonePct }), [school.notifySettings]);
   const dismissedSet = new Set(school.dismissedAlerts || []);
 
   const dismissAlert = (athleteId, statName, target) => {
@@ -5195,9 +5249,30 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   });
   const allAlerts = careerAthletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
-    alerts: getMilestoneAlerts(a, alertRecords, school.milestones || [], school.sport, seasonBests)
+    alerts: getMilestoneAlerts(a, alertRecords, school.milestones || [], school.sport, seasonBests, notifyOpts)
       .filter(alert => !isAlertDismissed(a.id, alert.statName, alert.target))
   })).filter(x => x.alerts.length > 0);
+
+  // Auto-email alerts when the program has it enabled. A stable signature of the current alert set drives
+  // the effect (so it doesn't fire on every render), it's debounced so rapid edits batch into one send, and
+  // the send-alert function de-dupes server-side so each crossing emails exactly once. Manual mode → no-op.
+  const autoSentSig = useRef("");
+  const alertSig = useMemo(() => {
+    if (!(school.notifySettings || {}).auto) return "";
+    return allAlerts.flatMap(({ athlete, alerts }) => (alerts || []).map(al => `${athlete.id}|${al.statName}|${al.type}|${al.target}`)).sort().join(",");
+  }, [allAlerts, school.notifySettings]);
+  useEffect(() => {
+    if (!alertSig || alertSig === autoSentSig.current) return;
+    const payload = [];
+    allAlerts.forEach(({ athlete, alerts }) => (alerts || []).forEach(al => payload.push({
+      athlete_id: String(athlete.id), athlete_name: athlete.name,
+      stat_name: al.statName, kind: al.type, variant: al.variant || null,
+      current: al.current, target: al.target, holder_name: al.holderName || null,
+    })));
+    if (!payload.length) return;
+    const t = setTimeout(() => { autoSentSig.current = alertSig; sendAlerts(school.id, payload).catch(() => {}); }, 6000);
+    return () => clearTimeout(t);
+  }, [alertSig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAlertCount = allAlerts.reduce((a, x) => a + x.alerts.length, 0);
 
@@ -5258,6 +5333,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
       {showRecords && <RecordsModal school={school} onClose={()=>setShowRecords(false)} onSave={recs=>onUpdate({...school,records:recs})} />}
       {showRecMins && <RecordMinimumsModal school={school} onClose={()=>setShowRecMins(false)} onSave={mins=>onUpdate({...school, recordMins: mins})} />}
       {showMilestoneSettings && <MilestoneSettingsModal school={school} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
+      {showNotifySettings && <NotifySettingsModal school={school} onClose={()=>setShowNotifySettings(false)} onSave={ns=>onUpdate({...school, notifySettings: ns})} />}
       {showEmailPreview && <EmailPreviewModal allAlerts={allAlerts} school={school} onClose={()=>setShowEmailPreview(false)} />}
 
       <div style={{ background:"#fff", borderBottom:"1px solid #e8e4dd", padding: isMobile ? "0 14px" : "0 24px" }}>
@@ -5274,11 +5350,15 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
             </div>
           </div>
           <div style={{ display:"flex",gap:8 }}>
-            {(activeTab==="milestones" || activeTab==="alerts") && (
+            {(activeTab==="milestones" || activeTab==="alerts") && (<>
+              <button onClick={()=>setShowNotifySettings(true)} title="Notification settings"
+                style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
+                ⚙️{!isMobile && " Notifications"}
+              </button>
               <button onClick={()=>setShowEmailPreview(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>
                 📧 Send alerts ({totalAlertCount})
               </button>
-            )}
+            </>)}
           </div>
         </div>
         <div style={{ display:"flex",gap:0,marginTop:16, overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -5446,7 +5526,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   return true;
                 })
                 .map(athlete=>{
-                const ats = getMilestoneAlerts(athlete, alertRecords, school.milestones||[], school.sport, seasonBests)
+                const ats = getMilestoneAlerts(athlete, alertRecords, school.milestones||[], school.sport, seasonBests, notifyOpts)
                   .filter(a => !isAlertDismissed(athlete.id, a.statName, a.target));
                 const isSelected = selectedAthlete?.id===athlete.id;
                 const isActive = athlete.isActive !== false;
