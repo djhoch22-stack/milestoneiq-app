@@ -565,7 +565,7 @@ const BASEBALL_RATE_DEFS = [
   // ERA = 7 × Earned Runs ÷ Innings Pitched (7-inning HS games; matches MaxPreps). LOWER is better —
   // records and leaderboards rank ascending. IP converted from .1/.2 thirds notation by ipInnings.
   { name: "ERA", short: "ERA", after: "Innings Pitched", fmt: "era2", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40, lowerIsBetter: true,
-    calc: (g) => { const ip = ipInnings(g("Innings Pitched")); return ip > 0 ? (7 * g("Earned Runs")) / ip : null; }, note: (g) => `${g("Innings Pitched").toLocaleString()} IP` },
+    calc: (g) => { const ip = ipInnings(g("Innings Pitched")); const er = g("Earned Runs"); return (ip > 0 && er > 0) ? (7 * er) / ip : null; }, note: (g) => `${g("Innings Pitched").toLocaleString()} IP` },
 ];
 function rateDefsFor(sport) {
   if (sport === "baseball") return BASEBALL_RATE_DEFS;
