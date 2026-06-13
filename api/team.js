@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   const careerPool = (atpRaw || []).map((p) => ({
     id: p.id, name: p.name, stats: p.stats || {},
     firstYear: p.first_year, lastYear: p.last_year, gradYear: p.grad_year,
-    isCurrent: p.is_current, schoolHOF: p.school_hall_of_fame, stateHOF: p.state_hall_of_fame,
+    isCurrent: p.is_current, schoolHOF: p.school_hall_of_fame, stateHOF: p.state_hall_of_fame, hofYear: p.hof_year,
   }));
   const athletes = (athletesRaw || []).map((a) => ({
     name: a.name, position: a.position, gradYear: a.grad_year, isActive: a.is_active !== false, stats: a.stats || {},
@@ -289,13 +289,15 @@ export default async function handler(req, res) {
   // ── HALL OF FAME — INDUCTED ONLY (athletes ⇄ coaches) ───────────────────────
   const inductedAth = careerPool.filter((p) => p.schoolHOF || p.stateHOF)
     .sort((a, b) => (b.stateHOF ? 1 : 0) - (a.stateHOF ? 1 : 0) || a.name.localeCompare(b.name));
-  const athCards = inductedAth.length ? inductedAth.map((p) => {
+  const athItems = inductedAth.map((p) => {
     const badges = (p.stateHOF ? `<span class="badge state">State HOF</span>` : "") + (p.schoolHOF ? `<span class="badge school">School HOF</span>` : "");
     const honors = awardsForHolder(p.name, "player", awards);
     const hs = honors.length ? `<div style="font-size:11px;color:#6b7280;margin-top:8px">${honors.map((h) => esc(awardLabel(h))).join(" · ")}</div>` : "";
     const pts = Number(p.stats?.["Points"]) || 0;
-    return `<div class="hcard" data-p="${esc(normName(p.name))}"><div style="font-weight:700">${esc(p.name)}</div>${yearsStr(p) ? `<div style="font-size:12px;color:#6b7280">${yearsStr(p)}</div>` : ""}<div style="margin-top:6px">${badges}</div>${pts ? `<div style="font-size:12px;color:#9ca3af;margin-top:6px">${fmtNum(pts)} career points</div>` : ""}${hs}</div>`;
-  }).join("") : `<div class="empty">No athletes have been inducted into the Hall of Fame yet.</div>`;
+    const iy = p.hofYear ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:6px">Inducted ${esc(String(p.hofYear))}</div>` : "";
+    const html = `<div class="hcard" data-p="${esc(normName(p.name))}" style="cursor:pointer"><div style="font-size:11px;color:#9ca3af;font-weight:600">👤 Athlete</div><div style="font-weight:700;margin-top:2px">${esc(p.name)}</div>${yearsStr(p) ? `<div style="font-size:12px;color:#6b7280">${yearsStr(p)}</div>` : ""}<div style="margin-top:6px">${badges}</div>${pts ? `<div style="font-size:12px;color:#9ca3af;margin-top:6px">${fmtNum(pts)} career points</div>` : ""}${hs}${iy}</div>`;
+    return { name: p.name, year: p.hofYear || null, html };
+  });
 
   // Combine each coach's record across EVERY public program in the school (cross-sport),
   // mirroring the app's "Combine all teams" — so e.g. a coach who led soccer + basketball
@@ -318,30 +320,33 @@ export default async function handler(req, res) {
   orgAwardsRaw.forEach((a) => { const k = normName(a.holder_name) + "|" + (sportById[a.program_id] || ""); (awBySport[k] = awBySport[k] || []).push(a); });
   const coaches = buildCoachStats(orgSeasons);
   const inductedCoaches = coaches.filter((c) => inducted.has(normName(c.name))).sort((a, b) => b.wins - a.wins);
-  const coachCards2 = inductedCoaches.length ? inductedCoaches.map((c) => {
+  const coachHofYear = {};
+  Object.entries(team.coach_hof || {}).forEach(([k, v]) => { if (v) coachHofYear[normName(k)] = (typeof v === "number" ? v : null); });
+  const coachProfiles = {}; // powers the click-to-open coach record modal
+  const coachItems = inductedCoaches.map((c) => {
     const tot = c.wins + c.losses + (c.ties || 0); const pct = tot > 0 ? Math.round((c.wins / tot) * 1000) / 10 : null;
-    const yr = String(c.firstYear) === String(c.lastYear) ? esc(String(c.firstYear)) : esc(String(c.firstYear)) + "–" + esc(String(c.lastYear));
-    const coy = awardsForHolder(c.name, "coach", awards);
-    const ch = coy.length ? `<div style="font-size:11px;color:#6b7280;margin-top:6px">${coy.map((a) => esc(awardLabel(a))).join(" · ")}</div>` : "";
-    // Per-sport breakdown (e.g. Boys Basketball vs Girls Soccer) when a coach led multiple teams.
-    const byTeam = c.byTeam || {}; const teams = Object.keys(byTeam);
-    const breakdown = teams.length > 1
-      ? `<div style="margin-top:8px;border-top:1px solid #f3f0ea;padding-top:6px">${teams.sort().map((tm) => {
-          const b = byTeam[tm];
-          const aw = awBySport[normName(c.name) + "|" + tm] || [];
-          const awStr = aw.length ? `<div style="font-size:10px;color:#7c3aed;margin-top:1px">🏅 ${aw.map((a) => esc(awardLabel(a))).join(" · ")}</div>` : "";
-          return `<div style="padding:3px 0"><div style="font-size:11px;color:#6b7280;display:flex;justify-content:space-between;gap:8px"><span>${esc(tm)}</span><span style="color:#111;font-weight:600">${b.wins}-${b.losses}${b.ties ? `-${b.ties}` : ""}</span></div>${awStr}</div>`;
-        }).join("")}</div>`
-      : "";
-    return `<div class="hcard"><div style="font-weight:700">${esc(c.name)} <span class="badge school">Inducted</span></div><div style="font-size:12px;color:#6b7280">${yr} · ${c.seasons} season${c.seasons !== 1 ? "s" : ""}</div><div style="font-size:14px;font-weight:600;color:#111;margin:6px 0 2px">${c.wins}–${c.losses}${c.ties ? `–${c.ties}` : ""}${pct != null ? ` (${pct}%)` : ""}</div>${c.titles ? `<div style="font-size:11px;color:#92400e">🏆 ${c.titles} league title${c.titles !== 1 ? "s" : ""}</div>` : ""}${breakdown}${ch}</div>`;
-  }).join("") : `<div class="empty">No coaches have been inducted into the Hall of Fame yet.</div>`;
+    const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
+    const coy = awardsForHolder(c.name, "coach", awards).map((a) => awardLabel(a));
+    const iy = coachHofYear[normName(c.name)] || null;
+    const byTeam = c.byTeam || {};
+    coachProfiles[normName(c.name)] = {
+      n: c.name, iy, yrs, ss: c.seasons, w: c.wins, l: c.losses, t: c.ties || 0, pct,
+      lw: c.leagueWins || 0, ll: c.leagueLosses || 0, lt: c.leagueTies || 0, titles: c.titles || 0,
+      teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a)); return { tm, w: b.wins, l: b.losses, t: b.ties || 0, aw }; }),
+      coy,
+    };
+    const iyHtml = iy ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:6px">Inducted ${esc(String(iy))}</div>` : "";
+    const chHtml = coy.length ? `<div style="font-size:11px;color:#6b7280;margin-top:6px">${coy.map((a) => esc(a)).join(" · ")}</div>` : "";
+    const html = `<div class="hcard" data-c="${esc(normName(c.name))}" style="cursor:pointer"><div style="font-size:11px;color:#9ca3af;font-weight:600">🎓 Coach</div><div style="font-weight:700;margin-top:2px">${esc(c.name)}</div><div style="font-size:12px;color:#6b7280">${esc(yrs)} · ${c.seasons} season${c.seasons !== 1 ? "s" : ""}</div><div style="font-size:14px;font-weight:600;color:#111;margin:6px 0 2px">${c.wins}–${c.losses}${c.ties ? `–${c.ties}` : ""}${pct != null ? ` (${pct}%)` : ""}</div>${c.titles ? `<div style="font-size:11px;color:#92400e">🏆 ${c.titles} league title${c.titles !== 1 ? "s" : ""}</div>` : ""}${chHtml}${iyHtml}<div style="font-size:12px;color:#1a56db;font-weight:600;margin-top:8px">View full record →</div></div>`;
+    return { name: c.name, year: iy, html };
+  });
 
-  const hofSection = `
-    <input type="radio" name="hofview" id="hv-ath" class="hvin" checked>
-    <input type="radio" name="hofview" id="hv-coach" class="hvin">
-    <div class="hvbar"><label for="hv-ath">👤 Athletes</label><label for="hv-coach">🎓 Coaches</label></div>
-    <div class="hvpanel hv-ath"><div class="hcards">${athCards}</div></div>
-    <div class="hvpanel hv-coach"><div class="hcards">${coachCards2}</div></div>`;
+  // One combined Hall of Fame list — athletes + coaches intermixed, sorted by induction year (newest first;
+  // entries with no recorded year fall to the bottom). Replaces the old athletes/coaches toggle.
+  const hofMembers = [...athItems, ...coachItems].sort((a, b) => (b.year || 0) - (a.year || 0) || a.name.localeCompare(b.name));
+  const hofSection = hofMembers.length
+    ? `<div class="hcards">${hofMembers.map((m) => m.html).join("")}</div>`
+    : `<div class="empty">No one has been inducted into the Hall of Fame yet.</div>`;
 
   // ── Header + tabs ───────────────────────────────────────────────────────────
   const SPORT_EMOJI = /basket/i.test(team.sport) ? "🏀" : /foot/i.test(team.sport) ? "🏈" : /soccer/i.test(team.sport) ? "⚽" : /base/i.test(team.sport) ? "⚾" : /volley/i.test(team.sport) ? "🏐" : /track|cross/i.test(team.sport) ? "🏃" : "🏆";
@@ -411,7 +416,7 @@ export default async function handler(req, res) {
   const dsJson = JSON.stringify(DISPLAY_STATS[team.sport] || []);
   const pColor = JSON.stringify(logoColor);
   const script =
-    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var RD=${rdJson};var DS=${dsJson};var CURMETA={ic:${JSON.stringify(SPORT_ICON[team.sport] || "•")},lbl:${JSON.stringify(prettySport(team.sport))}};` +
+    `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var RD=${rdJson};var DS=${dsJson};var CURMETA={ic:${JSON.stringify(SPORT_ICON[team.sport] || "•")},lbl:${JSON.stringify(prettySport(team.sport))}};var COACH=${JSON.stringify(coachProfiles).replace(/</g, "\\u003c")};` +
     `(function(){function e(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}` +
     `function ord(ks){return ks.slice().sort(function(a,b){var i=SO.indexOf(a),j=SO.indexOf(b);if(i!==-1&&j!==-1)return i-j;if(i!==-1)return -1;if(j!==-1)return 1;return a<b?-1:a>b?1:0;});}` +
     `function pgv(s,k){var v=Number(s[k]),g=Number(s["Games Played"]);if(!g||g<=0||isNaN(v))return null;return Math.round(v/g*10)/10;}` +
@@ -435,7 +440,8 @@ export default async function handler(req, res) {
     `function spBody(p,si){if(si===0)return curBody(p);var x=(p.xs||[])[si-1]||{};return '<h3 style="margin:0 0 10px;font-size:14px">Career statistics — '+e(String(x.lbl||""))+'</h3>'+(x.html||"");}` +
     `var CURP=null;` +
     `function openP(k){var p=PROF[k];if(!p)return;CURP=p;var ini=p.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var bdg=(p.a?'<span class="hbadge">Active</span> ':"")+(p.sh?"🏛️ ":"")+(p.st?"⭐":"");var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(p.n)+" "+bdg+'</div><div class="pmsub">'+(p.y?e(p.y):"")+(p.pos?" · "+e(p.pos):"")+"</div></div></div></div>"+'<div class="pmbody">'+spTabs(p,0)+'<div id="psbody">'+spBody(p,0)+'</div></div>';document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
-    `var ov=document.getElementById("pmodal");document.addEventListener("click",function(ev){var t=ev.target;if(!t)return;if(t.closest&&t.closest(".pmx")){if(ov)ov.style.display="none";return;}if(t===ov){ov.style.display="none";return;}var tb=t.closest&&t.closest(".psptab");if(tb&&CURP){var si=+tb.getAttribute("data-si");var bd=document.getElementById("psbody");if(bd)bd.innerHTML=spBody(CURP,si);var tabs=document.querySelectorAll(".psptab");for(var i=0;i<tabs.length;i++){var o2=(+tabs[i].getAttribute("data-si"))===si;tabs[i].style.background=o2?"#111":"#f0f0ee";tabs[i].style.color=o2?"#fff":"#374151";}return;}var el=t.closest&&t.closest("[data-p]");if(el){openP(el.getAttribute("data-p"));}});})();`;
+    `function openC(k){var c=COACH[k];if(!c)return;var ini=c.n.split(" ").map(function(w){return w?w.charAt(0):"";}).join("").slice(0,2).toUpperCase();var tl=function(l,v,s){return '<div class="ptile"><div class="pl">'+e(l)+'</div><div class="pv">'+e(String(v))+'</div><div class="psub">'+e(s||"")+"</div></div>";};var tiles='<div class="ptiles">'+tl("Record",c.w+"\\u2013"+c.l+(c.t?"\\u2013"+c.t:""),(c.pct!=null?c.pct+"% win":""))+((c.lw+c.ll+c.lt)>0?tl("League",c.lw+"\\u2013"+c.ll+(c.lt?"\\u2013"+c.lt:""),""):"")+tl("Seasons",c.ss,c.yrs)+(c.titles?tl("League titles","\\uD83C\\uDFC6 "+c.titles,""):"")+"</div>";var coy=(c.coy&&c.coy.length)?'<h3 style="margin:16px 0 8px;font-size:14px">Coach of the Year</h3><div>'+c.coy.map(function(a){return '<div style="font-size:13px;color:#374151;padding:3px 0">\\uD83C\\uDFC5 '+e(a)+"</div>";}).join("")+"</div>":"";var tm=(c.teams&&c.teams.length>1)?'<h3 style="margin:16px 0 8px;font-size:14px">By team</h3>'+c.teams.map(function(b){return '<div style="font-size:13px;color:#374151;padding:4px 0;display:flex;justify-content:space-between;gap:10px"><span>'+e(b.tm)+(b.aw&&b.aw.length?" \\uD83C\\uDFC5":"")+'</span><span style="font-weight:600;color:#111">'+b.w+"\\u2013"+b.l+(b.t?"\\u2013"+b.t:"")+"</span></div>";}).join(""):"";var h='<div class="pmhd" style="background:'+PCOLOR+'"><button class="pmx" type="button">\\u2715</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">'+e(ini)+'</div><div><div class="pmname">'+e(c.n)+' \\uD83C\\uDF93</div><div class="pmsub">Head coach'+(c.iy?" \\u00b7 Inducted "+e(String(c.iy)):"")+'</div></div></div></div><div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3>'+tiles+coy+tm+"</div>";document.getElementById("pmcard").innerHTML=h;document.getElementById("pmodal").style.display="flex";}` +
+    `var ov=document.getElementById("pmodal");document.addEventListener("click",function(ev){var t=ev.target;if(!t)return;if(t.closest&&t.closest(".pmx")){if(ov)ov.style.display="none";return;}if(t===ov){ov.style.display="none";return;}var tb=t.closest&&t.closest(".psptab");if(tb&&CURP){var si=+tb.getAttribute("data-si");var bd=document.getElementById("psbody");if(bd)bd.innerHTML=spBody(CURP,si);var tabs=document.querySelectorAll(".psptab");for(var i=0;i<tabs.length;i++){var o2=(+tabs[i].getAttribute("data-si"))===si;tabs[i].style.background=o2?"#111":"#f0f0ee";tabs[i].style.color=o2?"#fff":"#374151";}return;}var ec=t.closest&&t.closest("[data-c]");if(ec){openC(ec.getAttribute("data-c"));return;}var el=t.closest&&t.closest("[data-p]");if(el){openP(el.getAttribute("data-p"));}});})();`;
 
   const body = `
     <div class="phead">${logoBox}<div><a href="/school/${esc(slugify(school))}" style="font-size:12px;color:#6b7280;text-decoration:none">← All ${esc(school)} programs</a><h1 style="margin:0;font-size:26px">${esc(school)}</h1><div class="meta">${counts}</div></div></div>
@@ -459,7 +465,7 @@ export default async function handler(req, res) {
       <section class="panel p-records"><h2>School Records</h2><p class="sub">Every record by stat, variant, holder &amp; year.</p>${recordsSection}</section>
       <section class="panel p-alltime"><h2>All-Time Program History</h2><p class="sub">Pick a stat to rank every player — tap a name for their full profile.</p>${alltimeSection}</section>
       <section class="panel p-seasons"><h2>Season History</h2><p class="sub">Year-by-year results with cumulative coach records.</p>${seasonsSection}</section>
-      <section class="panel p-hof"><h2>Hall of Fame</h2><p class="sub">Inducted athletes &amp; coaches — use the toggle to switch.</p>${hofSection}</section>
+      <section class="panel p-hof"><h2>Hall of Fame</h2><p class="sub">Inducted athletes &amp; coaches, by induction year — tap any name for full stats.</p>${hofSection}</section>
     </div>
     <div id="pmodal"><div id="pmcard"></div></div>
     <script>${script}</script>
