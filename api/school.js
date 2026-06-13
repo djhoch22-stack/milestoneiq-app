@@ -45,11 +45,11 @@ export default async function handler(req, res) {
     }
     return h;
   };
-  const honorLine = (label, list) => list.length ? `<h3 style="margin:16px 0 8px;font-size:14px">${label}</h3><div style="font-size:13px;color:#374151;line-height:1.6">${list.map((a) => esc(awardLabel(a) + (a.season ? " (" + a.season + ")" : ""))).join(" · ")}</div>` : "";
+  const honorLine = (label, list, emoji) => list.length ? `<h3 style="margin:16px 0 8px;font-size:14px">${label}</h3><div>${list.map((a) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} ${esc(awardLabel(a) + (a.season ? " (" + a.season + ")" : ""))}</div>`).join("")}</div>` : "";
   const head = (name, badge, m, sub) => `<div class="pmhd" style="background:${esc(m.col)}"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">${esc(name.split(" ").map((w) => w ? w[0] : "").join("").slice(0, 2).toUpperCase())}</div><div><div class="pmname">${esc(name)} ${badge}</div><div class="pmsub">${esc(sub)}</div></div></div></div>`;
   const athleteCard = (name, stats, m, year, honors) =>
     head(name, "🏛️", m, m.sport + (year ? " · Inducted " + year : "")) +
-    `<div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Career statistics</h3><div class="ptiles">${tilesFor(stats, m.sportKey)}</div>${honorLine("Honors", honors)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View full record &amp; seasons →</a></p></div>`;
+    `<div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Career statistics</h3><div class="ptiles">${tilesFor(stats, m.sportKey)}</div>${honorLine("Honors", honors, SPORT_ICON[m.sportKey] || "🏅")}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View full record &amp; seasons →</a></p></div>`;
   const coachCard = (c, m, year, coy) => {
     const tot = c.wins + c.losses + (c.ties || 0), pct = tot > 0 ? Math.round(c.wins / tot * 1000) / 10 : null;
     const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       + (lt > 0 ? tile("League", (c.leagueWins || 0) + "–" + (c.leagueLosses || 0) + (c.leagueTies ? "–" + c.leagueTies : ""), "") : "")
       + tile("Seasons", c.seasons, yrs) + (c.titles ? tile("League titles", "🏆 " + c.titles, "") : "");
     return head(c.name, "🎓", m, "Head coach" + (year ? " · Inducted " + year : "")) +
-      `<div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${honorLine("Coach of the Year", coy)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p></div>`;
+      `<div class="pmbody"><h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${honorLine("Coach of the Year", coy, SPORT_ICON[m.sportKey] || "🏅")}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p></div>`;
   };
 
   // Build the inductee list + a card per inductee (keyed for click-to-open).
