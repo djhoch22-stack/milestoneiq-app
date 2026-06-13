@@ -177,7 +177,8 @@ export function evalRateSpec(spec, stats) {
   }
   if (spec.kind === "era") {
     const ip = ipInnings(g("Innings Pitched"));
-    return ip > 0 ? (7 * g("Earned Runs")) / ip : null; // 7-inning HS games (matches MaxPreps)
+    const er = g("Earned Runs");
+    return (ip > 0 && er > 0) ? (7 * er) / ip : null; // 7-inning HS games (matches MaxPreps); no earned runs = no data (not a real 0.00)
   }
   return null;
 }
