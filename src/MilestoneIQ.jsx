@@ -2142,6 +2142,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const save = async () => {
     setBusy(true); setErr("");
     const career = {}; // accumulate this player's career = sum of their seasons, so the all-time leaderboard updates
+    const seasons = []; // the seasons that survived this save → drives the player's first/last year range
     for (const row of draft) {
       if (!String(row.season || "").trim()) continue;
       const stats = {};
@@ -2151,12 +2152,15 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
         season: String(row.season).trim(), grade: row.grade ? String(row.grade).trim() : null, stats,
       });
       if (error) { setBusy(false); setErr(`Couldn't save ${row.season}: ${error.message || error}`); return; }
+      seasons.push(String(row.season).trim());
       for (const k in stats) career[k] = /^Longest /.test(k) ? Math.max(career[k] || 0, stats[k]) : (career[k] || 0) + stats[k];
     }
+    seasons.sort(); // "2021-2022" < "2022-2023" — string sort is chronological for the YYYY-YYYY format
     setBusy(false); setEditing(false); load();
-    // Roll the edited seasons into the player's career so their all-time rank + totals refresh
-    // right away (only THIS player is touched — no program-wide recompute).
-    if (onSaved) onSaved(career);
+    // Roll the edited seasons into the player's career so their all-time rank + totals refresh right away
+    // (only THIS player is touched — no program-wide recompute). Also pass the first/last season so the
+    // All-Time "Years" column shows their range instead of a stale grad year.
+    if (onSaved) onSaved(career, { firstYear: seasons[0] || null, lastYear: seasons[seasons.length - 1] || null });
   };
 
   const th = { textAlign: "right", padding: "6px 8px", fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" };
@@ -2525,12 +2529,15 @@ function PlayerProfileModal({ player, school, onClose, onUpdate, ALL_STATS, effe
             allStats={ALL_STATS}
             seasonOptions={(school.seasons || []).map(s => s.season).filter(Boolean)}
             careerStats={player.stats}
-            onSaved={(career) => {
-              // Push the recomputed career into the all-time roster + active roster so the
-              // leaderboard position and totals update immediately (persisted via id upsert).
+            onSaved={(career, years) => {
+              // Push the recomputed career + year range into the all-time roster + active roster so the
+              // leaderboard position, totals, and "Years" column update immediately (persisted via id upsert).
               if (!career || !Object.keys(career).length) return;
               const key = normName(player.name);
-              const merge = (arr) => (arr || []).map(p => normName(p.name) === key ? { ...p, stats: career } : p);
+              const yr = years || {};
+              const merge = (arr) => (arr || []).map(p => normName(p.name) === key
+                ? { ...p, stats: career, ...(yr.firstYear ? { firstYear: yr.firstYear } : {}), ...(yr.lastYear ? { lastYear: yr.lastYear } : {}) }
+                : p);
               onUpdate({ ...school, allTimeRoster: merge(school.allTimeRoster), athletes: merge(school.athletes) });
             }}
           />
@@ -3205,6 +3212,16 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   // to THAT season's row, so the leaderboard reflects just that year. Seasons come from player_seasons.
   const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
   const seasonOpts = [...new Set((allSeasonRows || []).map(r => r.season).filter(Boolean))].sort((a, b) => String(b).localeCompare(String(a)));
+  // First/last season a player actually has rows for — fallback for the "Years" column when their all-time
+  // row carries no first/last year (e.g. a manually-added player whose seasons were entered in-profile).
+  const seasonSpan = {};
+  (allSeasonRows || []).forEach(r => {
+    const n = (r.player_name || "").toLowerCase().trim(), s = r.season;
+    if (!n || !s) return;
+    const e = seasonSpan[n] || (seasonSpan[n] = { first: s, last: s });
+    if (s < e.first) e.first = s;
+    if (s > e.last) e.last = s;
+  });
   const seasonView = season !== "all";
   const qualKey = seasonView ? "season" : "career"; // rate / fewest qualifying minimum scope
   const displayRoster = seasonView
@@ -3338,7 +3355,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
                     </div>
                   </td>
                   <td style={{padding:"9px 16px",color:"#9ca3af",fontSize:12,whiteSpace:"nowrap"}}>
-                    {(p.firstYear && p.lastYear) ? (p.firstYear===p.lastYear ? p.firstYear : p.firstYear+" – "+p.lastYear) : p.gradYear ? "Class of "+p.gradYear : ""}
+                    {(() => { const sp = seasonSpan[(p.name||"").toLowerCase().trim()]; const fy = p.firstYear || sp?.first, ly = p.lastYear || sp?.last; return (fy && ly) ? (fy===ly ? fy : fy+" – "+ly) : p.gradYear ? "Class of "+p.gradYear : ""; })()}
                   </td>
                   <td style={{padding:"9px 16px",textAlign:"right",fontWeight:700,color:"#111",fontSize:15}}>{rateDef ? fmtRateVal(rateDef.fmt, val) : val.toLocaleString()}</td>
                   <td style={{padding:"9px 16px 9px 0"}}>
