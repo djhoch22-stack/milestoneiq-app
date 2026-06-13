@@ -552,6 +552,22 @@ export function activeYears(firstYear, lastYear, gradYear) {
 export function seasonEndYear(seasonStr) {
   return parseInt(String(seasonStr || "").split("-")[1] || String(seasonStr || ""), 10);
 }
+// Cumulative postseason tallies for a coach across the seasons they coached — mirrors the program-overview
+// "team success" rollup (a state title also counts as a final four / playoff appearance, etc.).
+export function coachPostseason(coachName, seasons) {
+  const n = normName(coachName);
+  const mine = (seasons || []).filter((s) => normName(s.coach) === n && s.notes);
+  const cnt = (re) => mine.filter((s) => re.test(s.notes)).length;
+  const stateChamps = cnt(/state champ|state champion/i);
+  const runnerUp = cnt(/runner.?up|runner up|2nd place/i);
+  const third = cnt(/3rd place|3rd/i);
+  const finalFours = cnt(/final.?4|final four/i) + stateChamps + runnerUp + third;
+  const eliteEights = cnt(/elite.?8|elite eight/i) + finalFours;
+  const sweetSixteens = cnt(/sweet.?16|sweet sixteen/i) + eliteEights;
+  const playoffs = cnt(/playoff|round of|first round|state first/i) + sweetSixteens;
+  const leagueTitles = cnt(/league champion|league champ/i);
+  return { stateChamps, runnerUp, finalFours, eliteEights, sweetSixteens, playoffs, leagueTitles };
+}
 
 // Full HTML document shell with SEO meta + JSON-LD + app-matching styles +
 // JS-free CSS tabs. `body` is the page content (may include the .tabs markup).
