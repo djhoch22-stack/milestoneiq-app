@@ -248,11 +248,12 @@ export default async function handler(req, res) {
     const cmap = {};
     seasonsList.forEach((s) => {
       if (!s.coach) return;
-      if (!cmap[s.coach]) cmap[s.coach] = { wins: 0, losses: 0, ties: 0, leagueWins: 0, leagueLosses: 0, leagueTies: 0, seasons: 0, titles: 0, firstYear: s.season, lastYear: s.season };
+      if (!cmap[s.coach]) cmap[s.coach] = { wins: 0, losses: 0, ties: 0, leagueWins: 0, leagueLosses: 0, leagueTies: 0, seasons: 0, leagueTitles: 0, stateTitles: 0, firstYear: s.season, lastYear: s.season };
       const r = cmap[s.coach]; r.seasons++;
       if (s.wins != null) r.wins += s.wins; if (s.losses != null) r.losses += s.losses; if (s.ties != null) r.ties += s.ties;
       if (s.leagueWins != null) r.leagueWins += s.leagueWins; if (s.leagueLosses != null) r.leagueLosses += s.leagueLosses; if (s.leagueTies != null) r.leagueTies += s.leagueTies;
-      if (s.notes && /champion/i.test(s.notes)) r.titles++;
+      if (s.notes && /league champ/i.test(s.notes)) r.leagueTitles++;
+      if (s.notes && /state champ/i.test(s.notes)) r.stateTitles++;
       if (String(s.season) < String(r.firstYear)) r.firstYear = s.season;
       if (String(s.season) > String(r.lastYear)) r.lastYear = s.season;
     });
@@ -268,7 +269,8 @@ export default async function handler(req, res) {
           <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">Overall</div><div style="font-weight:700;font-size:16px;color:#111">${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ""}</div><div style="font-size:11px;color:#6b7280">${pct}%</div></div>
           <div style="background:${cur ? "#dbeafe" : "#f9fafb"};border-radius:8px;padding:8px 12px"><div style="font-size:10px;color:#9ca3af">League</div><div style="font-weight:700;font-size:16px;color:#111">${rec.leagueWins}-${rec.leagueLosses}${rec.leagueTies ? `-${rec.leagueTies}` : ""}</div><div style="font-size:11px;color:#6b7280">${lpct}%</div></div>
         </div>
-        ${rec.titles > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:8px">🏆 ${rec.titles} league title${rec.titles !== 1 ? "s" : ""}</div>` : ""}
+        ${rec.leagueTitles > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:8px">🏆 ${rec.leagueTitles} league title${rec.leagueTitles !== 1 ? "s" : ""}</div>` : ""}
+        ${rec.stateTitles > 0 ? `<div style="font-size:11px;color:#b45309;margin-top:4px">🏅 ${rec.stateTitles} state title${rec.stateTitles !== 1 ? "s" : ""}</div>` : ""}
       </div>`;
     }).join("");
 
@@ -277,8 +279,10 @@ export default async function handler(req, res) {
       const rec = (s.wins != null) ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
       const lrec = (s.leagueWins != null) ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
       const wp = s.winPct != null ? s.winPct + "%" : "—";
-      const isChamp = s.notes && /league champion/i.test(s.notes);
-      const note = s.notes ? `<span style="background:${isChamp ? "#fef3c7" : "#eff6ff"};color:${isChamp ? "#92400e" : "#1e40af"};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${isChamp ? "🏆 " : ""}${esc(s.notes)}</span>` : "";
+      const isSt = s.notes && /state champ/i.test(s.notes);
+      const isLg = s.notes && /league champ/i.test(s.notes);
+      const isChamp = isSt || isLg;
+      const note = s.notes ? `<span style="background:${isChamp ? "#fef3c7" : "#eff6ff"};color:${isChamp ? "#92400e" : "#1e40af"};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${isSt ? "🏅 " : isLg ? "🏆 " : ""}${esc(s.notes)}</span>` : "";
       return `<tr style="background:${isChamp ? "#fffbeb" : i % 2 ? "#fafaf8" : "#fff"}"><td style="font-weight:700">${esc(s.season || "")}</td><td>${esc(s.coach || "—")}</td><td class="num" style="font-weight:600">${rec}</td><td class="num" style="color:#6b7280">${lrec}</td><td class="num">${wp}</td><td>${note}</td></tr>`;
     }).join("");
 
