@@ -521,6 +521,7 @@ export default function AppWrapper() {
         initialSchools={schools}
         onUpdateSchool={handleUpdateSchool}
         orgId={orgId}
+        orgName={org?.name || ''}
         tier={tier}
         tierLimits={TIER_LIMITS[tier] || TIER_LIMITS.program}
         role={role}
