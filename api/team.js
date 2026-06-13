@@ -8,6 +8,7 @@ import {
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
+  seasonSuccessScore, activeYears, seasonEndYear,
 } from "./_lib.js";
 
 export default async function handler(req, res) {
@@ -116,15 +117,17 @@ export default async function handler(req, res) {
   const athByName = {}; athletes.forEach((a) => { athByName[normName(a.name)] = a; });
   // A player's honors/awards (this program) → label strings with year, shown on their profile card.
   const honorsArr = (name) => awardsForHolder(name, "player", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
+  // Team success during a player's career: seasons (with scoring notes) overlapping their active years.
+  const tsFor = (fy, ly, gy) => { const yrs = activeYears(fy, ly, gy); return seasonsList.filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0).map((se) => ({ ssn: se.season, note: se.notes, pts: seasonSuccessScore(se.notes) })); };
   const profiles = {};
   careerPool.forEach((p) => {
     const k = normName(p.name); const ath = athByName[k];
     profiles[k] = { n: p.name, y: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? String(p.firstYear) : String(p.firstYear) + "–" + String(p.lastYear)) : (p.gradYear ? "Class of " + p.gradYear : ""),
-      pos: (ath && ath.position) ? ath.position : "", a: !!(p.isCurrent || activeSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(p.name) };
+      pos: (ath && ath.position) ? ath.position : "", a: !!(p.isCurrent || activeSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(p.name), ts: tsFor(p.firstYear, p.lastYear, p.gradYear) };
   });
   athletes.forEach((a) => {
     const k = normName(a.name); if (profiles[k]) return;
-    profiles[k] = { n: a.name, y: a.gradYear ? "Class of " + a.gradYear : "", pos: a.position || "", a: a.isActive !== false, sh: 0, st: 0, at: 0, s: a.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(a.name) };
+    profiles[k] = { n: a.name, y: a.gradYear ? "Class of " + a.gradYear : "", pos: a.position || "", a: a.isActive !== false, sh: 0, st: 0, at: 0, s: a.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(a.name), ts: tsFor(null, null, a.gradYear) };
   });
 
   // ── OVERVIEW ────────────────────────────────────────────────────────────────
@@ -377,6 +380,12 @@ export default async function handler(req, res) {
   // Server-rendered honors + records rows for a cross-sport tab (mirror the in-browser hon()/recl() markup).
   const honRowsHtml = (hons, emoji) => hons.length ? `<h3 style="margin:16px 0 8px;font-size:14px">Honors</h3><div>${hons.map((a) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} ${esc(a)}</div>`).join("")}</div>` : "";
   const recRowsHtml = (recs, emoji) => recs.length ? `<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>${recs.map((r) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} <b>${esc(r.n)}</b> ${r.v ? `<span style="color:#9ca3af">(${esc(r.v)})</span> ` : ""}— ${esc(String(r.val))}</div>`).join("")}</div>` : "";
+  const tsRowsHtml = (seasons, row, emoji) => {
+    const yrs = activeYears(row.first_year, row.last_year, row.grad_year);
+    const secs = (seasons || []).filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0);
+    if (!secs.length) return "";
+    return `<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">${secs.map((se) => `<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">${emoji} ${esc(se.season)}</span><span style="color:#6b7280;flex:1">${esc(se.notes)}</span><span style="font-weight:700;color:#92400e;white-space:nowrap">+${seasonSuccessScore(se.notes)}</span></div>`).join("")}</div>`;
+  };
 
   // ── Cross-sport profiles: a kid's OTHER gender-compatible public programs in this org, so their
   // profile can toggle between sports (career stats + rank + records + honors per sport) — mirrors the app.
@@ -388,7 +397,8 @@ export default async function handler(req, res) {
       sb(`player_seasons?program_id=eq.${t.id}&select=player_name,season,stats`),
       sb(`records?program_id=eq.${t.id}`),
       sb(`awards?program_id=eq.${t.id}&scope=eq.player&select=kind,holder_name,season`),
-    ]).then(([rows, pss, recs, aws]) => ({ t, rows: rows || [], pss: pss || [], recs: recs || [], aws: aws || [] }))));
+      sb(`seasons?program_id=eq.${t.id}&select=season,notes`),
+    ]).then(([rows, pss, recs, aws, ses]) => ({ t, rows: rows || [], pss: pss || [], recs: recs || [], aws: aws || [], ses: ses || [] }))));
     // Career-tile HTML for one of a kid's other sports (mirrors the in-browser tiles(): stat + rank + rates).
     const profTiles = (stats, sport, pool) => {
       const rankOf = (st, val) => { if (!(val > 0)) return null; let c = 1; for (const q of pool) if ((Number((q.stats || {})[st]) || 0) > val) c++; return c; };
@@ -405,7 +415,7 @@ export default async function handler(req, res) {
       }
       return html;
     };
-    xsData.forEach(({ t, rows, pss, recs, aws }) => {
+    xsData.forEach(({ t, rows, pss, recs, aws, ses }) => {
       const ic = SPORT_ICON[t.sport] || "🏅", lbl = prettySport(t.sport);
       // That program's full record book → which records each player holds (mirrors the main page).
       const cp = rows.map((p) => ({ name: p.name, stats: p.stats || {}, firstYear: p.first_year, lastYear: p.last_year, gradYear: p.grad_year }));
@@ -429,7 +439,7 @@ export default async function handler(req, res) {
       rows.forEach((p) => {
         const k = normName(p.name); const prof = profiles[k];
         if (!prof) return; // only attach to a kid already shown on THIS program's page
-        const html = `<div class="ptiles">${profTiles(p.stats || {}, t.sport, rows)}</div>${honRowsHtml(honByName[k] || [], ic)}${recRowsHtml(recByHolder[k] || [], ic)}`;
+        const html = `<div class="ptiles">${profTiles(p.stats || {}, t.sport, rows)}</div>${honRowsHtml(honByName[k] || [], ic)}${recRowsHtml(recByHolder[k] || [], ic)}${tsRowsHtml(ses, p, ic)}`;
         (prof.xs = prof.xs || []).push({ ic, lbl, html });
       });
     });
@@ -467,7 +477,8 @@ export default async function handler(req, res) {
     `function seas(p){if(!p.ss||!p.ss.length)return "";var cols=ord(Object.keys(p.s).filter(function(k){return Number(p.s[k])>0;}));var ents=[];cols.forEach(function(c){ents.push({c:c});for(var i=0;i<RD.length;i++)if(RD[i].after===c)ents.push({d:RD[i]});});var head="<th>Season</th>"+ents.map(function(en){return '<th class="num">'+e(en.d?en.d.s:en.c)+"</th>";}).join("");var rs=p.ss.slice().sort(function(a,b){return String(b.season)<String(a.season)?-1:1;}).map(function(r){return "<tr><td>"+e(r.season)+"</td>"+ents.map(function(en){if(en.d){var dv=rv(r.s,en.d);return '<td class="num">'+(dv!=null?fmtR(en.d.fmt,dv):"—")+"</td>";}var v=r.s[en.c];return '<td class="num">'+(v!=null&&v!==""?Number(v).toLocaleString():"—")+"</td>";}).join("")+"</tr>";}).join("");var tot='<tr style="font-weight:700;background:#fafaf8"><td>Career</td>'+ents.map(function(en){if(en.d){var dv=rv(p.s,en.d);return '<td class="num">'+(dv!=null?fmtR(en.d.fmt,dv):"—")+"</td>";}return '<td class="num">'+(Number(p.s[en.c])||0).toLocaleString()+"</td>";}).join("")+"</tr>";return '<h3 style="margin:18px 0 8px;font-size:14px">Season by season</h3><div style="overflow-x:auto"><table><thead><tr>'+head+"</tr></thead><tbody>"+rs+tot+"</tbody></table></div>";}` +
     `function recl(p){if(!p.rec||!p.rec.length)return "";return '<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>'+p.rec.map(function(r){return '<div style="font-size:13px;color:#374151;padding:3px 0">'+SE+' <b>'+e(r.n)+"</b> "+(r.v?'<span style="color:#9ca3af">('+e(r.v)+")</span> ":"")+"— "+e(String(r.val))+"</div>";}).join("")+"</div>";}` +
     `function hon(p){if(!p.hon||!p.hon.length)return "";return '<h3 style="margin:16px 0 8px;font-size:14px">Honors</h3><div>'+p.hon.map(function(a){return '<div style="font-size:13px;color:#374151;padding:3px 0">'+SE+' '+e(a)+"</div>";}).join("")+"</div>";}` +
-    `function curBody(p){var chips="";if(p.sh)chips+='<div class="hofchip" style="background:#fef9c3;border-color:#fde68a;color:#92400e">🏛️ School Hall of Fame</div>';if(p.st)chips+='<div class="hofchip" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">⭐ State Hall of Fame</div>';return (chips?'<div class="hofchips">'+chips+"</div>":"")+'<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank</h3><div class="ptiles">'+tiles(p)+"</div>"+hon(p)+recl(p)+seas(p);}` +
+    `function tsl(p){if(!p.ts||!p.ts.length)return "";return '<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">'+p.ts.map(function(s){return '<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">'+SE+' '+e(s.ssn)+'</span><span style="color:#6b7280;flex:1">'+e(s.note)+'</span><span style="font-weight:700;color:#92400e;white-space:nowrap">+'+s.pts+"</span></div>";}).join("")+"</div>";}` +
+    `function curBody(p){var chips="";if(p.sh)chips+='<div class="hofchip" style="background:#fef9c3;border-color:#fde68a;color:#92400e">🏛️ School Hall of Fame</div>';if(p.st)chips+='<div class="hofchip" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">⭐ State Hall of Fame</div>';return (chips?'<div class="hofchips">'+chips+"</div>":"")+'<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank</h3><div class="ptiles">'+tiles(p)+"</div>"+hon(p)+recl(p)+tsl(p)+seas(p);}` +
     `function spTabs(p,si){var xs=p.xs||[];if(!xs.length)return "";var a=[{ic:CURMETA.ic,lbl:CURMETA.lbl}].concat(xs);var o='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';for(var i=0;i<a.length;i++){var on=i===si;o+='<button type="button" class="psptab" data-si="'+i+'" style="display:flex;align-items:center;gap:5px;border:none;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?"#111":"#f0f0ee")+';color:'+(on?"#fff":"#374151")+'">'+e(a[i].ic)+" "+e(String(a[i].lbl).replace(/^(Boys|Girls) /,""))+"</button>";}return o+"</div>";}` +
     `function spBody(p,si){if(si===0)return curBody(p);var x=(p.xs||[])[si-1]||{};return '<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank — '+e(String(x.lbl||""))+'</h3>'+(x.html||"");}` +
     `var CURP=null;` +
