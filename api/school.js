@@ -7,6 +7,7 @@ import {
   statsToDisplay, rateDefsFor, rateValue, fmtRateVal, RATE_FMT,
   pctRecordsFrom, pergameRecordsFrom, longestRecordsFrom, autoStatRecords,
   awardsForHolder, awardLabel, buildCoachStats, normName,
+  seasonSuccessScore, activeYears, seasonEndYear,
 } from "./_lib.js";
 
 export default async function handler(req, res) {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
   // multi-sport stats + years), player_seasons + records (for the per-program record book). Seasons + awards
   // are small enough to fetch across all programs at once.
   let orgSeasons = [], awards = [], allAtp = [];
-  const poolByProg = {}, pssByProg = {}, recsByProg = {}, atpByKey = {};
+  const poolByProg = {}, pssByProg = {}, recsByProg = {}, atpByKey = {}, seasonsByProg = {};
   if (ids.length) {
     const [progData, s, aw] = await Promise.all([
       Promise.all(ids.map((pid) => Promise.all([
@@ -47,6 +48,7 @@ export default async function handler(req, res) {
       poolByProg[pid] = atp; pssByProg[pid] = pss; recsByProg[pid] = recs; allAtp.push(...atp);
     });
     orgSeasons = (s || []).map((x) => ({ season: x.season, wins: x.wins, losses: x.losses, ties: x.ties, leagueWins: x.league_wins, leagueLosses: x.league_losses, leagueTies: x.league_ties, coach: x.coach, notes: x.notes, _team: (meta[x.program_id] || {}).sport || "" }));
+    (s || []).forEach((x) => { (seasonsByProg[x.program_id] = seasonsByProg[x.program_id] || []).push({ season: x.season, notes: x.notes }); });
     awards = aw || [];
   }
   const awardsByProg = {}; awards.forEach((a) => { (awardsByProg[a.program_id] = awardsByProg[a.program_id] || []).push(a); });
@@ -92,6 +94,12 @@ export default async function handler(req, res) {
   };
   const honRows = (label, list, emoji) => list.length ? `<h3 style="margin:16px 0 8px;font-size:14px">${label}</h3><div>${list.map((a) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} ${esc(awardLabel(a) + (a.season ? " (" + a.season + ")" : ""))}</div>`).join("")}</div>` : "";
   const recRows = (recs, emoji) => recs.length ? `<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>${recs.map((r) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} <b>${esc(r.n)}</b> ${r.v ? `<span style="color:#9ca3af">(${esc(r.v)})</span> ` : ""}— ${esc(String(r.val))}</div>`).join("")}</div>` : "";
+  const tsRows = (seasons, row, emoji) => {
+    const yrs = activeYears(row.first_year, row.last_year, row.grad_year);
+    const secs = (seasons || []).filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0);
+    if (!secs.length) return "";
+    return `<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">${secs.map((se) => `<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">${emoji} ${esc(se.season)}</span><span style="color:#6b7280;flex:1">${esc(se.notes)}</span><span style="font-weight:700;color:#92400e;white-space:nowrap">+${seasonSuccessScore(se.notes)}</span></div>`).join("")}</div>`;
+  };
   const head = (name, badge, m, sub) => `<div class="pmhd" style="background:${esc(m.col)}"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">${esc(name.split(" ").map((w) => w ? w[0] : "").join("").slice(0, 2).toUpperCase())}</div><div><div class="pmname">${esc(name)} ${badge}</div><div class="pmsub">${esc(sub)}</div></div></div></div>`;
   const shortLbl = (s) => s.replace(/^(Boys|Girls) /, "");
 
@@ -104,7 +112,7 @@ export default async function handler(req, res) {
         .map((t) => ({ prog: t.id, row: atpByKey[t.id + "|" + nk] })));
     const tabs = srcs.map(({ prog, row }) => {
       const m = meta[prog], yrs = yearsOf(row);
-      const body = `<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank — ${esc(m.sport)}${yrs ? " · " + esc(yrs) : ""}</h3><div class="ptiles">${tilesRanked(row.stats || {}, m.sportKey, poolByProg[prog] || [])}</div>${honRows("Honors", awardsForHolder(row.name, "player", awardsByProg[prog] || []), m.ic)}${recRows((recByHolderByProg[prog] || {})[nk] || [], m.ic)}`;
+      const body = `<h3 style="margin:0 0 10px;font-size:14px">Career statistics &amp; all-time rank — ${esc(m.sport)}${yrs ? " · " + esc(yrs) : ""}</h3><div class="ptiles">${tilesRanked(row.stats || {}, m.sportKey, poolByProg[prog] || [])}</div>${honRows("Honors", awardsForHolder(row.name, "player", awardsByProg[prog] || []), m.ic)}${recRows((recByHolderByProg[prog] || {})[nk] || [], m.ic)}${tsRows(seasonsByProg[prog] || [], row, m.ic)}`;
       return { ic: m.ic, lbl: shortLbl(m.sport), body };
     });
     const hy = yearsOf(p);
