@@ -292,7 +292,7 @@ export default async function handler(req, res) {
   const athItems = inductedAth.map((p) => {
     const badges = (p.stateHOF ? `<span class="badge state">State HOF</span>` : "") + (p.schoolHOF ? `<span class="badge school">School HOF</span>` : "");
     const honors = awardsForHolder(p.name, "player", awards);
-    const hs = honors.length ? `<div style="font-size:11px;color:#6b7280;margin-top:8px">${honors.map((h) => esc(awardLabel(h))).join(" · ")}</div>` : "";
+    const hs = honors.length ? `<div style="font-size:11px;color:#6b7280;margin-top:8px">${honors.map((h) => esc(awardLabel(h) + (h.season ? " (" + h.season + ")" : ""))).join(" · ")}</div>` : "";
     const pts = Number(p.stats?.["Points"]) || 0;
     const iy = p.hofYear ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:6px">Inducted ${esc(String(p.hofYear))}</div>` : "";
     const html = `<div class="hcard" data-p="${esc(normName(p.name))}" style="cursor:pointer"><div style="font-size:11px;color:#9ca3af;font-weight:600">👤 Athlete</div><div style="font-weight:700;margin-top:2px">${esc(p.name)}</div>${yearsStr(p) ? `<div style="font-size:12px;color:#6b7280">${yearsStr(p)}</div>` : ""}<div style="margin-top:6px">${badges}</div>${pts ? `<div style="font-size:12px;color:#9ca3af;margin-top:6px">${fmtNum(pts)} career points</div>` : ""}${hs}${iy}</div>`;
@@ -326,13 +326,13 @@ export default async function handler(req, res) {
   const coachItems = inductedCoaches.map((c) => {
     const tot = c.wins + c.losses + (c.ties || 0); const pct = tot > 0 ? Math.round((c.wins / tot) * 1000) / 10 : null;
     const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
-    const coy = awardsForHolder(c.name, "coach", awards).map((a) => awardLabel(a));
+    const coy = awardsForHolder(c.name, "coach", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
     const iy = coachHofYear[normName(c.name)] || null;
     const byTeam = c.byTeam || {};
     coachProfiles[normName(c.name)] = {
       n: c.name, iy, yrs, ss: c.seasons, w: c.wins, l: c.losses, t: c.ties || 0, pct,
       lw: c.leagueWins || 0, ll: c.leagueLosses || 0, lt: c.leagueTies || 0, titles: c.titles || 0,
-      teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a)); return { tm, w: b.wins, l: b.losses, t: b.ties || 0, aw }; }),
+      teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : "")); return { tm, w: b.wins, l: b.losses, t: b.ties || 0, aw }; }),
       coy,
     };
     const iyHtml = iy ? `<div style="font-size:11px;color:#7c3aed;font-weight:600;margin-top:6px">Inducted ${esc(String(iy))}</div>` : "";
