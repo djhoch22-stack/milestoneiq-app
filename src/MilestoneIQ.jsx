@@ -439,6 +439,9 @@ function getMilestoneAlerts(athlete, records = [], milestones = [], sport, bestB
     // (single game, per-game avg) aren't alertable; lower-is-better stats (ERA…) are skipped.
     if (rec.variant !== "Career total" && rec.variant !== "Single season") continue;
     if (isLowerBetterStat(sport, rec.statName)) continue;
+    // Don't alert the current record holder for "breaking" their own record (auto records are held by
+    // the live leader); other active athletes approaching them still fire.
+    if (rec.holderName && normName(athlete.name) === normName(rec.holderName)) continue;
     const isSeason = rec.variant === "Single season";
     const val = isSeason ? bestSeason[rec.statName] : athlete.stats[rec.statName];
     if (typeof val !== "number" || val <= 0) continue;
@@ -2215,7 +2218,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
 // Active-roster milestone alerts. Milestones track CAREER totals, so each active athlete is enriched with
 // their all-time career stats before checking (the raw athletes-table stats undercount); dismissed alerts
 // are dropped. Mirrors the Alerts/Overview logic exactly so every surface agrees.
-function activeAlerts(school, bestByName = {}) {
+function activeAlerts(school, bestByName = {}, records = (school.records || [])) {
   const careerByName = {};
   (school.allTimeRoster || []).forEach(p => { if (p && p.name) careerByName[p.name.toLowerCase().trim()] = p.stats; });
   const dismissed = new Set(school.dismissedAlerts || []);
@@ -2224,13 +2227,13 @@ function activeAlerts(school, bestByName = {}) {
     .map(a => {
       const cs = careerByName[(a.name || "").toLowerCase().trim()];
       const athlete = cs ? { ...a, stats: cs } : a;
-      const alerts = getMilestoneAlerts(athlete, school.records || [], school.milestones || [], school.sport, bestByName)
+      const alerts = getMilestoneAlerts(athlete, records, school.milestones || [], school.sport, bestByName)
         .filter(al => !dismissed.has(`${a.id}|${al.statName}|${al.target}`));
       return { athlete, alerts };
     })
     .filter(x => x.alerts.length > 0);
 }
-function activeAlertCount(school, bestByName = {}) { return activeAlerts(school, bestByName).reduce((n, x) => n + x.alerts.length, 0); }
+function activeAlertCount(school, bestByName = {}, records = (school.records || [])) { return activeAlerts(school, bestByName, records).reduce((n, x) => n + x.alerts.length, 0); }
 // Inducted Hall-of-Fame members (school or state).
 function hofMemberCount(school, allSchools) {
   // Count this program's roster players who are HOF members in THIS sport OR any gender-compatible one
@@ -2243,6 +2246,17 @@ function hofMemberCount(school, allSchools) {
     (p.allTimeRoster || []).forEach(pl => { if (pl.schoolHallOfFame || pl.stateHallOfFame) inducted.add(normName(pl.name)); });
   });
   return (school.allTimeRoster || []).filter(p => inducted.has(normName(p.name))).length;
+}
+// Records used for "about to break a record" alerts: stored records + auto-computed CAREER and
+// SINGLE-SEASON counting records (the current leaders), deduped. Covers every stat, so a sport with no
+// manually stored records still gets record-approach alerts. (Rate/%/per-game/longest aren't alertable.)
+function recordsForAlerts(school, seasonRows) {
+  const recPool = [...(school.athletes || []), ...(school.allTimeRoster || [])];
+  const statNames = statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s));
+  const auto = autoStatRecords(seasonRows || [], school.allTimeRoster || [], statNames, school.sport);
+  const stored = school.records || [];
+  const manualKeys = new Set(stored.map(r => r.statName + "|" + r.variant));
+  return [...stored, ...auto.filter(r => !manualKeys.has(r.statName + "|" + r.variant))];
 }
 // Total records a program shows on the Records tab = stored records + every auto-computed record
 // (career / single-season / per-game / % / longest / coach-wins), minus auto rows a manual record overrides.
@@ -5148,6 +5162,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const recordTotal = useMemo(() => programRecordCount({ ...school, allSeasonRows }), [school, allSeasonRows]);
   // Best single-season value per athlete — drives single-season record-break alerts.
   const seasonBests = useMemo(() => bestSeasonByName(allSeasonRows), [allSeasonRows]);
+  // Stored + auto-computed (career & single-season) records — so "about to break a record" alerts cover
+  // every school record, not just the manually stored ones.
+  const alertRecords = useMemo(() => recordsForAlerts(school, allSeasonRows), [school, allSeasonRows]);
   const dismissedSet = new Set(school.dismissedAlerts || []);
 
   const dismissAlert = (athleteId, statName, target) => {
@@ -5178,7 +5195,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   });
   const allAlerts = careerAthletes.filter(a => a.isActive !== false).map(a => ({
     athlete: a,
-    alerts: getMilestoneAlerts(a, school.records || [], school.milestones || [], school.sport, seasonBests)
+    alerts: getMilestoneAlerts(a, alertRecords, school.milestones || [], school.sport, seasonBests)
       .filter(alert => !isAlertDismissed(a.id, alert.statName, alert.target))
   })).filter(x => x.alerts.length > 0);
 
@@ -5429,7 +5446,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                   return true;
                 })
                 .map(athlete=>{
-                const ats = getMilestoneAlerts(athlete, school.records||[], school.milestones||[], school.sport, seasonBests)
+                const ats = getMilestoneAlerts(athlete, alertRecords, school.milestones||[], school.sport, seasonBests)
                   .filter(a => !isAlertDismissed(athlete.id, a.statName, a.target));
                 const isSelected = selectedAthlete?.id===athlete.id;
                 const isActive = athlete.isActive !== false;
@@ -5723,6 +5740,29 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                 Edit milestones
               </button>
             </div>
+
+            {(() => {
+              // Athletes about to break (or who broke) a school record of any kind — career or single-season,
+              // stored or auto-computed. Mirrors the Alerts tab so the same info shows on both.
+              const recAlerts = allAlerts.flatMap(({ athlete, alerts }) =>
+                (alerts || []).filter(a => a.type === "near_record" || a.type === "record_broken").map(a => ({ athlete, a })));
+              if (!recAlerts.length) return null;
+              recAlerts.sort((x, y) => (y.a.pct || 0) - (x.a.pct || 0));
+              return (
+                <div style={{ marginBottom:20, border:"1px solid #fde68a", background:"#fffbeb", borderRadius:12, padding:16 }}>
+                  <div style={{ fontWeight:700, fontSize:14, color:"#92400e", marginBottom:10 }}>🏆 Approaching a school record ({recAlerts.length})</div>
+                  {recAlerts.map(({ athlete, a }, idx) => (
+                    <div key={athlete.id + "|" + a.statName + "|" + a.variant + "|" + a.target}
+                      style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"6px 0", borderTop: idx ? "1px solid #fde68a" : "none" }}>
+                      <span style={{ fontSize:13, color:"#111" }}>{a.fullLabel}</span>
+                      <span style={{ fontSize:12, fontWeight:700, whiteSpace:"nowrap", color: a.type === "record_broken" ? "#16a34a" : "#d97706" }}>
+                        {a.type === "record_broken" ? "BROKEN!" : Math.round((a.pct || 0) * 100) + "%"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {(() => {
               let userMilestones = ((school.milestones && school.milestones.length > 0) ? school.milestones : defaultMilestonesFor(school.sport))
@@ -6150,22 +6190,24 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
   // page doesn't carry season rows, so fetch them per program once and compute the count; until the fetch
   // lands we show the stored-record count. Refetches when the set of programs changes (and on reload).
   const [recordCounts, setRecordCounts] = useState({});
-  // Best single-season values per program — keeps the home tile/header alert counts (which include
-  // single-season record breaks) consistent with the in-program Alerts tab.
+  // Best single-season values + record-alert sets per program — keeps the home tile/header alert counts
+  // (which include single-season + auto record-approach alerts) consistent with the in-program Alerts tab.
   const [seasonBestsByProgram, setSeasonBestsByProgram] = useState({});
+  const [recordsByProgram, setRecordsByProgram] = useState({});
   const schoolIdsKey = schools.map(s => s.id).join(",");
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
     (async () => {
       const entries = await Promise.all((schools || []).map(async (sc) => {
-        if (!sc.id) return [sc.id, (sc.records || []).length, {}];
-        try { const { data } = await getAllPlayerSeasons(sc.id); return [sc.id, programRecordCount({ ...sc, allSeasonRows: data || [] }), bestSeasonByName(data || [])]; }
-        catch { return [sc.id, (sc.records || []).length, {}]; }
+        if (!sc.id) return [sc.id, (sc.records || []).length, {}, (sc.records || [])];
+        try { const { data } = await getAllPlayerSeasons(sc.id); const rows = data || []; return [sc.id, programRecordCount({ ...sc, allSeasonRows: rows }), bestSeasonByName(rows), recordsForAlerts(sc, rows)]; }
+        catch { return [sc.id, (sc.records || []).length, {}, (sc.records || [])]; }
       }));
       if (!cancelled) {
         setRecordCounts(Object.fromEntries(entries.map(e => [e[0], e[1]])));
         setSeasonBestsByProgram(Object.fromEntries(entries.map(e => [e[0], e[2]])));
+        setRecordsByProgram(Object.fromEntries(entries.map(e => [e[0], e[3]])));
       }
     })();
     return () => { cancelled = true; };
@@ -6233,7 +6275,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
     return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} />;
   }
 
-  const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc, seasonBestsByProgram[sc.id] || {}), 0);
+  const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc, seasonBestsByProgram[sc.id] || {}, recordsByProgram[sc.id] || (sc.records || [])), 0);
 
   // ── Settings page ─────────────────────────────────────────────────────────
   const SettingsPage = () => {
@@ -6457,7 +6499,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14 }}>
             {orderedSchools.map(school=>{
               const sport = SPORTS[school.sport]||SPORTS.football;
-              const alerts = activeAlertCount(school, seasonBestsByProgram[school.id] || {});
+              const alerts = activeAlertCount(school, seasonBestsByProgram[school.id] || {}, recordsByProgram[school.id] || (school.records || []));
               const topAthlete = [...school.athletes].filter(a=>a.isActive!==false).sort((a,b)=>{
                 const at=Object.values(a.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
                 const bt=Object.values(b.stats).filter(v=>typeof v==="number").reduce((x,y)=>x+y,0);
