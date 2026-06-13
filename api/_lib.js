@@ -44,6 +44,10 @@ const GENDERS = { boys: "Boys", girls: "Girls", mens: "Men's", womens: "Women's"
 // "basketball_boys" -> "Boys Basketball"; "football" -> "Football".
 export function prettySport(s) {
   if (!s) return "Athletics";
+  // Suffix-less legacy keys that have a gendered counterpart → spell out the boys side (matches the app's
+  // labels). "soccer" = Boys Soccer (its girls program is "soccer_girls"); same for the legacy "basketball".
+  const OVERRIDE = { soccer: "Boys Soccer", basketball: "Boys Basketball" };
+  if (OVERRIDE[String(s).toLowerCase()]) return OVERRIDE[String(s).toLowerCase()];
   const parts = String(s).toLowerCase().split(/[_\s-]+/).filter(Boolean);
   let gender = "";
   if (parts.length && GENDERS[parts[parts.length - 1]]) gender = GENDERS[parts.pop()];
