@@ -1,12 +1,14 @@
 // GET /sitemap.xml  → dynamic sitemap: homepage, the directory, and every public team.
-import { sb, esc, SITE } from "./_lib.js";
+import { sb, esc, SITE, slugify } from "./_lib.js";
 
 export default async function handler(req, res) {
-  const teams = await sb(`public_teams?select=slug&order=slug.asc&limit=50000`);
+  const teams = await sb(`public_teams?select=slug,school_name&order=slug.asc&limit=50000`);
+  const schools = [...new Set(teams.map((t) => slugify(t.school_name || "")).filter(Boolean))];
 
   const urls = [
     { loc: `${SITE}/`, priority: "1.0", changefreq: "weekly" },
     { loc: `${SITE}/teams`, priority: "0.8", changefreq: "daily" },
+    ...schools.map((s) => ({ loc: `${SITE}/school/${esc(s)}`, priority: "0.8", changefreq: "weekly" })),
     ...teams
       .filter((t) => t.slug)
       .map((t) => ({ loc: `${SITE}/teams/${esc(t.slug)}`, priority: "0.7", changefreq: "weekly" })),
