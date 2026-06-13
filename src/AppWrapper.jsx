@@ -72,6 +72,7 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awar
       isActive: p.is_active,
       schoolHallOfFame: p.school_hall_of_fame,
       stateHallOfFame: p.state_hall_of_fame,
+      hofYear: p.hof_year,
       stats: p.stats || {},
     })),
     records: (records || []).map((r) => ({
@@ -296,6 +297,7 @@ export default function AppWrapper() {
         is_active: p.isActive || false,
         school_hall_of_fame: p.schoolHallOfFame || false,
         state_hall_of_fame: p.stateHallOfFame || false,
+        hof_year: p.hofYear || null,
         stats: p.stats || {},
       });
       const existing = updated.allTimeRoster.filter((p) => isUuid(p.id)).map((p) => ({ id: p.id, ...toRow(p) }));
