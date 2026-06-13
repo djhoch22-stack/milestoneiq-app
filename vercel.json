@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/teams", "destination": "/api/teams" },
     { "source": "/teams/:slug", "destination": "/api/team?slug=:slug" },
+    { "source": "/school/:slug", "destination": "/api/school?slug=:slug" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
