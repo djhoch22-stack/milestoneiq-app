@@ -6328,7 +6328,10 @@ function PromoAdmin() {
   );
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
+// Public school-hub slug — matches api/_lib slugify on the org name → /school/:slug
+const hubSlug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -6659,7 +6662,15 @@ export default function App({ initialSchools, onUpdateSchool, orgId, tier, tierL
                 {schools.length} program{schools.length!==1?"s":""} · {schools.reduce((a,s)=>a+s.athletes.filter(a=>a.isActive!==false).length,0)} athletes · {totalAlerts} active alerts
               </p>
             </div>
-            {role === "admin" && <button onClick={()=>setShowAddSchool(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer" }}>+ Add program</button>}
+            <div style={{ display:"flex",gap:10,alignItems:"center" }}>
+              {orgName && schools.some(s=>s.isPublic!==false) && (
+                <a href={`${window.location.origin}/school/${hubSlug(orgName)}`} target="_blank" rel="noreferrer"
+                  style={{ background:"#eff6ff",color:"#1a56db",border:"1px solid #bfdbfe",borderRadius:8,padding:"10px 16px",fontWeight:600,fontSize:14,textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6 }}>
+                  🌐 View public {orgName} page
+                </a>
+              )}
+              {role === "admin" && <button onClick={()=>setShowAddSchool(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:600,fontSize:14,cursor:"pointer" }}>+ Add program</button>}
+            </div>
           </div>
 
           {supabaseMode && schools.length===0 && new URLSearchParams(window.location.search).get("seed")==="dc" && (
