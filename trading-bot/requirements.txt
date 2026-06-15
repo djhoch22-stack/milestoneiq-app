@@ -1,3 +1,6 @@
 yfinance>=0.2.40
 pandas>=2.0
 PyYAML>=6.0
+
+# Live execution only (Path B standalone MCP client). Not needed for dry-run.
+mcp>=1.2

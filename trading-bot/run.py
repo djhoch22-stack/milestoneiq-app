@@ -48,6 +48,9 @@ def main() -> int:
     parser.add_argument("--config", default=str(Path(__file__).parent / "config.yaml"))
     parser.add_argument("--once", action="store_true", help="single pass (default)")
     parser.add_argument("--status", action="store_true", help="show state, no trading")
+    parser.add_argument("--review-only", action="store_true",
+                        help="live mode only: run review_equity_order for each "
+                             "planned order but place NOTHING (validation gate)")
     args = parser.parse_args()
 
     if not Path(args.config).exists():
@@ -104,16 +107,28 @@ def main() -> int:
         print(f"  ⚠ {state.halted_reason}")
         audit.write("halted", reason=state.halted_reason)
 
-    # Execute (dry-run simulates; live places real orders).
-    broker = make_broker(cfg.mode)
-    print(f"  Broker     : {broker.name}  ({'LIVE — REAL MONEY' if cfg.is_live else 'simulation'})")
+    if args.review_only and not cfg.is_live:
+        print("  --review-only requires mode: live (it exercises the review tool).")
+        return 2
+
+    # Execute. dry-run simulates; live reviews+places real orders; --review-only
+    # runs the review step but places nothing.
+    broker = make_broker(cfg, review_only=args.review_only, audit=audit)
+    if args.review_only:
+        label = "REVIEW-ONLY — no orders placed"
+    elif cfg.is_live:
+        label = "LIVE — REAL MONEY"
+    else:
+        label = "simulation"
+    print(f"  Broker     : {broker.name}  ({label})")
     if not orders:
         print("  Decision   : no orders this run.")
     for o in orders:
         result = broker.execute(o, state, now)
         line = (f"  {o.side.upper():<4} {o.shares:>10.4f} {o.symbol:<6} "
                 f"@ ${o.price:>8.2f}  ({o.reason})")
-        print(line + f"  -> {result['status']}")
+        print(line + f"  -> {result['status']}"
+              + (f": {result['reason']}" if result.get("reason") else ""))
         audit.write("order", side=o.side, symbol=o.symbol, shares=o.shares,
                     price=o.price, notional=round(o.notional, 2), reason=o.reason,
                     mode=cfg.mode, result=result)

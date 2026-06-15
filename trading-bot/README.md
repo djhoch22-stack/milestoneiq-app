@@ -124,23 +124,62 @@ Two independent stops:
 
 ---
 
-## Going live
+## Going live (Path B — standalone, fully automated)
 
-Do **not** skip the dry-run period. When you're ready:
+Execution runs as deterministic Python (no LLM in the money path) via a built-in
+MCP client ([`bot/mcp_client.py`](bot/mcp_client.py)) that talks directly to the
+Robinhood server. It trades **only** the agentic-allowed account you configure —
+a hard brokerage boundary that keeps your other accounts untouchable.
 
-1. **Wire the execution adapter.** In your **local** Claude Code session (where
-   the Robinhood tools are actually connected — not the cloud one):
-   - Run `/mcp`, confirm `robinhood-trading` is `connected`.
-   - Ask Claude to list the server's tools and find the **order-placement** tool
-     and its exact parameters (symbol, side, quantity/notional, order type).
-   - Implement `_place_order()` in [`bot/broker.py`](bot/broker.py) to call that
-     tool and return the real fill price. It currently raises `NotImplementedError`
-     on purpose, so flipping to `live` without wiring fails safe.
-2. **Place ONE tiny test order by hand** through the MCP tool (e.g. $1–$5) to
-   confirm the tool works and you understand its behavior.
-3. **Set `mode: live`** in `config.yaml`, keep `starting_cash` at your real
-   amount, and run a single pass while watching it.
-4. Keep the position/drawdown limits tight until you trust it.
+> The MCP client and the tool request/response parsing **could not be tested in
+> the environment they were written in** (no Robinhood access there). That's why
+> you go live through the staged gates below, on your own machine, smallest risk
+> first. Do not skip them.
+
+**Prep**
+
+1. Install the live dependency: `pip install "mcp>=1.2"` (already in
+   `requirements.txt`).
+2. Find your agentic account number (the only `agentic_allowed=true` account)
+   and set `execution.account_number` in `config.yaml`.
+3. Set `mode: live`. Leave `execution.test_mode_max_notional: 2.00` for now — it
+   caps **every** order at $2 regardless of anything else.
+
+**Gate 1 — review-only (places nothing, proves auth + plumbing)**
+
+```bash
+python run.py --review-only
+```
+
+This runs the full plan and calls `review_equity_order` for each order but
+places **zero** orders. The first run opens your browser once to authorize
+(tokens cache to `data/mcp_tokens.json`; later runs are non-interactive). Check
+`data/audit.jsonl` for the `review_response` entries — and **send them to Claude
+so the alert/fill parsers can be confirmed against real responses.**
+
+**Gate 2 — one tiny real order ($2 cap)**
+
+With `test_mode_max_notional: 2.00` still set, run a normal pass:
+
+```bash
+python run.py
+```
+
+It will place at most a ~$2 real order, then poll the fill. Confirm in the
+Robinhood app that it executed and that `state.json` recorded the real fill
+price. This proves place + poll + fill accounting end to end.
+
+**Gate 3 — full automation**
+
+Only after gates 1–2 pass cleanly:
+
+1. Set `test_mode_max_notional: 0` (disables the $2 cap; `max_order_notional`
+   still applies as the backstop).
+2. Schedule it with `com.user.tradingbot.plist.example` (see above).
+3. Watch the first few automated runs and the audit log closely.
+
+Keep the position/drawdown limits tight until you've seen it behave across at
+least a few sessions.
 
 ---
 

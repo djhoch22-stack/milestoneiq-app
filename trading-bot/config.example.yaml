@@ -18,6 +18,36 @@ mode: dry_run
 # Only money you are 100% okay losing entirely.
 starting_cash: 1000.00
 
+# Live execution via the Robinhood MCP server. Only used when mode: live.
+# The order tools ONLY work on an agentic-allowed account, which is a hard
+# brokerage-level boundary: the bot literally cannot touch your other accounts.
+execution:
+  # The agentic_allowed account number (e.g. the "Agentic" ••7040 account).
+  # REQUIRED before mode: live. Find it via the Robinhood MCP account tools.
+  account_number: ""
+
+  # Robinhood MCP endpoint (the server you added with `claude mcp add`).
+  mcp_url: https://agent.robinhood.com/mcp/trading
+
+  # Always call review_equity_order before placing. Leave true. The review
+  # surfaces pre-trade alerts (PDT, halts, buying power); if review reports a
+  # blocking alert, the bot skips that order.
+  review_first: true
+
+  # Hard ceiling on any single order's dollar value, as a last-resort backstop
+  # independent of the strategy/risk math. An order above this is refused.
+  max_order_notional: 450.00
+
+  # After placing, poll get_equity_orders this many times (every poll_interval
+  # seconds) to capture the real fill price before recording state.
+  poll_attempts: 10
+  poll_interval_seconds: 3
+
+  # Safety cap for staged testing. When > 0, NO order may exceed this notional,
+  # overriding everything else. Set to e.g. 2.00 for your first real test order,
+  # then 0 to disable once you trust it. Belt-and-suspenders over max_order_notional.
+  test_mode_max_notional: 2.00
+
 # How the bot decides what to buy/sell.
 strategy:
   # Only these symbols may ever be traded. The bot cannot touch anything else,

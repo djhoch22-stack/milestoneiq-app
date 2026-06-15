@@ -30,11 +30,23 @@ class RiskConfig:
 
 
 @dataclass
+class ExecutionConfig:
+    account_number: str
+    mcp_url: str
+    review_first: bool
+    max_order_notional: float
+    poll_attempts: int
+    poll_interval_seconds: float
+    test_mode_max_notional: float
+
+
+@dataclass
 class Config:
     mode: str
     starting_cash: float
     strategy: StrategyConfig
     risk: RiskConfig
+    execution: ExecutionConfig
     state_file: Path
     audit_log: Path
     kill_switch_file: Path
@@ -58,6 +70,7 @@ def load_config(path: str | os.PathLike) -> Config:
     strat = raw["strategy"]
     risk = raw["risk"]
     paths = raw["paths"]
+    execu = raw.get("execution", {}) or {}
 
     watchlist = [s.strip().upper() for s in strat["watchlist"]]
     if not watchlist:
@@ -70,6 +83,23 @@ def load_config(path: str | os.PathLike) -> Config:
         v = float(risk[k])
         if not 0 < v < 1:
             raise ValueError(f"risk.{k} must be between 0 and 1, got {v}")
+
+    execution = ExecutionConfig(
+        account_number=str(execu.get("account_number", "")).strip(),
+        mcp_url=execu.get("mcp_url", "https://agent.robinhood.com/mcp/trading"),
+        review_first=bool(execu.get("review_first", True)),
+        max_order_notional=float(execu.get("max_order_notional", 450.0)),
+        poll_attempts=int(execu.get("poll_attempts", 10)),
+        poll_interval_seconds=float(execu.get("poll_interval_seconds", 3)),
+        test_mode_max_notional=float(execu.get("test_mode_max_notional", 0.0)),
+    )
+
+    # Fail loudly if someone flips to live without the account wired.
+    if mode == "live" and not execution.account_number:
+        raise ValueError(
+            "mode is 'live' but execution.account_number is empty. Set it to your "
+            "agentic-allowed account number before trading real money."
+        )
 
     return Config(
         mode=mode,
@@ -88,6 +118,7 @@ def load_config(path: str | os.PathLike) -> Config:
             max_day_trades_per_5d=int(risk["max_day_trades_per_5d"]),
             max_orders_per_run=int(risk["max_orders_per_run"]),
         ),
+        execution=execution,
         state_file=base_dir / paths["state_file"],
         audit_log=base_dir / paths["audit_log"],
         kill_switch_file=base_dir / raw["kill_switch_file"],

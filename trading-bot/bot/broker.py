@@ -17,7 +17,10 @@ which one it's using.
 """
 from __future__ import annotations
 
+import json
+import time
 from datetime import datetime
+from uuid import uuid4
 
 from .risk import Order
 from .state import Position, State, TradeRecord
@@ -72,42 +75,183 @@ class DryRunBroker:
         return {"status": "simulated", "fill_price": order.price}
 
 
+# Words in a review/order response that mean "do not proceed".
+_BLOCKING_TOKENS = ("reject", "blocked", "halt", "insufficient", "not_allowed",
+                    "ineligible", "error")
+
+
 class RobinhoodMCPBroker:
-    """Live execution via the Robinhood MCP server.
+    """Live execution via the Robinhood MCP server: review -> place -> poll fill.
 
-    WIRING (do this in your LOCAL Claude Code session, not the cloud one):
+    Order placement goes through `call_tool(name, arguments) -> dict`, which is
+    injected (the real Robinhood MCP client, or a fake in tests). Every order is
+    market type, regular hours, on the configured agentic account. Safety caps
+    (max_order_notional and the staged test_mode_max_notional) are enforced here,
+    independent of the strategy/risk math, as a last-resort backstop.
 
-      1. In your local session, run `/mcp` and confirm robinhood-trading is
-         connected, then ask Claude to list its tools. You're looking for the
-         order-placement tool and its parameters (symbol, side, quantity or
-         notional, order type). Names vary by server version.
-
-      2. Implement `_place_order` below to call that tool and return the actual
-         fill price (or the order id, then poll for the fill).
-
-      3. Keep `mode: dry_run` until you have placed ONE tiny manual test order
-         through the tool by hand and confirmed it behaves.
-
-    Until _place_order is implemented, execute() raises — so flipping to
-    mode: live without doing the wiring fails safe instead of silently doing
-    nothing or, worse, something wrong.
+    ⚠️ The exact response shapes of the Robinhood tools could not be verified
+    where this was written. The parsers below are defensive and log raw
+    responses to the audit trail. Run `--review-only` first and share the output
+    so the alert/fill parsing can be confirmed against real responses.
     """
 
     name = "robinhood_mcp"
 
+    def __init__(self, call_tool, account_number: str, *, review_first: bool = True,
+                 poll_attempts: int = 10, poll_interval: float = 3.0,
+                 max_order_notional: float = 450.0, test_mode_max_notional: float = 0.0,
+                 review_only: bool = False, audit=None):
+        self.call_tool = call_tool
+        self.account_number = account_number
+        self.review_first = review_first
+        self.poll_attempts = poll_attempts
+        self.poll_interval = poll_interval
+        self.max_order_notional = max_order_notional
+        self.test_mode_max_notional = test_mode_max_notional
+        self.review_only = review_only
+        self.audit = audit
+
+    def _log(self, event: str, **fields):
+        if self.audit:
+            self.audit.write(event, **fields)
+
+    def _notional_cap(self) -> float:
+        cap = self.max_order_notional
+        if self.test_mode_max_notional > 0:
+            cap = min(cap, self.test_mode_max_notional)
+        return cap
+
+    def _base_args(self, order: Order) -> dict:
+        return {
+            "account_number": self.account_number,
+            "symbol": order.symbol,
+            "side": order.side,
+            "type": "market",
+            "quantity": f"{order.shares:.4f}",
+            "time_in_force": "gfd",
+            "market_hours": "regular_hours",
+        }
+
+    @staticmethod
+    def _is_blocked(resp: dict) -> str | None:
+        """Return a reason string if the response indicates we must not proceed."""
+        if resp.get("isError"):
+            return "tool returned isError"
+        blob = json.dumps(resp).lower()
+        # Only treat alert-ish structures as blocking, not incidental field names.
+        alerts = resp.get("alerts") or resp.get("pre_trade_alerts") or []
+        if alerts:
+            alert_blob = json.dumps(alerts).lower()
+            if any(tok in alert_blob for tok in _BLOCKING_TOKENS):
+                return f"blocking pre-trade alert: {alerts}"
+        if "rejected" in blob or '"state":"failed"' in blob:
+            return "response indicates rejection"
+        return None
+
     def execute(self, order: Order, state: State, now: datetime) -> dict:
-        fill_price = self._place_order(order)
+        cap = self._notional_cap()
+        if order.notional > cap + 1e-9:
+            self._log("order_refused", symbol=order.symbol, notional=order.notional,
+                      cap=cap)
+            return {"status": "refused",
+                    "reason": f"notional ${order.notional:.2f} exceeds cap ${cap:.2f}"}
+
+        args = self._base_args(order)
+
+        # 1) Review (pre-trade check). Always done in review-only mode.
+        if self.review_first or self.review_only:
+            review = self.call_tool("review_equity_order", args)
+            self._log("review_response", symbol=order.symbol, side=order.side,
+                      request=args, response=review)
+            blocked = self._is_blocked(review)
+            if blocked:
+                return {"status": "skipped", "reason": blocked, "review": review}
+            if self.review_only:
+                return {"status": "review_only", "review": review}
+
+        # 2) Place the real order (idempotent via ref_id).
+        place_args = {**args, "ref_id": str(uuid4())}
+        resp = self.call_tool("place_equity_order", place_args)
+        self._log("place_response", symbol=order.symbol, request=place_args,
+                  response=resp)
+        blocked = self._is_blocked(resp)
+        if blocked:
+            return {"status": "rejected", "reason": blocked, "response": resp}
+
+        order_id = resp.get("id") or resp.get("order_id") or resp.get("orderId")
+
+        # 3) Poll for the fill to capture the real price/quantity.
+        fill_price, filled_qty = self._poll_fill(order_id, order)
+        if filled_qty and filled_qty > 0:
+            order.shares = filled_qty
         _apply_fill(state, order, fill_price, now)
-        return {"status": "filled", "fill_price": fill_price}
+        return {"status": "filled", "fill_price": fill_price, "order_id": order_id,
+                "shares": order.shares}
 
-    def _place_order(self, order: Order) -> float:
-        raise NotImplementedError(
-            "RobinhoodMCPBroker is not wired up yet. Implement _place_order to "
-            "call the Robinhood MCP order tool from your local Claude Code "
-            "session. See the class docstring. Refusing to trade real money "
-            "with an unimplemented adapter."
-        )
+    def _poll_fill(self, order_id, order: Order) -> tuple[float, float | None]:
+        """Return (fill_price, filled_qty). Falls back to reference price (with a
+        loud audit warning) if the fill can't be parsed — never silently wrong."""
+        if not order_id:
+            self._log("fill_warning", symbol=order.symbol,
+                      reason="no order_id in place response; using reference price")
+            return order.price, None
+
+        for _ in range(self.poll_attempts):
+            resp = self.call_tool("get_equity_orders", {
+                "account_number": self.account_number, "order_id": order_id,
+            })
+            orders = resp.get("orders") or resp.get("results") or []
+            if orders:
+                o = orders[0]
+                if str(o.get("state", "")).lower() == "filled":
+                    price, qty = self._extract_fill(o)
+                    if price:
+                        return price, qty
+            time.sleep(self.poll_interval)
+
+        self._log("fill_warning", symbol=order.symbol, order_id=order_id,
+                  reason="order did not reach filled state within poll window; "
+                         "using reference price for accounting — VERIFY MANUALLY")
+        return order.price, None
+
+    @staticmethod
+    def _extract_fill(order_obj: dict) -> tuple[float | None, float | None]:
+        # Prefer an explicit average price; otherwise average the executions.
+        avg = order_obj.get("average_price") or order_obj.get("price")
+        qty = order_obj.get("cumulative_quantity") or order_obj.get("filled_quantity")
+        execs = order_obj.get("executions") or []
+        if execs:
+            total_q = sum(float(e.get("quantity", 0)) for e in execs)
+            total_v = sum(float(e.get("quantity", 0)) * float(e.get("price", 0))
+                          for e in execs)
+            if total_q > 0:
+                return total_v / total_q, total_q
+        try:
+            return (float(avg) if avg is not None else None,
+                    float(qty) if qty is not None else None)
+        except (TypeError, ValueError):
+            return None, None
 
 
-def make_broker(mode: str):
-    return RobinhoodMCPBroker() if mode == "live" else DryRunBroker()
+def make_broker(cfg, *, review_only: bool = False, audit=None):
+    """Build the right broker for the config's mode.
+
+    cfg is the full Config; mode/execution drive which broker is returned.
+    """
+    if cfg.mode != "live":
+        return DryRunBroker()
+
+    from .mcp_client import RobinhoodMCP
+    token_file = cfg.state_file.parent / "mcp_tokens.json"
+    client = RobinhoodMCP(cfg.execution.mcp_url, token_file)
+    return RobinhoodMCPBroker(
+        client.call_tool,
+        cfg.execution.account_number,
+        review_first=cfg.execution.review_first,
+        poll_attempts=cfg.execution.poll_attempts,
+        poll_interval=cfg.execution.poll_interval_seconds,
+        max_order_notional=cfg.execution.max_order_notional,
+        test_mode_max_notional=cfg.execution.test_mode_max_notional,
+        review_only=review_only,
+        audit=audit,
+    )
