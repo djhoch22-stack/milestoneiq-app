@@ -99,7 +99,7 @@ export default async function handler(req, res) {
     const yrs = activeYears(row.first_year, row.last_year, row.grad_year);
     const secs = (seasons || []).filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0);
     if (!secs.length) return "";
-    return `<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">${secs.map((se) => `<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">${emoji} ${esc(se.season)}</span><span style="color:#6b7280;flex:1">${esc(se.notes)}</span><span style="font-weight:700;color:#92400e;white-space:nowrap">+${seasonSuccessScore(se.notes)}</span></div>`).join("")}</div>`;
+    return `<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">${secs.map((se) => `<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">${emoji} ${esc(se.season)}</span><span style="color:#6b7280;flex:1">${esc(se.notes)}</span></div>`).join("")}</div>`;
   };
   const head = (name, badge, m, sub) => `<div class="pmhd" style="background:${esc(m.col)}"><button class="pmx" type="button">✕</button><div style="display:flex;align-items:center;gap:16px"><div class="pmav">${esc(name.split(" ").map((w) => w ? w[0] : "").join("").slice(0, 2).toUpperCase())}</div><div><div class="pmname">${esc(name)} ${badge}</div><div class="pmsub">${esc(sub)}</div></div></div></div>`;
   const shortLbl = (s) => s.replace(/^(Boys|Girls) /, "");
@@ -209,7 +209,7 @@ export default async function handler(req, res) {
       .hofyr{font-weight:700;color:#7c3aed;min-width:48px}.hofnm{font-weight:600;flex:1}.hofmeta{font-size:12px;color:#9ca3af;white-space:nowrap}
     </style>`;
 
-  res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=86400");
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   res.statusCode = 200;
   return res.end(htmlShell({ title, description, canonical, jsonld, body }));
 }
