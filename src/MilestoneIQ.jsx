@@ -1299,6 +1299,7 @@ function ImportModal({ school, onClose, onImport }) {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfResult, setPdfResult] = useState(null);
   const [pdfFileName, setPdfFileName] = useState(null);
+  const [colMap, setColMap] = useState({}); // unrecognized CSV/Excel header → chosen stat name ("" = skip)
 
   const parseCSV = (text) => {
     const lines = text.trim().split("\n").filter(l => l.trim());
@@ -1315,7 +1316,7 @@ function ImportModal({ school, onClose, onImport }) {
 
   // Accepts CSV *or* Excel (.xlsx/.xls) and normalizes both to { headers, rows }.
   const handleCSVFile = async (file) => {
-    setError(null); setPreview(null);
+    setError(null); setPreview(null); setColMap({});
     const name = (file.name || "").toLowerCase();
     try {
       if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
@@ -1442,6 +1443,22 @@ function ImportModal({ school, onClose, onImport }) {
     } catch (err) { setError("Template error: " + (err.message || err)); }
   };
 
+  // Column mapping: meta cols, plus which CSV/Excel headers don't auto-resolve to a known stat (so the user maps them).
+  const isMetaCol = (h) => /^name$/i.test(String(h).trim()) || /player.?name/i.test(h) || /^pos(ition)?$/i.test(String(h).trim()) || /grad.?year|class.?of/i.test(h);
+  const validStatList = [...new Set([
+    ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
+    ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})),
+  ])].sort();
+  const validSet = new Set(validStatList);
+  const unmappedHeaders = preview ? preview.headers.filter((h) => !isMetaCol(h) && !validSet.has(resolveStatAlias(h, school.sport))) : [];
+  const autoMatched = preview ? preview.headers.filter((h) => !isMetaCol(h) && validSet.has(resolveStatAlias(h, school.sport))).length : 0;
+  // Apply the user's column→stat choices by renaming those columns to canonical stat names before import.
+  const applyColMap = (p) => {
+    const rename = {}; for (const h of unmappedHeaders) { if (colMap[h]) rename[h] = colMap[h]; }
+    if (!Object.keys(rename).length) return p;
+    return { headers: p.headers.map((h) => rename[h] || h), rows: p.rows.map((r) => { const o = {}; for (const k in r) o[rename[k] || k] = r[k]; return o; }) };
+  };
+
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000 }}>
       <div style={{ background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:600,boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
@@ -1499,7 +1516,24 @@ function ImportModal({ school, onClose, onImport }) {
                     </tbody>
                   </table>
                 </div>
-                <button onClick={()=>{onImport(preview);onClose();}}
+                {autoMatched > 0 && <div style={{ marginTop:8,fontSize:12,color:"#166534" }}>✓ {autoMatched} stat column{autoMatched!==1?"s":""} auto-matched</div>}
+                {unmappedHeaders.length > 0 && (
+                  <div style={{ marginTop:10,background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:12 }}>
+                    <div style={{ fontWeight:600,fontSize:13,color:"#92400e",marginBottom:8 }}>{unmappedHeaders.length} column{unmappedHeaders.length!==1?"s":""} not recognized — map each to a stat, or skip:</div>
+                    {unmappedHeaders.map((h)=>(
+                      <div key={h} style={{ display:"flex",alignItems:"center",gap:10,marginBottom:6 }}>
+                        <span style={{ flex:1,minWidth:0,fontSize:13,color:"#374151",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{h}</span>
+                        <span style={{ color:"#9ca3af" }}>→</span>
+                        <select value={colMap[h]||""} onChange={(e)=>setColMap((m)=>({ ...m,[h]:e.target.value }))}
+                          style={{ flex:1,padding:"6px 8px",borderRadius:6,border:"1px solid #d1d5db",fontSize:13,background:"#fff" }}>
+                          <option value="">Skip this column</option>
+                          {validStatList.map((s)=><option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button onClick={()=>{onImport(applyColMap(preview));onClose();}}
                   style={{ marginTop:12,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"10px 24px",fontWeight:600,fontSize:14,cursor:"pointer",width:"100%" }}>
                   Import {preview.rows.length} athletes
                 </button>
