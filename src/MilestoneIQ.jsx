@@ -2727,34 +2727,69 @@ function seasonFromFilename(name) {
 }
 // MaxPreps / sheet abbreviations → the app's stat names. Per-game averages, percentages,
 // height, fouls, turnovers, and the 2-pt-only splits are dropped (the app tracks totals).
-const SEASON_STAT_ALIASES = {
-  "Games": "Games Played", "GP": "Games Played", "Wins": "Wins", "W": "Wins",
-  "Points": "Points", "Pts": "Points", "PTS": "Points",
-  "Assists": "Assists", "Asst": "Assists", "AST": "Assists",
-  "Rebounds": "Total Rebounds", "Tot Reb": "Total Rebounds", "Reb": "Total Rebounds", "TRB": "Total Rebounds",
-  "O Rebounds": "Offensive Rebounds", "Off Reb": "Offensive Rebounds", "ORB": "Offensive Rebounds",
-  "Def. Rebounds": "Defensive Rebounds", "Def Reb": "Defensive Rebounds", "DRB": "Defensive Rebounds",
-  "Steals": "Steals", "Stls": "Steals", "STL": "Steals",
-  "Blocks": "Blocks", "Blk Shts": "Blocks", "BLK": "Blocks",
-  "FGM": "Field Goals Made", "Field Goals Made": "Field Goals Made",
-  "FGA": "Field Goals Attempted", "Field Goals Attempted": "Field Goals Attempted",
-  "3pFGM": "Three Pointers Made", "3FGM": "Three Pointers Made",
-  "3pFGA": "Three Pointers Attempted", "3FGA": "Three Pointers Attempted",
-  "FTM": "Free Throws Made", "Free Throws Made": "Free Throws Made",
-  "FTA": "Free Throws Attempted", "Free Throws Attempted": "Free Throws Attempted",
-  // Soccer (MaxPreps): field + goalie abbreviations. "SO" = Shutouts.
-  "G": "Goals", "Gls": "Goals", "GLS": "Goals", "Goals": "Goals",
-  "A": "Assists",
-  "Sh": "Shots", "SH": "Shots", "Sht": "Shots", "Shts": "Shots", "SHT": "Shots", "Shots": "Shots",
-  "Sv": "Saves", "SV": "Saves", "Svs": "Saves", "SVS": "Saves", "Saves": "Saves",
-  "SO": "Shutouts", "SHO": "Shutouts", "ShO": "Shutouts", "Sho": "Shutouts", "SOs": "Shutouts", "Shutout": "Shutouts", "Shutouts": "Shutouts",
+// Source-export column aliases (MaxPreps / GameChanger / Hudl) → canonical RaftersIQ stat names. SPORT-AWARE
+// because abbreviations collide ("SO" = Shutouts in soccer vs Pitcher Strikeouts in baseball; "G" = Goals vs
+// Games; "FGA" = Field Goals Attempted in hoops vs Field Goals Attempts in football). Lookups are
+// case-insensitive (keys lowercased). Ambiguous football columns (Att/Yds/TD differ by pass/rush/rec) are
+// intentionally left unmapped — the import column-mapper handles those.
+const STAT_ALIAS_COMMON = { "gp": "Games Played", "g": "Games Played", "games": "Games Played", "games played": "Games Played" };
+const STAT_ALIASES_BY_SPORT = {
+  basketball: {
+    "w": "Wins", "wins": "Wins",
+    "pts": "Points", "points": "Points",
+    "ast": "Assists", "asst": "Assists", "assists": "Assists",
+    "reb": "Total Rebounds", "trb": "Total Rebounds", "tot reb": "Total Rebounds", "rebounds": "Total Rebounds",
+    "orb": "Offensive Rebounds", "off reb": "Offensive Rebounds", "o rebounds": "Offensive Rebounds", "offensive rebounds": "Offensive Rebounds",
+    "drb": "Defensive Rebounds", "def reb": "Defensive Rebounds", "def. rebounds": "Defensive Rebounds", "defensive rebounds": "Defensive Rebounds",
+    "stl": "Steals", "stls": "Steals", "steals": "Steals",
+    "blk": "Blocks", "blk shts": "Blocks", "blocks": "Blocks",
+    "fgm": "Field Goals Made", "fga": "Field Goals Attempted",
+    "3pm": "Three Pointers Made", "3pfgm": "Three Pointers Made", "3fgm": "Three Pointers Made", "3ptm": "Three Pointers Made",
+    "3pa": "Three Pointers Attempted", "3pfga": "Three Pointers Attempted", "3fga": "Three Pointers Attempted", "3pta": "Three Pointers Attempted",
+    "ftm": "Free Throws Made", "fta": "Free Throws Attempted",
+  },
+  soccer: {
+    "g": "Goals", "gls": "Goals", "goals": "Goals",
+    "a": "Assists", "ast": "Assists", "assists": "Assists",
+    "sh": "Shots", "sht": "Shots", "shts": "Shots", "shots": "Shots",
+    "sv": "Saves", "svs": "Saves", "saves": "Saves",
+    "so": "Shutouts", "sho": "Shutouts", "shutout": "Shutouts", "shutouts": "Shutouts",
+  },
+  baseball: {
+    "ab": "At Bats", "pa": "Plate Appearances",
+    "h": "Hits", "r": "Runs", "rbi": "RBIs", "rbis": "RBIs",
+    "2b": "Doubles", "db": "Doubles", "3b": "Triples", "tp": "Triples", "hr": "Home Runs",
+    "sb": "Stolen Base", "bb": "Walk (BB)", "hbp": "Hit By Pitch", "sf": "Sacrifice Fly", "sac": "Sacrifice Bunt",
+    "w": "Pitcher Wins", "ip": "Innings Pitched", "er": "Earned Runs",
+    "k": "Pitcher Strikeouts", "so": "Pitcher Strikeouts", "sv": "Pitcher Saves",
+    "cg": "Pitcher Complete Games", "sho": "Pitcher Shut Outs",
+  },
+  football: {
+    "cmp": "Completions", "comp": "Completions", "completions": "Completions",
+    "rec": "Receptions", "receptions": "Receptions",
+    "sack": "Sacks", "sacks": "Sacks",
+    "int": "Interceptions", "interceptions": "Interceptions",
+    "ff": "Forced Fumbles", "fr": "Fumble Recoveries",
+    "pd": "Pass Break Ups", "pbu": "Pass Break Ups", "pass break ups": "Pass Break Ups",
+    "solo": "Solo Tackles", "fgm": "Field Goals Made", "fga": "Field Goals Attempts",
+  },
 };
-function remapSeasonStats(stats, valid) {
+const _ciAlias = (m) => { const o = {}; for (const k in m) o[k.toLowerCase()] = m[k]; return o; };
+const _ALIAS_COMMON_CI = _ciAlias(STAT_ALIAS_COMMON);
+const _ALIAS_SPORT_CI = (() => { const o = {}; for (const s in STAT_ALIASES_BY_SPORT) o[s] = _ciAlias(STAT_ALIASES_BY_SPORT[s]); return o; })();
+// Resolve one source column header → a canonical stat name for the sport (else returns it unchanged).
+function resolveStatAlias(header, sport) {
+  const k = String(header == null ? "" : header).trim();
+  const lk = k.toLowerCase();
+  const sp = _ALIAS_SPORT_CI[String(sport || "").replace(/_(boys|girls)$/, "")] || {};
+  return sp[lk] || _ALIAS_COMMON_CI[lk] || k;
+}
+function remapSeasonStats(stats, valid, sport) {
   const useFilter = valid && valid.size > 0; // never filter against an empty set (would drop everything)
   const out = {};
   for (const k in (stats || {})) {
-    const mapped = SEASON_STAT_ALIASES[String(k).trim()] || String(k).trim();
-    if (useFilter && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop AI-invented ones
+    const mapped = resolveStatAlias(k, sport);
+    if (useFilter && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop source extras
     out[mapped] = stats[k];
   }
   return out;
@@ -3078,7 +3113,7 @@ function ImportSeasons({ school, roster = [] }) {
             // to the coach's stat set BEFORE the valid-set filter, so they aren't dropped.
             const _raw = a.stats || {}; const _norm = {};
             for (const _k in _raw) _norm[fixFbStat(school.sport, _k)] = _raw[_k];
-            arr.push({ name, number, stats: remapSeasonStats(_norm, seasonValid) });
+            arr.push({ name, number, stats: remapSeasonStats(_norm, seasonValid, school.sport) });
           }
         }
         const seasons = Object.keys(rawBySeason);
@@ -5395,7 +5430,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         if (metaCols.has(h)) return;
         const val = row[h];
         if (typeof val !== "number" || val <= 0) return;
-        const mapped = SEASON_STAT_ALIASES[String(h).trim()] || String(h).trim();
+        const mapped = resolveStatAlias(h, school.sport);
         if (!validStats.has(mapped)) return; // only stats in our structure — no AI-invented ones
         stats[mapped] = val;
       });
