@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Aggressive-momentum trading bot — configuration
+#
+#  Copy this file to `config.yaml` and edit. `config.yaml` is gitignored so your
+#  real settings never get committed.
+#
+#  READ THE README BEFORE CHANGING `mode`. The bot ships in dry_run on purpose.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# "dry_run"  -> never places real orders. Simulates fills at the live market
+#               price and logs what it WOULD do. Start here. Stay here for weeks.
+# "live"     -> places REAL orders with REAL money via the Robinhood MCP adapter.
+#               Do not switch to this until dry_run has behaved and you have
+#               wired + tested the execution adapter locally (see README).
+mode: dry_run
+
+# Starting cash the bot is allowed to manage. This is your hard ceiling of risk.
+# Only money you are 100% okay losing entirely.
+starting_cash: 1000.00
+
+# How the bot decides what to buy/sell.
+strategy:
+  # Only these symbols may ever be traded. The bot cannot touch anything else,
+  # no matter what its signals say. Keep these liquid (tight spreads) — small
+  # accounts get eaten alive by wide spreads on thin names.
+  watchlist: [SPY, QQQ, IWM, XLK, XLE, XLF, SMH, GLD, TLT]
+
+  # Momentum lookback in trading days (~63 = 3 months).
+  lookback_days: 63
+
+  # How many of the top-ranked names to hold at once. Fewer = more concentrated
+  # = more aggressive. With $1,000, more than ~3 makes positions too small to
+  # matter after fees/spreads.
+  top_n: 3
+
+  # A name must be in an uptrend (price above this SMA) to be eligible, even if
+  # its momentum rank is high. Filters out "falling knife" momentum.
+  trend_filter_sma_days: 100
+
+# Deterministic risk limits. These are enforced in CODE, not by any AI/LLM
+# judgment. They are the things standing between you and a wiped-out account.
+risk:
+  # Max fraction of total equity allowed in a single position.
+  max_position_pct: 0.40
+
+  # Keep at least this fraction of equity in cash at all times.
+  min_cash_pct: 0.05
+
+  # Per-position trailing stop. If a holding falls this far from its highest
+  # close since you bought it, the bot sells it on the next run.
+  trailing_stop_pct: 0.08
+
+  # GLOBAL KILL SWITCH. If total equity falls this far below its all-time high
+  # (high-water mark), the bot liquidates everything to cash and HALTS. You must
+  # manually re-enable it after reviewing what happened.
+  max_drawdown_kill_pct: 0.15
+
+  # Pattern Day Trader protection. US accounts under $25k may make at most 3 day
+  # trades per rolling 5 business days. The bot will refuse a trade that would
+  # break this. Leave a safety margin below 3.
+  max_day_trades_per_5d: 2
+
+  # Hard cap on number of orders the bot will place in a single run, as a
+  # circuit breaker against runaway logic.
+  max_orders_per_run: 4
+
+# Where state and logs live (relative to the trading-bot/ directory).
+paths:
+  state_file: data/state.json
+  audit_log: data/audit.jsonl
+
+# If this file exists, the bot will not place ANY orders and will exit.
+# Create it (e.g. `touch trading-bot/STOP`) to instantly pause everything.
+kill_switch_file: STOP
