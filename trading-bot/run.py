@@ -67,6 +67,14 @@ def main() -> int:
     prices = {s: float(closes[s].dropna().iloc[-1])
               for s in closes.columns if not closes[s].dropna().empty}
 
+    # Flag any watchlist names we couldn't price this run — they're excluded from
+    # ranking, so keep a record rather than dropping them silently.
+    missing = [s for s in cfg.strategy.watchlist if s not in prices]
+    if missing:
+        print(f"  ⚠ No price data for: {', '.join(missing)} "
+              f"(excluded from ranking this run)")
+        audit.write("data_warning", missing_symbols=missing)
+
     if args.status:
         print_status(state, prices)
         return 0

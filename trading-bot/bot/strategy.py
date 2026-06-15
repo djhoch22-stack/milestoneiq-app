@@ -9,12 +9,26 @@ targets into allowed orders; bot/broker.py executes them.
 """
 from __future__ import annotations
 
+import tempfile
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
 
 from .config import StrategyConfig
+
+# Isolate yfinance's timezone/cache SQLite in a per-user temp dir. The default
+# shared cache can throw "database is locked" under concurrent/overlapping runs,
+# which silently drops symbols from the ranking. A dedicated location avoids the
+# lock contention.
+try:
+    _CACHE_DIR = Path(tempfile.gettempdir()) / "tradingbot_yf_cache"
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    yf.set_tz_cache_location(str(_CACHE_DIR))
+except Exception:  # pragma: no cover - older yfinance without the setter
+    pass
 
 
 @dataclass
@@ -26,19 +40,43 @@ class Signal:
     eligible: bool        # in_uptrend AND momentum > 0
 
 
-def fetch_prices(symbols: list[str], lookback_days: int, sma_days: int) -> pd.DataFrame:
-    """Daily closing prices with enough history for the longest indicator."""
-    period_days = max(lookback_days, sma_days) + 40  # padding for non-trading days
+def _download_closes(symbols: list[str], period_days: int) -> pd.DataFrame:
     data = yf.download(
         symbols,
         period=f"{period_days}d",
         interval="1d",
         auto_adjust=True,
         progress=False,
+        threads=False,  # serial requests avoid the sqlite cache lock contention
     )
     closes = data["Close"]
     if isinstance(closes, pd.Series):  # single symbol -> Series; normalise to frame
         closes = closes.to_frame(name=symbols[0])
+    return closes.dropna(how="all")
+
+
+def fetch_prices(
+    symbols: list[str], lookback_days: int, sma_days: int, retries: int = 3
+) -> pd.DataFrame:
+    """Daily closing prices, retrying for any symbols that fail to download.
+
+    A transient fetch failure must not silently drop a symbol from the momentum
+    ranking, so we re-request just the missing names a few times before giving
+    up. run.py then logs whatever is still missing to the audit trail.
+    """
+    period_days = max(lookback_days, sma_days) + 40  # padding for non-trading days
+    closes = _download_closes(symbols, period_days)
+
+    for _ in range(retries):
+        missing = [s for s in symbols
+                   if s not in closes.columns or closes[s].dropna().empty]
+        if not missing:
+            break
+        time.sleep(1.5)
+        retry = _download_closes(missing, period_days)
+        for s in retry.columns:
+            closes[s] = retry[s]
+
     return closes.dropna(how="all")
 
 
