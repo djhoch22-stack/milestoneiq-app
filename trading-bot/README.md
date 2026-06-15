@@ -131,6 +131,13 @@ MCP client ([`bot/mcp_client.py`](bot/mcp_client.py)) that talks directly to the
 Robinhood server. It trades **only** the agentic-allowed account you configure —
 a hard brokerage boundary that keeps your other accounts untouchable.
 
+**Reconciliation:** at the start of every live run the bot calls `get_portfolio`
+and `get_equity_positions` and overwrites its local cash/positions with the
+broker's truth, so it can never trade on stale state. If that sync fails, the run
+aborts without trading. A real fill is recorded only after polling
+`get_equity_orders` confirms a `filled` state — orders that error or stay
+unconfirmed record no position.
+
 > The MCP client and the tool request/response parsing **could not be tested in
 > the environment they were written in** (no Robinhood access there). That's why
 > you go live through the staged gates below, on your own machine, smallest risk

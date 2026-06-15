@@ -233,6 +233,40 @@ def test_api_error_text_rejected_no_position():
     assert abs(state.cash - 1000.0) < 1e-9
 
 
+def test_sync_state_reconciles_cash_and_positions():
+    from bot.state import Position
+    tool = FakeTool({
+        "get_portfolio": {"data": {
+            "cash": "998.01",
+            "buying_power": {"buying_power": "998.0100"}}},
+        "get_equity_positions": {"data": {"positions": [
+            {"symbol": "SMH", "quantity": "0.003100",
+             "average_buy_price": "641.940000"}]}},
+    })
+    broker = make_broker(tool)
+    state = State(cash=994.0, equity_high_water_mark=1000.0)
+    # Stale/false positions that must be corrected away.
+    state.positions["XLK"] = Position("XLK", 0.0105, 190.0, 191.0, "2026-06-15T08:00")
+    state.positions["QQQ"] = Position("QQQ", 0.0027, 740.0, 741.0, "2026-06-15T08:00")
+    summary = broker.sync_state(state, {"SMH": 643.0})
+    assert abs(state.cash - 998.01) < 1e-6
+    assert set(state.positions) == {"SMH"}, "stale XLK/QQQ should be dropped"
+    assert abs(state.positions["SMH"].shares - 0.0031) < 1e-9
+    assert abs(state.positions["SMH"].avg_price - 641.94) < 1e-6
+    assert summary["cash"] == 998.01
+
+
+def test_sync_state_raises_on_error_response():
+    tool = FakeTool({"get_portfolio": {"_text": "API error 500", "isError": True}})
+    broker = make_broker(tool)
+    state = State(cash=994.0, equity_high_water_mark=1000.0)
+    try:
+        broker.sync_state(state, {})
+        raise AssertionError("expected sync_state to raise on error response")
+    except RuntimeError:
+        pass
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

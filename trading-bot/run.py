@@ -82,6 +82,24 @@ def main() -> int:
         print_status(state, prices)
         return 0
 
+    if args.review_only and not cfg.is_live:
+        print("  --review-only requires mode: live (it exercises the review tool).")
+        return 2
+
+    # Build the broker up front; in live mode, reconcile local state with the
+    # broker's truth BEFORE any decision so we never trade on stale state. Abort
+    # the run if reconciliation fails — better to skip a run than trade blind.
+    broker = make_broker(cfg, review_only=args.review_only, audit=audit)
+    if cfg.is_live:
+        try:
+            synced = broker.sync_state(state, prices)
+            print(f"  Reconciled : cash ${state.cash:,.2f}, "
+                  f"positions {list(state.positions) or '(none)'}")
+        except Exception as e:  # noqa: BLE001 - any failure must stop trading
+            print(f"  ABORT: account reconciliation failed: {e}")
+            audit.write("reconcile_failed", error=str(e))
+            return 3
+
     print_status(state, prices)
 
     # Kill-switch file: hard pause, no trading.
@@ -107,13 +125,8 @@ def main() -> int:
         print(f"  ⚠ {state.halted_reason}")
         audit.write("halted", reason=state.halted_reason)
 
-    if args.review_only and not cfg.is_live:
-        print("  --review-only requires mode: live (it exercises the review tool).")
-        return 2
-
     # Execute. dry-run simulates; live reviews+places real orders; --review-only
-    # runs the review step but places nothing.
-    broker = make_broker(cfg, review_only=args.review_only, audit=audit)
+    # runs the review step but places nothing. (broker built above for reconcile)
     if args.review_only:
         label = "REVIEW-ONLY — no orders placed"
     elif cfg.is_live:

@@ -74,6 +74,9 @@ class DryRunBroker:
         _apply_fill(state, order, order.price, now)
         return {"status": "simulated", "fill_price": order.price}
 
+    def sync_state(self, state: State, prices: dict) -> dict:
+        return {}  # dry-run keeps its own simulated state; nothing to reconcile
+
 
 # Words in a review/order response that mean "do not proceed".
 _BLOCKING_TOKENS = ("reject", "blocked", "halt", "insufficient", "not_allowed",
@@ -142,6 +145,65 @@ class RobinhoodMCPBroker:
     def _log(self, event: str, **fields):
         if self.audit:
             self.audit.write(event, **fields)
+
+    def sync_state(self, state: State, prices: dict) -> dict:
+        """Overwrite local cash + positions with the broker's truth.
+
+        Called at the start of every live run so the bot can never trade on stale
+        state. Raises on any failure — the caller must abort rather than trade on
+        bad data. Preserves the local trailing-stop high-water mark and open date
+        for positions we already track.
+        """
+        port = self.call_tool("get_portfolio", {"account_number": self.account_number})
+        if not isinstance(port, dict) or port.get("isError") or port.get("_text"):
+            raise RuntimeError(f"get_portfolio failed: {port}")
+        pbody = _body(port)
+        bp = pbody.get("buying_power") if isinstance(pbody, dict) else None
+        cash = (bp.get("buying_power") if isinstance(bp, dict) else None) \
+            or (pbody.get("cash") if isinstance(pbody, dict) else None)
+        if cash is None:
+            raise RuntimeError(f"could not find cash/buying_power in: {port}")
+        state.cash = float(cash)
+
+        pos_resp = self.call_tool("get_equity_positions",
+                                  {"account_number": self.account_number})
+        if not isinstance(pos_resp, dict) or pos_resp.get("isError") \
+                or pos_resp.get("_text"):
+            raise RuntimeError(f"get_equity_positions failed: {pos_resp}")
+        posbody = _body(pos_resp)
+        broker_positions = posbody.get("positions") or [] \
+            if isinstance(posbody, dict) else []
+
+        seen: set[str] = set()
+        for p in broker_positions:
+            sym = p.get("symbol")
+            qty = float(p.get("quantity") or 0)
+            if not sym or qty <= 0:
+                continue
+            seen.add(sym)
+            avg = float(p.get("average_buy_price") or 0)
+            cur = prices.get(sym, avg or 0)
+            existing = state.positions.get(sym)
+            if existing:
+                existing.shares = qty
+                existing.avg_price = avg or existing.avg_price
+                existing.high_price = max(existing.high_price, cur or existing.high_price)
+            else:
+                state.positions[sym] = Position(
+                    symbol=sym, shares=qty, avg_price=avg or cur,
+                    high_price=cur or avg, opened_at=datetime.now().isoformat())
+
+        # Drop anything the broker says we don't hold (fixes stale/false positions).
+        for sym in list(state.positions):
+            if sym not in seen:
+                del state.positions[sym]
+
+        state.equity_high_water_mark = max(state.equity_high_water_mark,
+                                           state.equity(prices))
+        summary = {"cash": round(state.cash, 2),
+                   "positions": {s: state.positions[s].shares for s in state.positions}}
+        self._log("reconciled", **summary)
+        return summary
 
     def _base_args(self, order: Order) -> dict:
         return {
