@@ -1465,7 +1465,7 @@ function ImportModal({ school, onClose, onImport }) {
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import career stats — {school.name}</h2>
-            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Upload a CSV or Excel file, or let AI extract stats from any PDF</p>
+            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Import a CSV/Excel export from MaxPreps, GameChanger or Hudl — or let AI read any PDF. We auto-match the columns and let you map the rest.</p>
           </div>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#666" }}>✕</button>
         </div>
@@ -1549,6 +1549,15 @@ function ImportModal({ school, onClose, onImport }) {
                 <pre style={{ background:"#f9fafb",borderRadius:8,padding:12,fontSize:11,overflowX:"auto",color:"#374151",marginTop:8,whiteSpace:"pre-wrap",wordBreak:"break-all" }}>{sampleCSV}</pre>
               </details>
             </div>
+            <details style={{ marginTop:10 }}>
+              <summary style={{ fontSize:13,color:"#6b7280",cursor:"pointer",userSelect:"none" }}>📥 How to export from MaxPreps, GameChanger or Hudl</summary>
+              <div style={{ fontSize:12,color:"#374151",marginTop:8,lineHeight:1.7,background:"#f9fafb",borderRadius:8,padding:"10px 12px" }}>
+                <div><b>MaxPreps:</b> your team → <b>Stats</b> → pick a season → <b>Export</b> (CSV/Excel).</div>
+                <div><b>GameChanger:</b> team → <b>Stats</b> → Season → <b>Export</b> → CSV.</div>
+                <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → Export → CSV.</div>
+                <div style={{ marginTop:6,color:"#6b7280" }}>Drop the file above — known columns auto-match, and you map the rest.</div>
+              </div>
+            </details>
           </>
         )}
 
