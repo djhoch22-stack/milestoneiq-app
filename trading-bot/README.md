@@ -96,15 +96,17 @@ decisions make sense to you before risking a cent.
 
 ### Schedule it
 
-Use the included `com.user.tradingbot.plist.example` (macOS launchd) to run it
-automatically each weekday morning. Edit the paths inside, then:
+Use the installer — it auto-detects your venv Python and paths, writes the
+LaunchAgent, and loads it:
 
 ```bash
-cp com.user.tradingbot.plist.example ~/Library/LaunchAgents/com.user.tradingbot.plist
-launchctl load ~/Library/LaunchAgents/com.user.tradingbot.plist
+python scripts/install_schedule.py            # weekdays at 09:00 local time
+python scripts/install_schedule.py --hour 9 --minute 30   # custom time
+python scripts/install_schedule.py --uninstall            # remove it
 ```
 
-Your Mac must be awake when the schedule fires.
+Pick a time during US market hours in your Mac's local timezone. Your Mac must
+be awake when the schedule fires; if asleep, launchd runs it at the next wake.
 
 ---
 

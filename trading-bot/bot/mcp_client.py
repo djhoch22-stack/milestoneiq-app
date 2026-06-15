@@ -20,11 +20,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+# Quiet a harmless, noisy warning: we open a fresh connection per tool call, and
+# Robinhood's server rejects the MCP session-termination DELETE with HTTP 400.
+# It has no effect on the calls themselves, so we suppress just that logger.
+logging.getLogger("mcp.client.streamable_http").setLevel(logging.CRITICAL)
 
 try:
     from mcp import ClientSession
