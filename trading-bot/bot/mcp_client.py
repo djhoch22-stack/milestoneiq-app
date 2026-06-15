@@ -171,18 +171,29 @@ class RobinhoodMCP:
 
         MCP returns content blocks; trading tools return JSON text. We return
         structuredContent when present, else parse the first text block, else
-        return the raw text under {"_text": ...} so nothing is lost.
+        return the raw text under {"_text": ...} so nothing is lost. The result's
+        isError flag is always propagated so the caller can detect failures —
+        error bodies (e.g. "API error 400: ...") are not valid JSON and surface
+        as {"_text": ..., "isError": ...}.
         """
-        if getattr(result, "structuredContent", None):
-            return result.structuredContent
+        is_error = bool(getattr(result, "isError", False))
+        sc = getattr(result, "structuredContent", None)
+        if sc:
+            out = dict(sc)
+            out.setdefault("isError", is_error)
+            return out
         for block in getattr(result, "content", []) or []:
             text = getattr(block, "text", None)
             if text:
                 try:
-                    return json.loads(text)
+                    parsed = json.loads(text)
                 except json.JSONDecodeError:
-                    return {"_text": text}
-        return {"_raw": str(result), "isError": getattr(result, "isError", False)}
+                    return {"_text": text, "isError": is_error}
+                if isinstance(parsed, dict):
+                    parsed.setdefault("isError", is_error)
+                    return parsed
+                return {"data": parsed, "isError": is_error}
+        return {"_raw": str(result), "isError": is_error}
 
     def call_tool(self, name: str, arguments: dict) -> dict:
         return asyncio.run(self._call_async(name, arguments))

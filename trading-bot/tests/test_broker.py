@@ -178,19 +178,59 @@ def test_rejected_state_in_envelope_blocks():
     assert "SPY" not in state.positions
 
 
-def test_fill_falls_back_to_reference_price_when_unparseable():
+def test_unconfirmed_order_returns_pending_no_position():
+    # An order that never reaches "filled" must NOT be recorded as a position.
     tool = FakeTool({
-        "review_equity_order": {"alerts": []},
-        "place_equity_order": {"id": "ord-2"},
-        "get_equity_orders": {"orders": []},  # never reaches filled
+        "review_equity_order": {"data": {"order_checks": {}}},
+        "place_equity_order": {"data": {"order": {"id": "ord-2",
+                                                  "state": "unconfirmed"}}},
+        "get_equity_orders": {"data": {"order": {"id": "ord-2",
+                                                 "state": "unconfirmed"}}},
     })
     broker = make_broker(tool)
     state = State(cash=1000.0, equity_high_water_mark=1000.0)
-    order = Order("buy", "SPY", 1.0, 100.0, "no fill data")
+    order = Order("buy", "SPY", 1.0, 100.0, "never fills")
     result = broker.execute(order, state, datetime(2026, 6, 16))
-    assert result["status"] == "filled"
-    assert result["fill_price"] == 100.0  # reference price fallback
-    assert "SPY" in state.positions
+    assert result["status"] == "pending", result
+    assert "SPY" not in state.positions
+    assert abs(state.cash - 1000.0) < 1e-9  # cash untouched
+
+
+def test_nested_place_then_confirmed_fill():
+    # Real shapes: place -> {"data": {"order": {...}}}; fill confirmed by polling.
+    tool = FakeTool({
+        "review_equity_order": {"data": {"order_checks": {}}},
+        "place_equity_order": {"data": {"order": {"id": "ord-7",
+                                                  "state": "unconfirmed"}}},
+        "get_equity_orders": {"data": {"order": {
+            "id": "ord-7", "state": "filled", "average_price": "643.50",
+            "cumulative_quantity": "0.0031"}}},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "SMH", 0.0031, 643.0, "real shape")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "filled", result
+    assert result["fill_price"] == 643.50
+    assert result["order_id"] == "ord-7"
+    assert abs(state.positions["SMH"].shares - 0.0031) < 1e-9
+
+
+def test_api_error_text_rejected_no_position():
+    # Robinhood rejections arrive as non-JSON {"_text": "API error 400: ..."}.
+    tool = FakeTool({
+        "review_equity_order": {"data": {"order_checks": {}}},
+        "place_equity_order": {"_text": "API error 400: {\"non_field_errors\":"
+                               "[\"complete your investor profile\"]}",
+                               "isError": False},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "XLK", 0.0105, 190.0, "blocked by RH")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "rejected", result
+    assert "XLK" not in state.positions
+    assert abs(state.cash - 1000.0) < 1e-9
 
 
 if __name__ == "__main__":

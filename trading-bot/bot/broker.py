@@ -91,6 +91,23 @@ def _body(resp) -> dict:
     return resp if isinstance(resp, dict) else {}
 
 
+def _order_obj(resp) -> dict:
+    """Pull the order object out of a response.
+
+    Place returns {"data": {"order": {...}}}; get_equity_orders single-order may
+    return {"data": {"order": {...}}} or {"data": {"orders": [{...}]}}. Review
+    returns the order fields directly under data. This normalizes all of them.
+    """
+    body = _body(resp)
+    if isinstance(body, dict):
+        if isinstance(body.get("order"), dict):
+            return body["order"]
+        orders = body.get("orders") or body.get("results")
+        if isinstance(orders, list) and orders:
+            return orders[0]
+    return body if isinstance(body, dict) else {}
+
+
 class RobinhoodMCPBroker:
     """Live execution via the Robinhood MCP server: review -> place -> poll fill.
 
@@ -141,22 +158,30 @@ class RobinhoodMCPBroker:
     def _is_blocked(resp: dict) -> str | None:
         """Return a reason string if the response indicates we must not proceed.
 
-        Robinhood returns pre-trade alerts under `order_checks` (an empty {} means
-        no alerts). We also accept a couple of alternative field names defensively.
-        A non-empty alerts structure blocks only if it contains a blocking token;
-        otherwise it's noted (the full response is already in the audit log) and we
-        proceed, since this runs unattended.
+        Catches, in order: tool errors (isError / non-JSON error bodies like
+        "API error 400: ..."), explicit error fields, blocking pre-trade alerts
+        under `order_checks` (empty {} = none), and rejected order states.
+        A non-empty alert blocks only if it contains a blocking token; otherwise
+        it's noted (the full response is in the audit log) and we proceed.
         """
+        if not isinstance(resp, dict):
+            return f"unexpected response type: {type(resp).__name__}"
         if resp.get("isError"):
-            return "tool returned isError"
+            return f"tool returned isError: {resp.get('_text', resp)}"
+        # Error bodies aren't valid JSON, so they arrive as {"_text": ...}.
+        if resp.get("_text"):
+            return f"error response: {str(resp['_text'])[:200]}"
         body = _body(resp)
+        if isinstance(body, dict) and body.get("non_field_errors"):
+            return f"order error: {body['non_field_errors']}"
         alerts = (body.get("order_checks") or body.get("alerts")
-                  or body.get("pre_trade_alerts") or resp.get("alerts") or {})
+                  or body.get("pre_trade_alerts") or resp.get("alerts") or {}) \
+            if isinstance(body, dict) else {}
         if alerts:
             alert_blob = json.dumps(alerts).lower()
             if any(tok in alert_blob for tok in _BLOCKING_TOKENS):
                 return f"blocking pre-trade alert: {alerts}"
-        state = str(body.get("state", "")).lower()
+        state = str(_order_obj(resp).get("state", "")).lower()
         if state in ("rejected", "failed", "cancelled", "voided"):
             return f"order state is {state!r}"
         return None
@@ -210,45 +235,49 @@ class RobinhoodMCPBroker:
         if blocked:
             return {"status": "rejected", "reason": blocked, "response": resp}
 
-        pbody = _body(resp)
-        order_id = (pbody.get("id") or pbody.get("order_id")
-                    or pbody.get("orderId") or resp.get("id"))
+        order_obj = _order_obj(resp)
+        order_id = (order_obj.get("id") or order_obj.get("order_id")
+                    or order_obj.get("orderId"))
+        if not order_id:
+            # Order was accepted-shaped but we can't find an id to confirm it.
+            # Do NOT record a fill we can't verify.
+            self._log("fill_warning", symbol=order.symbol,
+                      reason="no order id in place response; not recording a fill")
+            return {"status": "pending", "reason": "no order id to confirm fill",
+                    "response": resp}
 
-        # 3) Poll for the fill to capture the real price/quantity.
+        # 3) Poll for the actual fill. Only a confirmed fill updates state — we
+        #    never assume/fabricate a fill, since that desyncs us from reality.
         fill_price, filled_qty = self._poll_fill(order_id, order)
+        if fill_price is None:
+            self._log("fill_warning", symbol=order.symbol, order_id=order_id,
+                      reason="order not confirmed filled within poll window; "
+                             "no position recorded — will reconcile next run")
+            return {"status": "pending", "order_id": order_id,
+                    "reason": "not confirmed filled within poll window"}
+
         if filled_qty and filled_qty > 0:
             order.shares = filled_qty
         _apply_fill(state, order, fill_price, now)
         return {"status": "filled", "fill_price": fill_price, "order_id": order_id,
                 "shares": order.shares}
 
-    def _poll_fill(self, order_id, order: Order) -> tuple[float, float | None]:
-        """Return (fill_price, filled_qty). Falls back to reference price (with a
-        loud audit warning) if the fill can't be parsed — never silently wrong."""
-        if not order_id:
-            self._log("fill_warning", symbol=order.symbol,
-                      reason="no order_id in place response; using reference price")
-            return order.price, None
+    def _poll_fill(self, order_id, order: Order) -> tuple[float | None, float | None]:
+        """Return (fill_price, filled_qty), or (None, None) if no confirmed fill.
 
+        Never falls back to a guessed price — an unconfirmed order returns None so
+        the caller records no position rather than a fabricated one."""
         for _ in range(self.poll_attempts):
             resp = self.call_tool("get_equity_orders", {
                 "account_number": self.account_number, "order_id": order_id,
             })
-            gbody = _body(resp)
-            orders = (gbody.get("orders") or gbody.get("results")
-                      or (gbody if isinstance(gbody, list) else []))
-            if orders:
-                o = orders[0]
-                if str(o.get("state", "")).lower() == "filled":
-                    price, qty = self._extract_fill(o)
-                    if price:
-                        return price, qty
+            o = _order_obj(resp)
+            if str(o.get("state", "")).lower() == "filled":
+                price, qty = self._extract_fill(o)
+                if price:
+                    return price, qty
             time.sleep(self.poll_interval)
-
-        self._log("fill_warning", symbol=order.symbol, order_id=order_id,
-                  reason="order did not reach filled state within poll window; "
-                         "using reference price for accounting — VERIFY MANUALLY")
-        return order.price, None
+        return None, None
 
     @staticmethod
     def _extract_fill(order_obj: dict) -> tuple[float | None, float | None]:
