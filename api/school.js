@@ -7,7 +7,7 @@ import {
   statsToDisplay, rateDefsFor, rateValue, fmtRateVal, RATE_FMT,
   pctRecordsFrom, pergameRecordsFrom, longestRecordsFrom, autoStatRecords,
   awardsForHolder, awardLabel, buildCoachStats, normName,
-  seasonSuccessScore, activeYears, seasonEndYear, coachPostseason,
+  seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
 
 export default async function handler(req, res) {
@@ -27,6 +27,7 @@ export default async function handler(req, res) {
   const ids = teams.map((t) => t.id).filter(Boolean);
   const teamById = {}; teams.forEach((t) => { teamById[t.id] = t; });
   const meta = {}; teams.forEach((t) => { meta[t.id] = { sportKey: t.sport, sport: prettySport(t.sport), slug: t.slug, col: t.primary_color || "#1a3a6b", ic: SPORT_ICON[t.sport] || "🏅" }; });
+  const labelEmoji = {}; Object.values(meta).forEach((mm) => { labelEmoji[mm.sport] = mm.ic; });
 
   // Load per-program (keeps each query under PostgREST row caps): full all-time roster (for ranking pools +
   // multi-sport stats + years), player_seasons + records (for the per-program record book). Seasons + awards
@@ -130,7 +131,9 @@ export default async function handler(req, res) {
     const ps = coachPostseason(c.name, orgSeasons);
     const psItems = [["🏆", "League titles", ps.leagueTitles], ["🏅", "State titles", ps.stateChamps], ["🥈", "State runner-up", ps.runnerUp], ["🎯", "Final Fours", ps.finalFours], ["🎖️", "Elite 8s", ps.eliteEights], ["⭐", "Sweet 16s", ps.sweetSixteens], ["🏟️", "Playoff apps", ps.playoffs]].filter((x) => x[2] > 0);
     const psHtml = psItems.length ? `<h3 style="margin:16px 0 8px;font-size:14px">Postseason / team success</h3><div class="ptiles">${psItems.map((x) => tile(x[0] + " " + x[1], x[2], "")).join("")}</div>` : "";
-    const body = `<h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${psHtml}${honRows("Coach of the Year", coy, m.ic)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p>`;
+    const titleSeasons = coachTitleSeasons(c.name, orgSeasons);
+    const champHtml = titleSeasons.length ? `<h3 style="margin:16px 0 8px;font-size:14px">League &amp; state titles by year</h3><div>${titleSeasons.map((x) => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;border-top:1px solid #f3f0ea"><span style="font-weight:700;color:#111;white-space:nowrap">${labelEmoji[x.team] || "🏅"} ${esc(x.season)}</span><span style="color:#6b7280;flex:1">${esc(x.team)}</span><span style="white-space:nowrap;font-weight:600">${x.state ? "🏅 State" : ""}${x.state && x.league ? " · " : ""}${x.league ? "🏆 League" : ""}</span></div>`).join("")}</div>` : "";
+    const body = `<h3 style="margin:0 0 10px;font-size:14px">Coaching record</h3><div class="ptiles">${tiles}</div>${psHtml}${champHtml}${honRows("Coach of the Year", coy, m.ic)}<p style="margin-top:16px"><a href="/teams/${esc(m.slug)}">View team →</a></p>`;
     return { hd: head(c.name, "🎓", m, "Head coach" + (year ? " · Inducted " + year : "")), tabs: [{ ic: m.ic, lbl: shortLbl(m.sport), body }] };
   };
 
