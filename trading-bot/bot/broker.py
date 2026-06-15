@@ -80,6 +80,17 @@ _BLOCKING_TOKENS = ("reject", "blocked", "halt", "insufficient", "not_allowed",
                     "ineligible", "error")
 
 
+def _body(resp) -> dict:
+    """Unwrap Robinhood's {"data": {...}, "guide": ...} envelope.
+
+    The tools return the real payload under a top-level "data" key. Fall back to
+    the response itself if it isn't wrapped, so the parsers work either way.
+    """
+    if isinstance(resp, dict) and isinstance(resp.get("data"), (dict, list)):
+        return resp["data"]
+    return resp if isinstance(resp, dict) else {}
+
+
 class RobinhoodMCPBroker:
     """Live execution via the Robinhood MCP server: review -> place -> poll fill.
 
@@ -137,15 +148,17 @@ class RobinhoodMCPBroker:
         """Return a reason string if the response indicates we must not proceed."""
         if resp.get("isError"):
             return "tool returned isError"
-        blob = json.dumps(resp).lower()
+        body = _body(resp)
         # Only treat alert-ish structures as blocking, not incidental field names.
-        alerts = resp.get("alerts") or resp.get("pre_trade_alerts") or []
+        alerts = (body.get("alerts") or body.get("pre_trade_alerts")
+                  or resp.get("alerts") or [])
         if alerts:
             alert_blob = json.dumps(alerts).lower()
             if any(tok in alert_blob for tok in _BLOCKING_TOKENS):
                 return f"blocking pre-trade alert: {alerts}"
-        if "rejected" in blob or '"state":"failed"' in blob:
-            return "response indicates rejection"
+        state = str(body.get("state", "")).lower()
+        if state in ("rejected", "failed", "cancelled", "voided"):
+            return f"order state is {state!r}"
         return None
 
     def execute(self, order: Order, state: State, now: datetime) -> dict:
@@ -178,7 +191,9 @@ class RobinhoodMCPBroker:
         if blocked:
             return {"status": "rejected", "reason": blocked, "response": resp}
 
-        order_id = resp.get("id") or resp.get("order_id") or resp.get("orderId")
+        pbody = _body(resp)
+        order_id = (pbody.get("id") or pbody.get("order_id")
+                    or pbody.get("orderId") or resp.get("id"))
 
         # 3) Poll for the fill to capture the real price/quantity.
         fill_price, filled_qty = self._poll_fill(order_id, order)
@@ -200,7 +215,9 @@ class RobinhoodMCPBroker:
             resp = self.call_tool("get_equity_orders", {
                 "account_number": self.account_number, "order_id": order_id,
             })
-            orders = resp.get("orders") or resp.get("results") or []
+            gbody = _body(resp)
+            orders = (gbody.get("orders") or gbody.get("results")
+                      or (gbody if isinstance(gbody, list) else []))
             if orders:
                 o = orders[0]
                 if str(o.get("state", "")).lower() == "filled":

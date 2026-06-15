@@ -87,7 +87,15 @@ def main() -> int:
 
 
 def _print_accounts(resp: dict, tool_name: str) -> None:
-    accounts = resp.get("accounts") or resp.get("results") or resp.get("data")
+    # Responses are wrapped as {"data": {"accounts": [...]}}; handle that plus
+    # a few unwrapped shapes.
+    data = resp.get("data") if isinstance(resp, dict) else None
+    accounts = None
+    for src in (data, resp):
+        if isinstance(src, dict):
+            accounts = src.get("accounts") or src.get("results")
+            if accounts:
+                break
     if isinstance(resp, list):
         accounts = resp
     if not accounts:

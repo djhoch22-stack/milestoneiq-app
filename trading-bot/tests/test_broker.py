@@ -102,6 +102,41 @@ def test_review_only_places_nothing():
     assert not state.positions
 
 
+def test_handles_data_wrapped_envelope():
+    # Robinhood wraps payloads as {"data": {...}, "guide": ...}; the broker must
+    # read fields inside "data".
+    tool = FakeTool({
+        "review_equity_order": {"data": {"alerts": []}, "guide": "..."},
+        "place_equity_order": {"data": {"id": "ord-9", "state": "confirmed"},
+                               "guide": "..."},
+        "get_equity_orders": {"data": {"orders": [
+            {"state": "filled", "average_price": "200.00",
+             "cumulative_quantity": "1.0"}
+        ]}, "guide": "..."},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "QQQ", 1.0, 199.0, "wrapped envelope")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "filled", result
+    assert result["fill_price"] == 200.0
+    assert result["order_id"] == "ord-9"
+    assert "QQQ" in state.positions
+
+
+def test_rejected_state_in_envelope_blocks():
+    tool = FakeTool({
+        "review_equity_order": {"data": {"alerts": []}},
+        "place_equity_order": {"data": {"id": "x", "state": "rejected"}},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "SPY", 1.0, 100.0, "will be rejected")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "rejected", result
+    assert "SPY" not in state.positions
+
+
 def test_fill_falls_back_to_reference_price_when_unparseable():
     tool = FakeTool({
         "review_equity_order": {"alerts": []},
