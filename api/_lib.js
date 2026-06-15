@@ -568,6 +568,15 @@ export function coachPostseason(coachName, seasons) {
   const leagueTitles = cnt(/league champion|league champ/i);
   return { stateChamps, runnerUp, finalFours, eliteEights, sweetSixteens, playoffs, leagueTitles };
 }
+// Every league/state title season for a coach, each tagged with its season + sport label (`_team`) — powers
+// the "by year and by sport" championship breakdown on coach cards (a coach may win across multiple sports).
+export function coachTitleSeasons(coachName, seasons) {
+  const n = normName(coachName);
+  return (seasons || [])
+    .filter((s) => normName(s.coach) === n && s.notes && (/league champ/i.test(s.notes) || /state champ/i.test(s.notes)))
+    .map((s) => ({ season: s.season, team: s._team || "", league: /league champ/i.test(s.notes), state: /state champ/i.test(s.notes) }))
+    .sort((a, b) => String(b.season).localeCompare(String(a.season)));
+}
 
 // Full HTML document shell with SEO meta + JSON-LD + app-matching styles +
 // JS-free CSS tabs. `body` is the page content (may include the .tabs markup).
