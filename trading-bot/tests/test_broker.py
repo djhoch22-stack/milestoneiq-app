@@ -102,6 +102,36 @@ def test_blocking_review_alert_skips_order():
     assert "SPY" not in state.positions
 
 
+def test_order_checks_blocking_alert_skips():
+    # Real alerts come under `order_checks`; a blocking one must stop the order.
+    tool = FakeTool({
+        "review_equity_order": {"data": {
+            "order_checks": {"pdt": {"message": "order would be rejected: PDT"}}}},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "SPY", 1.0, 100.0, "pdt block")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "skipped", result
+    assert [c[0] for c in tool.calls] == ["review_equity_order"]
+
+
+def test_empty_order_checks_does_not_block():
+    # The real "no alerts" shape is an empty dict — must NOT block.
+    tool = FakeTool({
+        "review_equity_order": {"data": {"order_checks": {}}},
+        "place_equity_order": {"data": {"id": "ok", "state": "confirmed"}},
+        "get_equity_orders": {"data": {"orders": [
+            {"state": "filled", "average_price": "100.00",
+             "cumulative_quantity": "1.0"}]}},
+    })
+    broker = make_broker(tool)
+    state = State(cash=1000.0, equity_high_water_mark=1000.0)
+    order = Order("buy", "SPY", 1.0, 100.0, "no alerts")
+    result = broker.execute(order, state, datetime(2026, 6, 16))
+    assert result["status"] == "filled", result
+
+
 def test_review_only_places_nothing():
     tool = FakeTool({"review_equity_order": {"alerts": [], "quote": {"price": "100"}}})
     broker = make_broker(tool, review_only=True)

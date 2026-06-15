@@ -139,13 +139,19 @@ class RobinhoodMCPBroker:
 
     @staticmethod
     def _is_blocked(resp: dict) -> str | None:
-        """Return a reason string if the response indicates we must not proceed."""
+        """Return a reason string if the response indicates we must not proceed.
+
+        Robinhood returns pre-trade alerts under `order_checks` (an empty {} means
+        no alerts). We also accept a couple of alternative field names defensively.
+        A non-empty alerts structure blocks only if it contains a blocking token;
+        otherwise it's noted (the full response is already in the audit log) and we
+        proceed, since this runs unattended.
+        """
         if resp.get("isError"):
             return "tool returned isError"
         body = _body(resp)
-        # Only treat alert-ish structures as blocking, not incidental field names.
-        alerts = (body.get("alerts") or body.get("pre_trade_alerts")
-                  or resp.get("alerts") or [])
+        alerts = (body.get("order_checks") or body.get("alerts")
+                  or body.get("pre_trade_alerts") or resp.get("alerts") or {})
         if alerts:
             alert_blob = json.dumps(alerts).lower()
             if any(tok in alert_blob for tok in _BLOCKING_TOKENS):
