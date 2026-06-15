@@ -150,6 +150,21 @@ class RobinhoodMCP:
                 result = await session.call_tool(name, arguments=arguments)
                 return self._parse(result)
 
+    async def _list_tools_async(self) -> list[dict]:
+        async with streamablehttp_client(self.url, auth=self._provider()) as (r, w, _):
+            async with ClientSession(r, w) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                return [{
+                    "name": t.name,
+                    "description": (t.description or "").strip(),
+                    "required": (t.inputSchema or {}).get("required", []),
+                    "properties": list(((t.inputSchema or {}).get("properties") or {})),
+                } for t in tools.tools]
+
+    def list_tools(self) -> list[dict]:
+        return asyncio.run(self._list_tools_async())
+
     @staticmethod
     def _parse(result) -> dict:
         """Extract the tool's JSON payload from an MCP CallToolResult.
