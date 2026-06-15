@@ -157,7 +157,7 @@ places **zero** orders. The first run opens your browser once to authorize
 `data/audit.jsonl` for the `review_response` entries — and **send them to Claude
 so the alert/fill parsers can be confirmed against real responses.**
 
-**Gate 2 — one tiny real order ($2 cap)**
+**Gate 2 — tiny real orders ($2 clamp)**
 
 With `test_mode_max_notional: 2.00` still set, run a normal pass:
 
@@ -165,9 +165,10 @@ With `test_mode_max_notional: 2.00` still set, run a normal pass:
 python run.py
 ```
 
-It will place at most a ~$2 real order, then poll the fill. Confirm in the
-Robinhood app that it executed and that `state.json` recorded the real fill
-price. This proves place + poll + fill accounting end to end.
+Each buy is resized down to ~$2 (so a few ~$2 orders, well under $10 total),
+placed for real, then polled for the fill. Confirm in the Robinhood app that
+they executed and that `state.json` recorded the real fill prices. This proves
+place + poll + fill accounting end to end on real—but tiny—orders.
 
 **Gate 3 — full automation**
 

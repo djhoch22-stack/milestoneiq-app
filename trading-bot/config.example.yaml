@@ -43,9 +43,10 @@ execution:
   poll_attempts: 10
   poll_interval_seconds: 3
 
-  # Safety cap for staged testing. When > 0, NO order may exceed this notional,
-  # overriding everything else. Set to e.g. 2.00 for your first real test order,
-  # then 0 to disable once you trust it. Belt-and-suspenders over max_order_notional.
+  # Staged-testing clamp. When > 0, each BUY is resized DOWN so its value is at
+  # most this many dollars — the order still goes through (exercising the real
+  # place/poll/fill path) but stays tiny. Set 2.00 for your first real orders,
+  # then 0 to disable once you trust it. (Sells are left whole.)
   test_mode_max_notional: 2.00
 
 # How the bot decides what to buy/sell.

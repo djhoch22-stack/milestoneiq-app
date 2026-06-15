@@ -22,7 +22,7 @@ import time
 from datetime import datetime
 from uuid import uuid4
 
-from .risk import Order
+from .risk import MIN_ORDER_NOTIONAL, SHARE_PRECISION, Order
 from .state import Position, State, TradeRecord
 
 
@@ -126,12 +126,6 @@ class RobinhoodMCPBroker:
         if self.audit:
             self.audit.write(event, **fields)
 
-    def _notional_cap(self) -> float:
-        cap = self.max_order_notional
-        if self.test_mode_max_notional > 0:
-            cap = min(cap, self.test_mode_max_notional)
-        return cap
-
     def _base_args(self, order: Order) -> dict:
         return {
             "account_number": self.account_number,
@@ -162,12 +156,31 @@ class RobinhoodMCPBroker:
         return None
 
     def execute(self, order: Order, state: State, now: datetime) -> dict:
-        cap = self._notional_cap()
-        if order.notional > cap + 1e-9:
+        # Staged testing: resize the order DOWN to the test cap (don't refuse it),
+        # so the first real orders are deliberately tiny but still exercise the
+        # full place/poll/fill path. Sells of an existing position are left whole
+        # (you can't sell a fraction you don't hold meaningfully for a test).
+        if (self.test_mode_max_notional > 0 and order.side == "buy"
+                and order.notional > self.test_mode_max_notional):
+            clamped = round(self.test_mode_max_notional / order.price, SHARE_PRECISION)
+            self._log("order_clamped_for_test", symbol=order.symbol,
+                      from_shares=order.shares, to_shares=clamped,
+                      cap=self.test_mode_max_notional)
+            order.shares = clamped
+
+        # Hard backstop: refuse anything still above the absolute ceiling. With a
+        # correct strategy on a $1k account this should never fire — if it does,
+        # something is wrong and we'd rather place nothing.
+        if order.notional > self.max_order_notional + 1e-9:
             self._log("order_refused", symbol=order.symbol, notional=order.notional,
-                      cap=cap)
+                      cap=self.max_order_notional)
             return {"status": "refused",
-                    "reason": f"notional ${order.notional:.2f} exceeds cap ${cap:.2f}"}
+                    "reason": f"notional ${order.notional:.2f} exceeds backstop "
+                              f"${self.max_order_notional:.2f}"}
+        if order.notional < MIN_ORDER_NOTIONAL:
+            return {"status": "skipped",
+                    "reason": f"notional ${order.notional:.2f} below minimum "
+                              f"${MIN_ORDER_NOTIONAL:.2f}"}
 
         args = self._base_args(order)
 

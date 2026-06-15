@@ -59,23 +59,34 @@ def test_happy_path_places_and_records_fill():
         "review_equity_order", "place_equity_order", "get_equity_orders"]
 
 
-def test_notional_cap_refuses_oversized_order():
+def test_backstop_refuses_oversized_order():
     tool = FakeTool({})  # should never be called
     broker = make_broker(tool, max_order_notional=50.0)
     state = State(cash=1000.0, equity_high_water_mark=1000.0)
-    order = Order("buy", "SPY", 2.0, 100.0, "too big")  # $200 > $50 cap
+    order = Order("buy", "SPY", 2.0, 100.0, "too big")  # $200 > $50 backstop
     result = broker.execute(order, state, datetime(2026, 6, 16))
     assert result["status"] == "refused"
     assert not tool.calls, "no tool calls should happen for a refused order"
 
 
-def test_test_mode_notional_overrides_to_tiny():
-    tool = FakeTool({})
+def test_test_mode_clamps_buy_down_to_cap():
+    tool = FakeTool({
+        "review_equity_order": {"data": {"alerts": []}},
+        "place_equity_order": {"data": {"id": "ord-3", "state": "confirmed"}},
+        "get_equity_orders": {"data": {"orders": [
+            {"state": "filled", "average_price": "100.00",
+             "cumulative_quantity": "0.02"}
+        ]}},
+    })
     broker = make_broker(tool, max_order_notional=450.0, test_mode_max_notional=2.0)
     state = State(cash=1000.0, equity_high_water_mark=1000.0)
-    order = Order("buy", "SPY", 0.1, 100.0, "ten bucks")  # $10 > $2 test cap
+    order = Order("buy", "SPY", 5.0, 100.0, "would be $500")  # clamp to $2 -> 0.02
     result = broker.execute(order, state, datetime(2026, 6, 16))
-    assert result["status"] == "refused", result
+    assert result["status"] == "filled", result
+    # placed quantity should reflect the $2 clamp (0.02 sh @ $100), not 5.0
+    place_call = next(c for c in tool.calls if c[0] == "place_equity_order")
+    assert place_call[1]["quantity"] == "0.0200", place_call[1]
+    assert abs(state.positions["SPY"].shares - 0.02) < 1e-6
 
 
 def test_blocking_review_alert_skips_order():
