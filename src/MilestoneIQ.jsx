@@ -1336,7 +1336,15 @@ function ImportModal({ school, onClose, onImport }) {
         if (!rows.length) throw new Error("No player rows found in the spreadsheet");
         setPreview({ headers, rows });
       } else {
-        setPreview(parseCSV(await file.text()));
+        const text = await file.text();
+        // GameChanger/softball exports stack Batting/Pitching/Fielding sections with a section row above the
+        // real headers, split the name into Last/First, and reuse abbreviations — a flat parse mis-reads them.
+        // Detect + map explicitly (already canonical, so the column-mapper shows nothing to map); else fall back.
+        const gc = parseGameChangerCSV(text, school.sport);
+        if (gc) {
+          const statKeys = [...new Set(gc.flatMap((r) => Object.keys(r.stats)))];
+          setPreview({ headers: ["Name", ...statKeys], rows: gc.map((r) => ({ Name: r.name, ...r.stats })) });
+        } else setPreview(parseCSV(text));
       }
     } catch (err) { setError(err.message || String(err)); }
   };
@@ -2842,6 +2850,92 @@ function remapSeasonStats(stats, valid, sport) {
   }
   return out;
 }
+
+// Quote-aware CSV/TSV splitter → array of rows (each an array of cell strings). Handles fields wrapped in
+// "double quotes" with embedded delimiters/newlines and escaped "" quotes — GameChanger quotes every cell
+// and its glossary row has commas inside quotes, so a naive line.split(",") corrupts it.
+function splitCSVRows(text) {
+  const s = String(text).replace(/\r\n?/g, "\n");
+  const delim = (s.match(/\t/g) || []).length > (s.match(/,/g) || []).length ? "\t" : ",";
+  const rows = []; let row = [], field = "", inQ = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// GameChanger (baseball/softball) exports stack Batting / Pitching / Fielding sections side-by-side with a
+// SECTION-LABEL row sitting above the real header row, split the player name into Last + First columns, and
+// REPEAT abbreviations across sections ("H" = hits in Batting but hits-allowed in Pitching; "2B"/"SF"/"SB"
+// mean innings-at-position in Fielding). A flat header parse mis-reads all of that — so we map each column by
+// (section, abbreviation) to the exact stat name we store, and skip everything we don't track. Section-qualified
+// keys also resolve the collisions (we take batting H/R/BB/HR but pitching SO, etc.).
+const GC_BASEBALL_MAP = {
+  "Batting|GP": "Games Played", "Batting|PA": "Plate Appearances", "Batting|AB": "At Bats", "Batting|H": "Hits",
+  "Batting|2B": "Doubles", "Batting|3B": "Triples", "Batting|HR": "Home Runs", "Batting|R": "Runs", "Batting|RBI": "RBIs",
+  "Batting|SB": "Stolen Base", "Batting|SF": "Sacrifice Fly", "Batting|SAC": "Sacrifice Bunt", "Batting|BB": "Walk (BB)",
+  "Batting|HBP": "Hit By Pitch", "Batting|ROE": "Reached on Error",
+  "Pitching|IP": "Innings Pitched", "Pitching|GP": "Pitcher Appearances", "Pitching|GS": "Pitcher Games Started",
+  "Pitching|BF": "Batters Faced", "Pitching|#P": "# of Pitches", "Pitching|W": "Pitcher Wins", "Pitching|SV": "Pitcher Saves",
+  "Pitching|ER": "Earned Runs", "Pitching|SO": "Pitcher Strikeouts",
+  "Fielding|TC": "Total Chances", "Fielding|A": "Assists", "Fielding|PO": "Put Outs", "Fielding|DP": "Double Plays", "Fielding|TP": "Triple Plays",
+};
+// Parse a GameChanger-style sectioned export → [{ name, number, stats }] with our canonical stat names,
+// or null if the file isn't that format (so callers fall back to their generic flat parse).
+function parseGameChangerCSV(text, sport) {
+  const sp = String(sport || "").replace(/_(boys|girls)$/, "");
+  if (sp !== "baseball" && sp !== "softball") return null;
+  const rows = splitCSVRows(text);
+  if (rows.length < 3) return null;
+  // The section-label row is mostly empty and contains Batting/Pitching/Fielding; it sits in the first few rows.
+  let secIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    const r = rows[i].map((c) => (c || "").trim());
+    const hasSec = r.includes("Batting") || r.includes("Pitching") || r.includes("Fielding");
+    if (hasSec && r.filter((c) => c !== "").length <= Math.max(5, r.length * 0.25)) { secIdx = i; break; }
+  }
+  if (secIdx < 0) return null;
+  let hdrIdx = secIdx + 1; // header = the next row with several filled cells
+  while (hdrIdx < rows.length && rows[hdrIdx].filter((c) => (c || "").trim() !== "").length < 3) hdrIdx++;
+  if (hdrIdx >= rows.length) return null;
+  const sec = []; let cur = ""; // forward-fill the section label across each section's columns
+  rows[secIdx].forEach((c, i) => { const v = (c || "").trim(); if (v) cur = v; sec[i] = cur; });
+  const hdr = rows[hdrIdx].map((c) => (c || "").trim());
+  const lastIdx = hdr.findIndex((h) => /^last$/i.test(h));
+  const firstIdx = hdr.findIndex((h) => /^first$/i.test(h));
+  const nameIdx = hdr.findIndex((h) => /^(name|player)$/i.test(h));
+  const numIdx = hdr.findIndex((h) => /^(number|#|no\.?|jersey)$/i.test(h));
+  const skip = /^(totals?|glossary)$/i; // GameChanger appends a Totals row + a Glossary row
+  const out = [];
+  for (let r = hdrIdx + 1; r < rows.length; r++) {
+    const vals = rows[r];
+    if (!vals || vals.every((c) => (c || "").trim() === "")) continue;
+    const numRaw = numIdx >= 0 ? (vals[numIdx] || "").trim() : "";
+    let name = nameIdx >= 0 ? (vals[nameIdx] || "").trim()
+      : `${firstIdx >= 0 ? (vals[firstIdx] || "").trim() : ""} ${lastIdx >= 0 ? (vals[lastIdx] || "").trim() : ""}`.trim();
+    if (!name || skip.test(name) || skip.test(numRaw)) continue;
+    const stats = {};
+    for (let i = 0; i < hdr.length; i++) {
+      if (i === lastIdx || i === firstIdx || i === nameIdx || i === numIdx) continue;
+      const key = GC_BASEBALL_MAP[`${sec[i]}|${hdr[i]}`];
+      if (!key) continue;
+      const raw = (vals[i] || "").trim();
+      if (raw === "" || raw === "-") continue;
+      const n = Number(raw);
+      if (!isNaN(n) && n !== 0) stats[key] = n; // 0 == absent for counting stats; skip (matches handleImport)
+    }
+    out.push({ name, number: numRaw && !skip.test(numRaw) ? numRaw : null, stats });
+  }
+  return out.length ? out : null;
+}
 // Match the stat sheet's abbreviated names ("A. Terpstra") to the roster's full names
 // ("Alex Terpstra") by last name + first initial; keep the fuller name as canonical.
 function seasonNameKey(name) {
@@ -3168,10 +3262,11 @@ function ImportSeasons({ school, roster = [] }) {
             arr.push({ name, number, stats: remapSeasonStats(_norm, seasonValid, school.sport) });
           }
         }
-        // Flat one-season exports (Hudl / GameChanger CSV·TXT, or any flat player×stat sheet): each
-        // file = ONE season. Season from the filename, else a single shared prompt. Delimiter is auto-
-        // detected (tab for .txt, comma for .csv). Columns run through the SAME sport-aware mapping as
-        // the PDF path (remapSeasonStats), so "PTS"→Points etc., and unknown columns are dropped.
+        // One-season flat exports: GameChanger/softball sectioned CSVs go through the section-aware parser
+        // (Batting/Pitching/Fielding + split Last/First names + Totals/Glossary rows); anything else is a
+        // simple one-header-row table (Hudl, etc.), delimiter auto-detected (tab for .txt, comma for .csv).
+        // Either way each FILE = ONE season (filename, else a single shared prompt), columns run through the
+        // SAME sport-aware mapping as the PDF path (remapSeasonStats), and unknown columns are dropped.
         for (const f of flatFiles) {
           let season = seasonFromFilename(f.name);
           if (!season) {
@@ -3182,13 +3277,18 @@ function ImportSeasons({ school, roster = [] }) {
           setMsg(`Reading ${f.name}…`);
           let text = "";
           try { text = await f.text(); } catch (e2) { errs.push(`${f.name}: could not read file`); continue; }
+          const arr = (rawBySeason[season] = rawBySeason[season] || []);
+          const gc = parseGameChangerCSV(text, school.sport);
+          if (gc) {
+            for (const rec of gc) arr.push({ name: rec.name, number: rec.number, stats: remapSeasonStats(rec.stats, seasonValid, school.sport) });
+            continue;
+          }
           const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter((l) => l.trim());
           if (lines.length < 2) { errs.push(`${f.name}: no player rows`); continue; }
           const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ",";
           const hdr = lines[0].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
           const nameIdx = hdr.findIndex((h) => /^name$/i.test(h.trim()) || /player.?name|^player$|athlete/i.test(h));
           const numIdx = hdr.findIndex((h) => /^(#|no\.?|num(ber)?|jersey)$/i.test(h.trim()));
-          const arr = (rawBySeason[season] = rawBySeason[season] || []);
           for (const line of lines.slice(1)) {
             const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
             const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
