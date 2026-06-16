@@ -3440,7 +3440,7 @@ function ImportSeasons({ school, roster = [] }) {
   );
 }
 
-function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [], allSchools = [], onImportCareer }) {
+function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [], allSchools = [] }) {
   const ALL_STATS = statsToDisplay(roster, school?.sport);
   // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
   // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
@@ -3464,16 +3464,11 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   const addPlayerBtn = (school && onUpdate) ? (
     <button onClick={() => setShowAdd(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>+ Add player</button>
   ) : null;
-  // Career-stats import (MaxPreps PDF + Hudl/GameChanger CSV·TXT) — same dialog as the Athletes tab,
-  // surfaced here too since the All-Time roster is what career imports feed.
-  const importCareerBtn = (school && onUpdate && onImportCareer) ? (
-    <button onClick={onImportCareer} style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>↑ Import (MaxPreps · Hudl · GameChanger)</button>
-  ) : null;
 
   if (!roster.length) return (
     <div>
       {addPlayerModal}
-      {school && school.id && <div style={{ marginBottom:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center" }}><ImportSeasons school={school} roster={roster} />{importCareerBtn}{addPlayerBtn}</div>}
+      {school && school.id && <div style={{ marginBottom:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center" }}><ImportSeasons school={school} roster={roster} />{addPlayerBtn}</div>}
       <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",border:"2px dashed #e5e7eb",borderRadius:12}}>
         No all-time roster data yet — use <strong>Import season stats</strong> above, or <strong>+ Add player</strong> to enter one by hand.
       </div>
@@ -3593,7 +3588,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,flex:1,minWidth:160}} />
         <span style={{fontSize:13,color:"#9ca3af",whiteSpace:"nowrap"}}>{filtered.length} players</span>
       </div>
-      {school && school.id && <div style={{ marginBottom:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center" }}><ImportSeasons school={school} roster={roster} />{importCareerBtn}</div>}
+      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} roster={roster} /></div>}
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
@@ -6352,7 +6347,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
 
 
         {/* ALL-TIME TAB */}
-        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} allSeasonRows={allSeasonRows} allSchools={allSchools} onImportCareer={()=>setShowImport(true)} />}
+        {activeTab==="all-time" && <AllTimeTab roster={school.allTimeRoster||[]} athletes={school.athletes} school={school} onUpdate={onUpdate} allSeasonRows={allSeasonRows} allSchools={allSchools} />}
 
         {/* SEASONS TAB */}
         {activeTab==="seasons" && (
