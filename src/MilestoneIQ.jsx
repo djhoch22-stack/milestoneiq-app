@@ -1292,7 +1292,7 @@ function RecordsModal({ school, onClose, onSave }) {
 
 // ── CSV / PDF Upload Modal ─────────────────────────────────────────────────────
 function ImportModal({ school, onClose, onImport }) {
-  const [activeTab, setActiveTab] = useState("csv");
+  const [activeTab, setActiveTab] = useState("pdf");
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
@@ -1426,6 +1426,10 @@ function ImportModal({ school, onClose, onImport }) {
       headers: "Name,Grad Year,Games Played,Goals,Assists,Saves,Shutouts",
       example:  "Emma Schoenwald,2026,22,18,12,0,0"
     },
+    baseball: {
+      headers: "Name,Grad Year,Games Played,At Bats,Hits,Doubles,Triples,Home Runs,Runs,RBIs,Stolen Base,Walk (BB),Hit By Pitch,Innings Pitched,Earned Runs,Pitcher Strikeouts,Pitcher Wins",
+      example:  "Jake Miller,2026,28,95,38,9,2,6,31,34,12,18,3,42.0,15,55,5"
+    },
   };
   const tpl = SPORT_TEMPLATES[school.sport] || SPORT_TEMPLATES.football;
   const sampleCSV = tpl.headers + "\n" + tpl.example;
@@ -1466,7 +1470,7 @@ function ImportModal({ school, onClose, onImport }) {
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import career stats — {school.name}</h2>
-            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Import a CSV, TXT, or Excel export from GameChanger or Hudl — or let AI read a MaxPreps PDF. We auto-match the columns and let you map the rest.</p>
+            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Upload a MaxPreps stats PDF, or a CSV/TXT/Excel export from Hudl or GameChanger — we auto-match the columns and let you map the rest.</p>
           </div>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#666" }}>✕</button>
         </div>
@@ -1480,7 +1484,7 @@ function ImportModal({ school, onClose, onImport }) {
         </div>
 
         <div style={{ display:"flex",gap:0,marginBottom:20,border:"1px solid #e5e7eb",borderRadius:10,overflow:"hidden" }}>
-          {[["csv","📄 CSV / Excel"],["pdf","🤖 AI PDF import"]].map(([tab,label]) => (
+          {[["pdf","📄 MaxPreps (PDF)"],["csv","📊 Hudl / GameChanger (CSV & TXT)"]].map(([tab,label]) => (
             <button key={tab} onClick={() => { setActiveTab(tab); setError(null); setPreview(null); setPdfResult(null); }}
               style={{ flex:1,padding:"10px",fontSize:13,fontWeight:activeTab===tab?700:400,cursor:"pointer",border:"none",
                 background:activeTab===tab?"#1a56db":"#f9fafb", color:activeTab===tab?"#fff":"#6b7280" }}>
@@ -1553,7 +1557,7 @@ function ImportModal({ school, onClose, onImport }) {
             <details style={{ marginTop:10 }}>
               <summary style={{ fontSize:13,color:"#6b7280",cursor:"pointer",userSelect:"none" }}>📥 How to export from MaxPreps, GameChanger or Hudl</summary>
               <div style={{ fontSize:12,color:"#374151",marginTop:8,lineHeight:1.7,background:"#f9fafb",borderRadius:8,padding:"10px 12px" }}>
-                <div><b>MaxPreps:</b> no CSV export — save/print the stats page as a <b>PDF</b>, then use the 🤖 AI PDF import tab above.</div>
+                <div><b>MaxPreps:</b> no CSV export — save/print the stats page as a <b>PDF</b>, then use the <b>📄 MaxPreps (PDF)</b> tab above.</div>
                 <div><b>GameChanger:</b> team → <b>Stats</b> → <b>Export</b> → drop the <b>CSV or TXT</b> here.</div>
                 <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → Export → drop the <b>CSV or TXT</b> here.</div>
                 <div style={{ marginTop:6,color:"#6b7280" }}>Drop the file above — known columns auto-match, and you map the rest.</div>
@@ -2111,7 +2115,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls"];
+const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
