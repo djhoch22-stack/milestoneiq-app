@@ -3061,7 +3061,7 @@ function ImportHelpModal({ sport, onClose }) {
           <div style={{ fontSize: 18, fontWeight: 700, color: "#111" }}>📥 How to import your stats</div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>✕</button>
         </div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Upload a season's PDFs (or an Excel file) and we read the players and stats automatically.</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Upload a season's PDFs, a Hudl / GameChanger CSV or TXT export, or an Excel file — we read the players and stats automatically.</div>
 
         <div style={{ ...block, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 14px" }}>
           <p style={tHead}>⭐ The #1 tip: upload the roster AND the stat sheet together</p>
@@ -3077,6 +3077,7 @@ function ImportHelpModal({ sport, onClose }) {
           <p style={tHead}>📄 What you can upload</p>
           <ul style={ul}>
             <li style={tBody}><strong>PDF stat sheets</strong> — MaxPreps printouts work great; our AI reads them.</li>
+            <li style={tBody}><strong>Hudl / GameChanger CSV or TXT</strong> — export one season's stats and upload the file; we auto-match the columns to your sport (one file = one season).</li>
             <li style={tBody}><strong>PDF rosters</strong> — jersey #, full name, position.</li>
             <li style={tBody}><strong>Excel template</strong> — click <strong>Download template</strong> to type stats in by hand.</li>
           </ul>
@@ -3121,11 +3122,14 @@ function ImportSeasons({ school, roster = [] }) {
     if (!school || !school.id) { setMsg("Open a saved program first."); return; }
     const xlsxFiles = files.filter((f) => /\.(xlsx|xls)$/i.test(f.name));
     const pdfFiles = files.filter((f) => /\.pdf$/i.test(f.name));
+    const flatFiles = files.filter((f) => /\.(csv|tsv|txt)$/i.test(f.name)); // flat one-season exports (Hudl/GameChanger)
     setBusy(true);
     try {
       // PDFs: each file is ONE season's roster → AI-extract, then replace just that season
       // (other seasons untouched). Season comes from the filename, else we ask.
-      if (pdfFiles.length) {
+      // Flat CSV/TXT exports (Hudl / GameChanger) take the SAME per-season path below — they skip the
+      // AI step and parse the table directly, then feed the shared reconcile + merge that PDFs use.
+      if (pdfFiles.length || flatFiles.length) {
         const seasonValid = new Set([
           ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
           ...(SPORTS[school.sport]?.statCategories || []).map((s) => s.name), // sport record stats (soccer: Goals/Assists/Saves/Shutouts)
@@ -3164,8 +3168,43 @@ function ImportSeasons({ school, roster = [] }) {
             arr.push({ name, number, stats: remapSeasonStats(_norm, seasonValid, school.sport) });
           }
         }
+        // Flat one-season exports (Hudl / GameChanger CSV·TXT, or any flat player×stat sheet): each
+        // file = ONE season. Season from the filename, else a single shared prompt. Delimiter is auto-
+        // detected (tab for .txt, comma for .csv). Columns run through the SAME sport-aware mapping as
+        // the PDF path (remapSeasonStats), so "PTS"→Points etc., and unknown columns are dropped.
+        for (const f of flatFiles) {
+          let season = seasonFromFilename(f.name);
+          if (!season) {
+            if (!shared) shared = (window.prompt("What season are these stats for? (e.g. 2011-2012)") || "").trim();
+            season = shared;
+          }
+          if (!season) { errs.push(`${f.name}: no season given`); continue; }
+          setMsg(`Reading ${f.name}…`);
+          let text = "";
+          try { text = await f.text(); } catch (e2) { errs.push(`${f.name}: could not read file`); continue; }
+          const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter((l) => l.trim());
+          if (lines.length < 2) { errs.push(`${f.name}: no player rows`); continue; }
+          const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ",";
+          const hdr = lines[0].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
+          const nameIdx = hdr.findIndex((h) => /^name$/i.test(h.trim()) || /player.?name|^player$|athlete/i.test(h));
+          const numIdx = hdr.findIndex((h) => /^(#|no\.?|num(ber)?|jersey)$/i.test(h.trim()));
+          const arr = (rawBySeason[season] = rawBySeason[season] || []);
+          for (const line of lines.slice(1)) {
+            const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
+            const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
+            if (!name) continue;
+            const number = (numIdx >= 0 && String(vals[numIdx] || "").trim() !== "") ? String(vals[numIdx]).trim() : null;
+            const raw = {};
+            hdr.forEach((h, i) => {
+              if (i === nameIdx || i === numIdx || !h) return;
+              const v = vals[i]; if (v === "" || v == null) return;
+              const n = Number(v); if (!isNaN(n)) raw[h] = n;
+            });
+            arr.push({ name, number, stats: remapSeasonStats(raw, seasonValid, school.sport) });
+          }
+        }
         const seasons = Object.keys(rawBySeason);
-        if (!seasons.length) { setBusy(false); setMsg("No season stats found in those PDFs." + (errs.length ? " " + errs[0] : "")); return; }
+        if (!seasons.length) { setBusy(false); setMsg("No season stats found in those files." + (errs.length ? " " + errs[0] : "")); return; }
         // Reconcile each season: merge roster (full names) + stat sheet (abbreviated) into one
         // row per player, using jersey number to keep same-name players (siblings) separate.
         // Full-name roster of everyone already in the program (all-time + active), so abbreviated stat-sheet
@@ -3285,8 +3324,8 @@ function ImportSeasons({ school, roster = [] }) {
     <>
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
-        {busy ? "Working…" : "📥 Import season stats (.xlsx or PDF)"}
-        <input type="file" accept=".xlsx,.xls,.pdf" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
+        {busy ? "Working…" : "📥 Import season stats (MaxPreps · Hudl · GameChanger)"}
+        <input type="file" accept=".xlsx,.xls,.pdf,.csv,.tsv,.txt" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
       <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
       <button onClick={() => setShowHelp(true)} style={{ background: "none", border: "none", color: "#1a56db", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textDecoration: "underline", padding: "8px 2px" }}>❓ How to import</button>
