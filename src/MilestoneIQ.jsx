@@ -3468,7 +3468,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   if (!roster.length) return (
     <div>
       {addPlayerModal}
-      {school && school.id && <div style={{ marginBottom:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center" }}><ImportSeasons school={school} roster={roster} />{addPlayerBtn}</div>}
+      {school && school.id && addPlayerBtn && <div style={{ marginBottom:12 }}>{addPlayerBtn}</div>}
       <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",border:"2px dashed #e5e7eb",borderRadius:12}}>
         No all-time roster data yet — use <strong>Import season stats</strong> above, or <strong>+ Add player</strong> to enter one by hand.
       </div>
@@ -3588,7 +3588,6 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
           style={{border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 12px",fontSize:13,flex:1,minWidth:160}} />
         <span style={{fontSize:13,color:"#9ca3af",whiteSpace:"nowrap"}}>{filtered.length} players</span>
       </div>
-      {school && school.id && <div style={{ marginBottom:12 }}><ImportSeasons school={school} roster={roster} /></div>}
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
           <thead>
@@ -5515,7 +5514,6 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(() => { try { return sessionStorage.getItem("mq_dash_tab") || "overview"; } catch (e) { return "overview"; } });
   useEffect(() => { try { sessionStorage.setItem("mq_dash_tab", activeTab); } catch (e) {} }, [activeTab]);
-  const [showImport, setShowImport] = useState(false);
   const [showAddAthlete, setShowAddAthlete] = useState(false);
   const [showRecords, setShowRecords] = useState(false);
   const [showRecMins, setShowRecMins] = useState(false);
@@ -5651,7 +5649,6 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
 
   return (
     <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
-      {showImport && <ImportModal school={school} onClose={()=>setShowImport(false)} onImport={handleImport} />}
       {showAddAthlete && <AddAthleteModal onClose={()=>setShowAddAthlete(false)} sport={school.sport} existingNames={[...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name)} onAdd={a=>{ const upd = withAddedPlayer(school, a); if (upd) onUpdate(upd); }} />}
       {showRecords && <RecordsModal school={school} onClose={()=>setShowRecords(false)} onSave={recs=>onUpdate({...school,records:recs})} />}
       {showRecMins && <RecordMinimumsModal school={school} onClose={()=>setShowRecMins(false)} onSave={mins=>onUpdate({...school, recordMins: mins})} />}
@@ -5697,6 +5694,13 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
       </div>
 
       <div style={{ padding: isMobile ? 14 : 24 }}>
+
+        {/* Season-stats import — a mainstay on every tab (xlsx · csv · txt · pdf; MaxPreps / Hudl / GameChanger). */}
+        {school && school.id && (
+          <div style={{ marginBottom: isMobile ? 14 : 20 }}>
+            <ImportSeasons school={school} roster={school.allTimeRoster || []} />
+          </div>
+        )}
 
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
@@ -5836,7 +5840,6 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
                     );
                   })}
                 </div>
-                <button onClick={()=>setShowImport(true)} style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:8,padding:"8px 14px",fontSize:13,cursor:"pointer" }}>↑ Import</button>
                 <button onClick={()=>setShowAddAthlete(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add player</button>
               </div>
             </div>
