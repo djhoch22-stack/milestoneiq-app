@@ -2140,7 +2140,7 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
             style={{ width:"100%",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 12px",fontSize:14 }}>
             {Object.entries(SPORTS)
               .filter(([k])=>k!=="basketball")
-              .sort((a,b)=>{ const av=AVAILABLE_SPORTS.includes(a[0]), bv=AVAILABLE_SPORTS.includes(b[0]); return av===bv?0:av?-1:1; })
+              .sort((a,b)=>{ const av=AVAILABLE_SPORTS.includes(a[0]), bv=AVAILABLE_SPORTS.includes(b[0]); if(av!==bv) return av?-1:1; return a[1].label.localeCompare(b[1].label); })
               .map(([k,v])=>{ const taken=existingSports.includes(k); const avail=AVAILABLE_SPORTS.includes(k); const ok=avail&&!taken; return <option key={k} value={k} disabled={!ok}>{v.icon} {v.label}{taken?" — already added":(avail?"":" — Coming soon")}</option>; })}
           </select>
         </div>
