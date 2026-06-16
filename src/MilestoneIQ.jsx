@@ -6556,6 +6556,274 @@ function PromoAdmin() {
 // Public school-hub slug — matches api/_lib slugify on the org name → /school/:slug
 const hubSlug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
+// ── All-sports Hall of Fame (user side only — never rendered on the public pages) ─────────────
+// One place to rank HOF candidates — players OR coaches (toggle) — across EVERY program in the org,
+// optionally filtered to a single sport (toggle), so an admin doesn't have to open each sport's HOF
+// tab. Reuses the exact same scoring + detail cards as the per-program HOF tab. Multi-sport
+// athletes/coaches are deduped to one entry (their best/combined score) with their sports shown;
+// induction edits write back to the candidate's home program (recognized across linkable sports).
+function AllSportsHof({ schools = [], onUpdate }) {
+  const [view, setView] = useState("athletes");        // athletes | coaches
+  const [sportFilter, setSportFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selPlayer, setSelPlayer] = useState(null);
+  const [selCoach, setSelCoach] = useState(null);
+  const [awardsByProgram, setAwardsByProgram] = useState({});
+  const [seasonRowsByProgram, setSeasonRowsByProgram] = useState({}); // lazy: season rows for a clicked player's program
+  const idsKey = (schools || []).map(s => s.id).join(",");
+
+  // Load every program's awards once (player all-league/all-state + coach COY feed the scores).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all((schools || []).map(async (p) => {
+        if (!p.id) return [p.id, []];
+        try { const { data } = await getAwards(p.id); return [p.id, (data || []).map(a => ({ ...a, _sport: p.sport, _team: SPORTS[p.sport]?.label || p.name || "Team" }))]; }
+        catch (e) { return [p.id, []]; }
+      }));
+      if (!cancelled) setAwardsByProgram(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mergedAwards = useMemo(() => Object.values(awardsByProgram).flat(), [awardsByProgram]);
+  const sportsPresent = useMemo(() => [...new Set((schools || []).map(s => s.sport))], [idsKey]); // eslint-disable-line
+  const scoped = useMemo(() => sportFilter === "all" ? schools : (schools || []).filter(s => s.sport === sportFilter), [sportFilter, schools]);
+
+  // Induction map (gender-aware) so a "confirmed" badge reflects induction in ANY linkable sport.
+  const inducted = useMemo(() => {
+    const m = new Map();
+    (schools || []).forEach(s => (s.allTimeRoster || []).forEach(pl => {
+      if (!pl.schoolHallOfFame && !pl.stateHallOfFame) return;
+      const nm = normName(pl.name); const e = m.get(nm) || { school: new Set(), state: new Set() };
+      if (pl.schoolHallOfFame) e.school.add(s.sport);
+      if (pl.stateHallOfFame) e.state.add(s.sport);
+      m.set(nm, e);
+    }));
+    return m;
+  }, [schools]);
+
+  // ATHLETES: score each roster entry in scope, dedupe multi-sport athletes to their best score.
+  const players = useMemo(() => {
+    const byName = new Map();
+    for (const p of scoped) {
+      const names = (p.allTimeRoster || []).map(x => x.name);
+      for (const player of (p.allTimeRoster || [])) {
+        try {
+          const ab = playerAwardBonus(player.name, mergedAwards, names);
+          const programScore = Math.min(calcProgramHofScore(player, p) + ab, 100);
+          const cross = (schools.length > 1) ? calcCrossSportScore(player.name, schools, p.sport) : null;
+          const finalScore = cross ? Math.min(cross.finalScore + ab, 100) : programScore;
+          const nm = normName(player.name);
+          const ind = inducted.get(nm);
+          const linkOK = (set) => set && [...set].some(sp => sportsLinkable(p.sport, sp));
+          const confirmed = !!ind && (linkOK(ind.school) || linkOK(ind.state));
+          const xState = !!ind && linkOK(ind.state);
+          const entry = { player, program: p, programScore, crossSport: cross?.crossSport || false, allScores: cross?.allScores || [], finalScore, confirmed, xState, sport: p.sport };
+          const prev = byName.get(nm);
+          if (!prev || entry.finalScore > prev.finalScore) byName.set(nm, entry);
+        } catch (e) {}
+      }
+    }
+    let arr = [...byName.values()];
+    if (search) arr = arr.filter(e => e.player.name.toLowerCase().includes(search.toLowerCase()));
+    return arr.sort((a, b) => b.finalScore - a.finalScore);
+  }, [scoped, mergedAwards, schools, inducted, search]); // eslint-disable-line
+
+  // COACHES: aggregate each coach's record across all in-scope programs (cross-sport), then rank.
+  const coaches = useMemo(() => {
+    const combined = scoped.flatMap(p => (p.seasons || []).map(s => ({ ...s, _team: SPORTS[p.sport]?.label || p.name || "Team" })));
+    const prior = Object.assign({}, ...scoped.map(p => p.coachPrior || {}));
+    const all = buildCoachStats(combined, { includePrior: true, prior });
+    const names = all.map(c => c.name);
+    const inductedC = new Set();
+    (schools || []).forEach(p => Object.keys(p.coachHof || {}).forEach(n => { if ((p.coachHof || {})[n]) inductedC.add(normName(n)); }));
+    let arr = all.map(coach => {
+      const ab = coachAwardBonus(coach.name, mergedAwards, names);
+      const coyCount = awardsForHolder(coach.name, "coach", mergedAwards, names).length;
+      return { ...coach, score: Math.min(calcCoachHofScore(coach, all) + ab, 100), coyCount, confirmed: inductedC.has(normName(coach.name)) };
+    });
+    if (search) arr = arr.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+    return { list: arr.sort((a, b) => b.score - a.score), combined };
+  }, [scoped, mergedAwards, schools, search]); // eslint-disable-line
+
+  const coachAwardsBySport = useMemo(() => {
+    const m = {};
+    mergedAwards.forEach(a => { if (a.scope !== "coach") return; const k = normName(a.holder_name) + "|" + (a._team || ""); (m[k] = m[k] || []).push(a); });
+    return m;
+  }, [mergedAwards]);
+
+  // Induction edits write back to the candidate's HOME program (the union logic recognizes it everywhere).
+  const togglePlayer = (player, type) => {
+    const program = selPlayer && selPlayer.program; if (!program) return;
+    const key = type === "state" ? "stateHallOfFame" : "schoolHallOfFame";
+    const updated = (program.allTimeRoster || []).map(p => {
+      if (p.id !== player.id) return p;
+      const on = !p[key]; const np = { ...p, [key]: on };
+      if (on && !np.hofYear) np.hofYear = new Date().getFullYear();
+      return np;
+    });
+    onUpdate({ ...program, allTimeRoster: updated });
+  };
+  const coachHomeProgram = (coachName) => {
+    let best = (schools || [])[0], bestN = -1;
+    for (const p of (schools || [])) { const n = (p.seasons || []).filter(s => normName(s.coach) === normName(coachName)).length; if (n > bestN) { bestN = n; best = p; } }
+    return best;
+  };
+  const toggleCoach = (coachName) => {
+    const p = coachHomeProgram(coachName); if (!p) return;
+    const ch = { ...(p.coachHof || {}) };
+    if (ch[coachName]) delete ch[coachName]; else ch[coachName] = new Date().getFullYear();
+    onUpdate({ ...p, coachHof: ch });
+  };
+  const openPlayer = async (entry) => {
+    setSelPlayer(entry);
+    const pid = entry.program && entry.program.id;
+    if (pid && !seasonRowsByProgram[pid]) {
+      try { const { data } = await getAllPlayerSeasons(pid); setSeasonRowsByProgram(m => ({ ...m, [pid]: data || [] })); } catch (e) {}
+    }
+  };
+
+  const list = view === "athletes" ? players : coaches.list;
+  const shown = list.slice(0, page * 25);
+  const confCount = view === "athletes" ? players.filter(p => p.confirmed).length : coaches.list.filter(c => c.confirmed).length;
+  const tabBtn = (active, label, on) => (
+    <button onClick={on} style={{ padding:"8px 16px", fontSize:13, border:"none", cursor:"pointer", fontWeight: active?700:400, background: active?"#1a3a6b":"#fff", color: active?"#fff":"#6b7280" }}>{label}</button>
+  );
+
+  return (
+    <div style={{ padding:24 }}>
+      <div style={{ marginBottom:8 }}>
+        <h1 style={{ margin:0, fontSize:28, fontWeight:700, color:"#111" }}>🏛️ Hall of Fame</h1>
+        <p style={{ margin:"4px 0 0", fontSize:14, color:"#6b7280" }}>
+          All {view==="athletes"?"athletes":"coaches"} across {sportFilter==="all" ? `${schools.length} program${schools.length!==1?"s":""}` : (SPORTS[sportFilter]?.label || sportFilter)} · {confCount} inducted · {list.length} rated
+        </p>
+      </div>
+
+      <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+        <div style={{ display:"flex", border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden" }}>
+          {tabBtn(view==="athletes","👤 Athletes",()=>{ setView("athletes"); setPage(1); })}
+          {tabBtn(view==="coaches","🎓 Coaches",()=>{ setView("coaches"); setPage(1); })}
+        </div>
+        <select value={sportFilter} onChange={e=>{ setSportFilter(e.target.value); setPage(1); }}
+          title="Filter to one sport, or rank across all of them"
+          style={{ border:"1px solid #e5e7eb", borderRadius:8, padding:"8px 12px", fontSize:13, background:"#fff" }}>
+          <option value="all">🏟️ All sports</option>
+          {sportsPresent.map(sp => <option key={sp} value={sp}>{SPORTS[sp]?.icon || ""} {SPORTS[sp]?.label || sp}</option>)}
+        </select>
+        <input value={search} onChange={e=>{ setSearch(e.target.value); setPage(1); }} placeholder={`Search ${view==="athletes"?"player":"coach"}...`}
+          style={{ border:"1px solid #e5e7eb", borderRadius:8, padding:"8px 12px", fontSize:13, flex:1, minWidth:160 }} />
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {view==="athletes" && shown.map((entry, i) => {
+          const { player, finalScore, confirmed, xState, crossSport, allScores } = entry;
+          const tier = hofTier(finalScore);
+          return (
+            <div key={player.id + "|" + entry.program.id} onClick={()=>openPlayer(entry)}
+              style={{ background:"#fff", borderRadius:12, border:`1px solid ${confirmed?"#c4b5fd":"#e8e4dd"}`, padding:"12px 16px", cursor:"pointer", boxShadow: confirmed?"0 0 0 2px #7c3aed22":"none" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:28, textAlign:"center", fontSize:13, fontWeight:700, color:"#9ca3af", flexShrink:0 }}>{i+1}</div>
+                <div style={{ width:48, height:48, borderRadius:"50%", background:tier.bg, border:`2px solid ${tier.border}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <div style={{ fontSize:15, fontWeight:800, color:tier.color, lineHeight:1 }}>{finalScore}</div>
+                  <div style={{ fontSize:7, fontWeight:700, color:tier.color, textTransform:"uppercase" }}>{tier.label}</div>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                    <span style={{ fontWeight:700, fontSize:14, color:"#111" }}>{player.name}</span>
+                    {confirmed && <span style={{ fontSize:11 }}>🏛️</span>}
+                    {xState && <span style={{ fontSize:11 }}>⭐</span>}
+                    <span style={{ background:"#eef2ff", color:"#3730a3", borderRadius:4, padding:"1px 6px", fontSize:10, fontWeight:700 }}>{SPORTS[entry.sport]?.icon||""} {SPORTS[entry.sport]?.label||entry.sport}</span>
+                    {crossSport && <span style={{ background:"#fef3c7", color:"#92400e", borderRadius:4, padding:"1px 6px", fontSize:10, fontWeight:700 }}>Multi-sport</span>}
+                  </div>
+                  <div style={{ fontSize:12, color:"#9ca3af", marginTop:2 }}>
+                    {player.firstYear && player.lastYear ? (player.firstYear===player.lastYear?player.firstYear:`${player.firstYear} – ${player.lastYear}`) : (player.gradYear?`Class of ${player.gradYear}`:"")}
+                    {crossSport && allScores.length>1 && <span style={{ marginLeft:8 }}>{allScores.map(s=>`${SPORTS[s.school.sport]?.icon||""} ${s.score}`).join("  ·  ")}</span>}
+                  </div>
+                </div>
+                <div style={{ width:90, flexShrink:0 }}>
+                  <div style={{ height:6, background:"#f0f0ee", borderRadius:3, overflow:"hidden" }}>
+                    <div style={{ width:`${finalScore}%`, height:"100%", background:tier.color, borderRadius:3 }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {view==="coaches" && shown.map((coach, i) => {
+          const tier = coachHofTier(coach.score);
+          const winPct = (coach.wins+coach.losses+(coach.ties||0))>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
+          return (
+            <div key={coach.name} onClick={()=>setSelCoach(coach)}
+              style={{ background:"#fff", borderRadius:12, border:`1px solid ${coach.confirmed?"#c4b5fd":"#e8e4dd"}`, padding:"12px 16px", cursor:"pointer", boxShadow: coach.confirmed?"0 0 0 2px #7c3aed22":"none" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ width:28, textAlign:"center", fontSize:13, fontWeight:700, color:"#9ca3af", flexShrink:0 }}>{i+1}</div>
+                <div style={{ width:48, height:48, borderRadius:"50%", background:tier.bg, border:`2px solid ${tier.border}`, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:tier.color, lineHeight:1 }}>{coach.score}</div>
+                  <div style={{ fontSize:7, fontWeight:700, color:tier.color, textTransform:"uppercase" }}>{tier.label}</div>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontWeight:700, fontSize:14, color:"#111" }}>{coach.name}</span>
+                    {coach.confirmed && <span style={{ fontSize:11 }}>🏛️</span>}
+                  </div>
+                  <div style={{ fontSize:11, color:"#9ca3af", marginTop:1, display:"flex", gap:10, flexWrap:"wrap" }}>
+                    <span>{coach.seasons} seasons</span>
+                    <span>{coach.wins}W–{coach.losses}L{coach.ties?`–${coach.ties}T`:""} ({winPct}%)</span>
+                    {coach.stateChamps>0 && <span style={{ color:"#b45309", fontWeight:600 }}>🏆 {coach.stateChamps} state</span>}
+                    {coach.leagueChamps>0 && <span style={{ color:"#1d4ed8", fontWeight:600 }}>🎖 {coach.leagueChamps} league</span>}
+                    {coach.coyCount>0 && <span style={{ color:"#6b21a8", fontWeight:600 }}>🏅 {coach.coyCount} COY</span>}
+                    {coach.teams && coach.teams.size>1 && <span style={{ color:"#0e7490", fontWeight:600 }}>🔗 {coach.teams.size} teams</span>}
+                  </div>
+                </div>
+                <div style={{ width:90, flexShrink:0 }}>
+                  <div style={{ height:6, background:"#f0f0ee", borderRadius:3, overflow:"hidden" }}>
+                    <div style={{ width:`${coach.score}%`, height:"100%", background:tier.color, borderRadius:3 }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {list.length===0 && <div style={{ padding:40, textAlign:"center", color:"#9ca3af" }}>No {view==="athletes"?"players":"coaches"} to rank yet{sportFilter!=="all"?" for this sport":""}.</div>}
+      </div>
+
+      {list.length > page*25 && (
+        <button onClick={()=>setPage(p=>p+1)} style={{ width:"100%", marginTop:10, padding:"10px 0", background:"#f9fafb", border:"1px solid #e5e7eb", borderRadius:10, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer" }}>
+          Load more ({list.length - page*25} remaining)
+        </button>
+      )}
+
+      {selPlayer && (
+        <HofDetailModal
+          {...selPlayer}
+          school={selPlayer.program}
+          allSchools={schools}
+          awards={mergedAwards}
+          allSeasonRows={seasonRowsByProgram[selPlayer.program && selPlayer.program.id] || []}
+          onClose={()=>setSelPlayer(null)}
+          onToggle={togglePlayer}
+        />
+      )}
+      {selCoach && (
+        <CoachHofModal
+          coach={selCoach}
+          school={{ ...(coachHomeProgram(selCoach.name) || (schools || [])[0] || {}), seasons: coaches.combined }}
+          allCoaches={coaches.list}
+          awards={mergedAwards}
+          awardsBySport={coachAwardsBySport}
+          confirmed={selCoach.confirmed}
+          onClose={()=>setSelCoach(null)}
+          onToggle={()=>{ toggleCoach(selCoach.name); setSelCoach(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
@@ -6858,7 +7126,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
             <span style={{ color:"#fff",fontWeight:700,fontSize:18,fontFamily:"Crimson Pro,serif" }}>RaftersIQ</span>
           </div>
           <div style={{ display:"flex",gap:0,marginLeft:16,border:"1px solid rgba(255,255,255,0.15)",borderRadius:8,overflow:"hidden" }}>
-            {[["schools","Programs"],["settings","Settings"]].map(([tab,label]) => (
+            {[["schools","Programs"],["hof","🏛️ Hall of Fame"],["settings","Settings"]].map(([tab,label]) => (
               <button key={tab} onClick={()=>setHomeTab(tab)}
                 style={{ padding:"6px 18px",fontSize:13,fontWeight:homeTab===tab?600:400,cursor:"pointer",border:"none",
                   background:homeTab===tab?"rgba(255,255,255,0.15)":"transparent",
@@ -6878,7 +7146,9 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
         </div>
       </div>
 
-      {homeTab === "settings" ? <SettingsPage /> : (
+      {homeTab === "settings" ? <SettingsPage />
+        : homeTab === "hof" ? <AllSportsHof schools={schools} onUpdate={updateSchool} />
+        : (
         <div style={{ padding:24 }}>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20 }}>
             <div>
