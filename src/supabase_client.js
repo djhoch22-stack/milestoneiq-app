@@ -107,12 +107,23 @@ export const getPrograms = async (orgId) => {
 };
 
 export const createProgram = async (orgId, programData) => {
-  const { data, error } = await supabase
-    .from('programs')
-    .insert({ org_id: orgId, ...programData })
-    .select()
-    .single();
-  return { data, error };
+  // Create via the secure RPC (inserts into the caller's OWN org server-side, so a stale/incorrect
+  // org_id from the browser can't trip the row-level security policy). Falls back to a direct insert
+  // if the function isn't deployed yet, so this is safe to ship before the SQL is run.
+  const rpc = await supabase.rpc('create_program', {
+    p_org_id: orgId,
+    p_name: programData.name,
+    p_mascot: programData.mascot ?? null,
+    p_sport: programData.sport,
+    p_primary_color: programData.primary_color ?? null,
+    p_logo_url: programData.logo_url ?? null,
+  });
+  if (!rpc.error) return { data: rpc.data, error: null };
+  if (/create_program.*does not exist|Could not find the function/i.test(rpc.error.message || '')) {
+    const { data, error } = await supabase.from('programs').insert({ org_id: orgId, ...programData }).select().single();
+    return { data, error };
+  }
+  return { data: null, error: rpc.error };
 };
 
 export const updateProgram = async (programId, updates) => {
