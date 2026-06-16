@@ -1302,11 +1302,12 @@ function ImportModal({ school, onClose, onImport }) {
   const [colMap, setColMap] = useState({}); // unrecognized CSV/Excel header → chosen stat name ("" = skip)
 
   const parseCSV = (text) => {
-    const lines = text.trim().split("\n").filter(l => l.trim());
-    if (lines.length < 2) throw new Error("CSV must have at least a header row and one data row");
-    const headers = lines[0].split(",").map(h => h.trim().replace(/"/g, ""));
+    const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter(l => l.trim());
+    if (lines.length < 2) throw new Error("File must have a header row and at least one data row");
+    const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ","; // tab for .txt (GameChanger/Hudl), comma for .csv
+    const headers = lines[0].split(delim).map(h => h.trim().replace(/"/g, ""));
     const rows = lines.slice(1).map(line => {
-      const vals = line.split(",").map(v => v.trim().replace(/"/g, ""));
+      const vals = line.split(delim).map(v => v.trim().replace(/"/g, ""));
       const obj = {};
       headers.forEach((h, i) => { obj[h] = isNaN(vals[i]) ? vals[i] : Number(vals[i]); });
       return obj;
@@ -1381,7 +1382,7 @@ function ImportModal({ school, onClose, onImport }) {
     const dropped = Array.from(e.dataTransfer.files || []);
     if (!dropped.length) return;
     const pdfs = dropped.filter(f => f.name.toLowerCase().endsWith(".pdf"));
-    const sheet = dropped.find(f => /\.(csv|xlsx|xls)$/i.test(f.name));
+    const sheet = dropped.find(f => /\.(csv|tsv|txt|xlsx|xls)$/i.test(f.name));
     if (pdfs.length) { setActiveTab("pdf"); handlePDFFiles(pdfs); }
     else if (sheet) { setActiveTab("csv"); handleCSVFile(sheet); }
     else setError("Please drop a .csv, .xlsx, or .pdf file");
@@ -1465,7 +1466,7 @@ function ImportModal({ school, onClose, onImport }) {
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
             <h2 style={{ margin:0,fontSize:18,fontWeight:700,color:"#111" }}>Import career stats — {school.name}</h2>
-            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Import a CSV/Excel export from MaxPreps, GameChanger or Hudl — or let AI read any PDF. We auto-match the columns and let you map the rest.</p>
+            <p style={{ margin:"4px 0 0",fontSize:13,color:"#666" }}>Import a CSV, TXT, or Excel export from GameChanger or Hudl — or let AI read a MaxPreps PDF. We auto-match the columns and let you map the rest.</p>
           </div>
           <button onClick={onClose} style={{ background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#666" }}>✕</button>
         </div>
@@ -1493,9 +1494,9 @@ function ImportModal({ school, onClose, onImport }) {
             <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
               style={{ border:`2px dashed ${dragOver?"#1a56db":"#ddd"}`,borderRadius:12,padding:32,textAlign:"center",background:dragOver?"#eff6ff":"#fafafa",marginBottom:16,transition:"all 0.2s" }}>
               <div style={{ fontSize:32,marginBottom:8 }}>📁</div>
-              <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your CSV or Excel file here</div>
+              <div style={{ fontWeight:600,color:"#333",marginBottom:4 }}>Drop your CSV, TXT, or Excel file here</div>
               <div style={{ fontSize:13,color:"#888",marginBottom:12 }}>or click to browse</div>
-              <input type="file" accept=".csv,.xlsx,.xls" onChange={e=>e.target.files[0]&&handleCSVFile(e.target.files[0])} style={{ display:"none" }} id="csv-input" />
+              <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={e=>e.target.files[0]&&handleCSVFile(e.target.files[0])} style={{ display:"none" }} id="csv-input" />
               <label htmlFor="csv-input" style={{ background:"#1a56db",color:"#fff",padding:"8px 20px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:600 }}>Choose file</label>
             </div>
             {preview && (
@@ -1552,9 +1553,9 @@ function ImportModal({ school, onClose, onImport }) {
             <details style={{ marginTop:10 }}>
               <summary style={{ fontSize:13,color:"#6b7280",cursor:"pointer",userSelect:"none" }}>📥 How to export from MaxPreps, GameChanger or Hudl</summary>
               <div style={{ fontSize:12,color:"#374151",marginTop:8,lineHeight:1.7,background:"#f9fafb",borderRadius:8,padding:"10px 12px" }}>
-                <div><b>MaxPreps:</b> your team → <b>Stats</b> → pick a season → <b>Export</b> (CSV/Excel).</div>
-                <div><b>GameChanger:</b> team → <b>Stats</b> → Season → <b>Export</b> → CSV.</div>
-                <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → Export → CSV.</div>
+                <div><b>MaxPreps:</b> no CSV export — save/print the stats page as a <b>PDF</b>, then use the 🤖 AI PDF import tab above.</div>
+                <div><b>GameChanger:</b> team → <b>Stats</b> → <b>Export</b> → drop the <b>CSV or TXT</b> here.</div>
+                <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → Export → drop the <b>CSV or TXT</b> here.</div>
                 <div style={{ marginTop:6,color:"#6b7280" }}>Drop the file above — known columns auto-match, and you map the rest.</div>
               </div>
             </details>
