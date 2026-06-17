@@ -1305,13 +1305,26 @@ function ImportModal({ school, onClose, onImport }) {
     const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter(l => l.trim());
     if (lines.length < 2) throw new Error("File must have a header row and at least one data row");
     const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ","; // tab for .txt (GameChanger/Hudl), comma for .csv
-    const headers = lines[0].split(delim).map(h => h.trim().replace(/"/g, ""));
-    const rows = lines.slice(1).map(line => {
+    // Hudl/GameChanger exports often put a TITLE row (e.g. "Denver Christian — 26 Games — Totals") above
+    // the real headers. Pick the header row = the row with the MOST delimited fields among the first few
+    // (title rows have 1-2; header/data rows have many). For normal files this is just row 0.
+    let hIdx = 0, best = -1;
+    for (let i = 0; i < Math.min(6, lines.length - 1); i++) {
+      const n = lines[i].split(delim).filter(c => c.trim()).length;
+      if (n > best) { best = n; hIdx = i; }
+    }
+    const rawHeaders = lines[hIdx].split(delim).map(h => h.trim().replace(/"/g, ""));
+    // Drop junk columns: blank headers + Hudl's "0" separator columns; keep only the FIRST of any
+    // duplicate header (Hudl repeats eFG%/OREB% etc.). Track each kept header's ORIGINAL column index.
+    const keep = []; const seen = new Set();
+    rawHeaders.forEach((h, i) => { const lk = h.toLowerCase(); if (!h || h === "0" || seen.has(lk)) return; seen.add(lk); keep.push({ h, i }); });
+    const headers = keep.map(k => k.h);
+    const rows = lines.slice(hIdx + 1).map(line => {
       const vals = line.split(delim).map(v => v.trim().replace(/"/g, ""));
       const obj = {};
-      headers.forEach((h, i) => { obj[h] = isNaN(vals[i]) ? vals[i] : Number(vals[i]); });
+      keep.forEach(({ h, i }) => { const v = vals[i]; obj[h] = (v == null || v === "") ? "" : (isNaN(v) ? v : Number(v)); });
       return obj;
-    });
+    }).filter(r => Object.values(r).some(v => v !== "" && v != null));
     return { headers, rows };
   };
 
@@ -1457,7 +1470,7 @@ function ImportModal({ school, onClose, onImport }) {
   };
 
   // Column mapping: meta cols, plus which CSV/Excel headers don't auto-resolve to a known stat (so the user maps them).
-  const isMetaCol = (h) => /^name$/i.test(String(h).trim()) || /player.?name/i.test(h) || /^pos(ition)?$/i.test(String(h).trim()) || /grad.?year|class.?of/i.test(h);
+  const isMetaCol = (h) => /^name$/i.test(String(h).trim()) || /^athletes?$/i.test(String(h).trim()) || /player.?name|^player$/i.test(h) || /^pos(ition)?$/i.test(String(h).trim()) || /grad.?year|class.?of/i.test(h) || /^(#|no\.?|num(ber)?|jersey)$/i.test(String(h).trim());
   const validStatList = [...new Set([
     ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
     ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})),
@@ -1567,7 +1580,7 @@ function ImportModal({ school, onClose, onImport }) {
               <div style={{ fontSize:12,color:"#374151",marginTop:8,lineHeight:1.7,background:"#f9fafb",borderRadius:8,padding:"10px 12px" }}>
                 <div><b>MaxPreps:</b> no CSV export — save/print the stats page as a <b>PDF</b>, then use the <b>📄 MaxPreps (PDF)</b> tab above.</div>
                 <div><b>GameChanger:</b> team → <b>Stats</b> → <b>Export</b> → drop the <b>CSV or TXT</b> here.</div>
-                <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → Export → drop the <b>CSV or TXT</b> here.</div>
+                <div><b>Hudl / Hudl Assist:</b> <b>Stats</b> → set the view to <b>Totals</b> (NOT <b>Averages</b> — we calculate per-game averages for you) → Export → drop the <b>CSV or TXT</b> here.</div>
                 <div style={{ marginTop:6,color:"#6b7280" }}>Drop the file above — known columns auto-match, and you map the rest.</div>
               </div>
             </details>
@@ -2797,6 +2810,7 @@ const STAT_ALIASES_BY_SPORT = {
     "reb": "Total Rebounds", "trb": "Total Rebounds", "tot reb": "Total Rebounds", "rebounds": "Total Rebounds",
     "orb": "Offensive Rebounds", "off reb": "Offensive Rebounds", "o rebounds": "Offensive Rebounds", "offensive rebounds": "Offensive Rebounds",
     "drb": "Defensive Rebounds", "def reb": "Defensive Rebounds", "def. rebounds": "Defensive Rebounds", "defensive rebounds": "Defensive Rebounds",
+    "oreb": "Offensive Rebounds", "dreb": "Defensive Rebounds", "treb": "Total Rebounds", "tot": "Total Rebounds",
     "stl": "Steals", "stls": "Steals", "steals": "Steals",
     "blk": "Blocks", "blk shts": "Blocks", "blocks": "Blocks",
     "fgm": "Field Goals Made", "fga": "Field Goals Attempted",
@@ -3171,7 +3185,7 @@ function ImportHelpModal({ sport, onClose }) {
           <p style={tHead}>📄 What you can upload</p>
           <ul style={ul}>
             <li style={tBody}><strong>PDF stat sheets</strong> — MaxPreps printouts work great; our AI reads them.</li>
-            <li style={tBody}><strong>Hudl / GameChanger CSV or TXT</strong> — export one season's stats and upload the file; we auto-match the columns to your sport (one file = one season).</li>
+            <li style={tBody}><strong>Hudl / GameChanger CSV or TXT</strong> — export one season's stats (in Hudl, set the view to <strong>Totals</strong>, NOT Averages — we calculate per-game averages for you) and upload the file; we auto-match the columns to your sport.</li>
             <li style={tBody}><strong>PDF rosters</strong> — jersey #, full name, position.</li>
             <li style={tBody}><strong>Excel template</strong> — click <strong>Download template</strong> to type stats in by hand.</li>
           </ul>
@@ -3286,10 +3300,13 @@ function ImportSeasons({ school, roster = [] }) {
           const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter((l) => l.trim());
           if (lines.length < 2) { errs.push(`${f.name}: no player rows`); continue; }
           const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ",";
-          const hdr = lines[0].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
+          // Skip a leading TITLE row (Hudl/GameChanger): header row = the one with the most fields.
+          let hIdx = 0, best = -1;
+          for (let i = 0; i < Math.min(6, lines.length - 1); i++) { const n = lines[i].split(delim).filter((c) => c.trim()).length; if (n > best) { best = n; hIdx = i; } }
+          const hdr = lines[hIdx].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
           const nameIdx = hdr.findIndex((h) => /^name$/i.test(h.trim()) || /player.?name|^player$|athlete/i.test(h));
           const numIdx = hdr.findIndex((h) => /^(#|no\.?|num(ber)?|jersey)$/i.test(h.trim()));
-          for (const line of lines.slice(1)) {
+          for (const line of lines.slice(hIdx + 1)) {
             const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
             const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
             if (!name) continue;
@@ -5613,15 +5630,20 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
   const totalAlertCount = allAlerts.reduce((a, x) => a + x.alerts.length, 0);
 
   const handleImport = (parsed) => {
-    const nameCol = parsed.headers.find(h => /^name$/i.test(h.trim()) || /player.?name/i.test(h));
+    const nameCol = parsed.headers.find(h => /^name$/i.test(h.trim()) || /^athletes?$/i.test(h.trim()) || /player.?name|^player$/i.test(h));
     const posCol  = parsed.headers.find(h => /^pos(ition)?$/i.test(h.trim()));
     const gradCol = parsed.headers.find(h => /grad.?year|class.?of/i.test(h));
     // Non-stat columns to exclude
     const metaCols = new Set([nameCol, posCol, gradCol].filter(Boolean));
     const validStats = new Set([
       ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
+      ...(SPORTS[school.sport]?.statCategories || []).filter((s) => s.name !== "Coach Wins").map((s) => s.name), // basketball/soccer/softball use statCategories, NOT groups
+      ...(DISPLAY_STATS[school.sport] || []),                              // canonical display stats for the sport
       ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})), // the program's ACTUAL stat names
     ]);
+    // Hudl basketball labels POINTS as "PF" (Points For) and personal fouls as "FOUL"; standard box scores
+    // use "PF" for fouls. Only treat PF as Points when BOTH columns exist (the Hudl signature) — never blindly.
+    const hudlPF = parsed.headers.some(h => /^pf$/i.test(String(h).trim())) && parsed.headers.some(h => /^fouls?$/i.test(String(h).trim()));
     const imported = parsed.rows.map((row, i) => {
       const name = nameCol ? String(row[nameCol]).trim() : `Athlete ${i+1}`;
       if (!name || name === "undefined") return null;
@@ -5630,7 +5652,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
         if (metaCols.has(h)) return;
         const val = row[h];
         if (typeof val !== "number" || val <= 0) return;
-        const mapped = resolveStatAlias(h, school.sport);
+        let mapped = resolveStatAlias(h, school.sport);
+        if (hudlPF && /^pf$/i.test(String(h).trim())) mapped = "Points"; // Hudl "PF" = Points For (FOUL also present)
         if (!validStats.has(mapped)) return; // only stats in our structure — no AI-invented ones
         stats[mapped] = val;
       });
