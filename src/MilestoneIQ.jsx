@@ -3322,6 +3322,9 @@ function ImportSeasons({ school, roster = [] }) {
           const hdr = lines[hIdx].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
           const nameIdx = hdr.findIndex((h) => /^name$/i.test(h.trim()) || /player.?name|^player$|athlete/i.test(h));
           const numIdx = hdr.findIndex((h) => /^(#|no\.?|num(ber)?|jersey)$/i.test(h.trim()));
+          // Hudl basketball: "PF" = Points For (points), with a separate "FOUL" column → map PF→Points only
+          // when BOTH are present (else PF = personal fouls). Mirrors the career importer's rule.
+          const hudlPF = hdr.some((h) => /^pf$/i.test(String(h).trim())) && hdr.some((h) => /^fouls?$/i.test(String(h).trim()));
           for (const line of lines.slice(hIdx + 1)) {
             const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
             const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
@@ -3331,7 +3334,7 @@ function ImportSeasons({ school, roster = [] }) {
             hdr.forEach((h, i) => {
               if (i === nameIdx || i === numIdx || !h) return;
               const v = vals[i]; if (v === "" || v == null) return;
-              const n = Number(v); if (!isNaN(n)) raw[h] = n;
+              const n = Number(v); if (!isNaN(n)) raw[(hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : h] = n;
             });
             arr.push({ name, number, stats: remapSeasonStats(raw, seasonValid, school.sport) });
           }
