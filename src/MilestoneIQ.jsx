@@ -1473,14 +1473,22 @@ function ImportModal({ school, onClose, onImport }) {
   const isMetaCol = (h) => /^name$/i.test(String(h).trim()) || /^athletes?$/i.test(String(h).trim()) || /player.?name|^player$/i.test(h) || /^pos(ition)?$/i.test(String(h).trim()) || /grad.?year|class.?of/i.test(h) || /^(#|no\.?|num(ber)?|jersey)$/i.test(String(h).trim());
   const validStatList = [...new Set([
     ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
+    ...(SPORTS[school.sport]?.statCategories || []).filter((s) => s.name !== "Coach Wins").map((s) => s.name), // basketball/soccer/softball use statCategories, NOT groups
+    ...(DISPLAY_STATS[school.sport] || []),                              // canonical display stats for the sport
     ...(school.allTimeRoster || []).flatMap((p) => Object.keys(p.stats || {})),
   ])].sort();
   const validSet = new Set(validStatList);
-  const unmappedHeaders = preview ? preview.headers.filter((h) => !isMetaCol(h) && !validSet.has(resolveStatAlias(h, school.sport))) : [];
-  const autoMatched = preview ? preview.headers.filter((h) => !isMetaCol(h) && validSet.has(resolveStatAlias(h, school.sport))).length : 0;
-  // Apply the user's column→stat choices by renaming those columns to canonical stat names before import.
+  // Hudl basketball labels points "PF" (Points For) and has a separate "FOUL" column; treat PF as Points
+  // ONLY when both are present (won't corrupt standard sheets where PF = personal fouls). Computed from the
+  // ORIGINAL upload headers so it's stable no matter what the user maps.
+  const hudlPF = !!(preview && preview.headers.some((h) => /^pf$/i.test(String(h).trim())) && preview.headers.some((h) => /^fouls?$/i.test(String(h).trim())));
+  const resolveHeader = (h) => (hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : resolveStatAlias(h, school.sport);
+  const unmappedHeaders = preview ? preview.headers.filter((h) => !isMetaCol(h) && !validSet.has(resolveHeader(h))) : [];
+  const autoMatched = preview ? preview.headers.filter((h) => !isMetaCol(h) && validSet.has(resolveHeader(h))).length : 0;
+  // Apply the user's column→stat choices (+ the Hudl PF→Points auto-map) by renaming columns to canonical stat names before import.
   const applyColMap = (p) => {
     const rename = {}; for (const h of unmappedHeaders) { if (colMap[h]) rename[h] = colMap[h]; }
+    if (hudlPF) p.headers.forEach((h) => { if (/^pf$/i.test(String(h).trim())) rename[h] = "Points"; });
     if (!Object.keys(rename).length) return p;
     return { headers: p.headers.map((h) => rename[h] || h), rows: p.rows.map((r) => { const o = {}; for (const k in r) o[rename[k] || k] = r[k]; return o; }) };
   };
