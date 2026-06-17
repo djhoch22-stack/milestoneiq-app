@@ -4935,6 +4935,21 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
   );
 }
 
+// Hall of Fame is a Program+ / School+ perk — locked on the base Program & School tiers (and any
+// tier we don't recognize). The tab + home nav stay VISIBLE but render <HofLocked/> instead of the
+// feature when the org's plan doesn't include it. App-side only — the public pages are unaffected.
+const HOF_TIERS = new Set(["program_plus", "school_plus"]);
+const hofEnabled = (tier) => HOF_TIERS.has(tier);
+function HofLocked() {
+  return (
+    <div style={{ background:"#fff", borderRadius:14, border:"2px dashed #e5e7eb", padding:"48px 32px", textAlign:"center", maxWidth:560, margin:"0 auto" }}>
+      <div style={{ fontSize:40, marginBottom:10 }}>🏛️</div>
+      <div style={{ fontSize:18, fontWeight:700, color:"#111", marginBottom:8 }}>Hall of Fame</div>
+      <div style={{ fontSize:14, lineHeight:1.5, color:"#6b7280" }}>This school's Hall of Fame isn't available at this time.</div>
+      <div style={{ fontSize:12.5, color:"#9ca3af", marginTop:10 }}>Included with the <strong>Program+</strong> and <strong>School+</strong> plans.</div>
+    </div>
+  );
+}
 function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   const [view, setView] = useState("athletes"); // athletes | coaches
   const [search, setSearch] = useState("");
@@ -5510,7 +5525,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
   );
 }
 
-function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
+function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState(() => { try { return sessionStorage.getItem("mq_dash_tab") || "overview"; } catch (e) { return "overview"; } });
   useEffect(() => { try { sessionStorage.setItem("mq_dash_tab", activeTab); } catch (e) {} }, [activeTab]);
@@ -6368,7 +6383,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate }) {
         )}
 
         {activeTab==="hof" && (
-          <HallOfFameTab school={school} allSchools={allSchools.length ? allSchools : [school]} allSeasonRows={allSeasonRows} onUpdate={onUpdate} />
+          hofEnabled(tier)
+            ? <HallOfFameTab school={school} allSchools={allSchools.length ? allSchools : [school]} allSeasonRows={allSeasonRows} onUpdate={onUpdate} />
+            : <HofLocked />
         )}
 
         {activeTab==="export" && (
@@ -6966,7 +6983,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
   }, [onSignOut]);
 
   if (activeSchool) {
-    return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} />;
+    return <SchoolDashboard school={activeSchool} allSchools={schools} onBack={()=>{ setActiveSchool(null); try { sessionStorage.removeItem("mq_school"); } catch (e) {} }} onUpdate={updateSchool} tier={tier} />;
   }
 
   const totalAlerts = schools.reduce((acc, sc) => acc + activeAlertCount(sc, seasonBestsByProgram[sc.id] || {}, recordsByProgram[sc.id] || (sc.records || [])), 0);
@@ -7163,7 +7180,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
       </div>
 
       {homeTab === "settings" ? <SettingsPage />
-        : homeTab === "hof" ? <AllSportsHof schools={schools} onUpdate={updateSchool} />
+        : homeTab === "hof" ? (hofEnabled(tier) ? <AllSportsHof schools={schools} onUpdate={updateSchool} /> : <div style={{ padding:24 }}><HofLocked /></div>)
         : (
         <div style={{ padding:24 }}>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20 }}>
