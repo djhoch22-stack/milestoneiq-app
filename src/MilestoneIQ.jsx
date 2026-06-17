@@ -6566,6 +6566,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
   const [view, setView] = useState("athletes");        // athletes | coaches
   const [sportFilter, setSportFilter] = useState("all");
   const [hofFilter, setHofFilter] = useState("candidates"); // candidates (hide inducted) | all | inducted
+  const [includePrior, setIncludePrior] = useState(true);   // coaches: count prior-school records/titles toward HOF?
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selPlayer, setSelPlayer] = useState(null);
@@ -6636,7 +6637,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
   const coaches = useMemo(() => {
     const combined = scoped.flatMap(p => (p.seasons || []).map(s => ({ ...s, _team: SPORTS[p.sport]?.label || p.name || "Team" })));
     const prior = Object.assign({}, ...scoped.map(p => p.coachPrior || {}));
-    const all = buildCoachStats(combined, { includePrior: true, prior });
+    const all = buildCoachStats(combined, { includePrior, prior });
     const names = all.map(c => c.name);
     const inductedC = new Set();
     (schools || []).forEach(p => Object.keys(p.coachHof || {}).forEach(n => { if ((p.coachHof || {})[n]) inductedC.add(normName(n)); }));
@@ -6647,7 +6648,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
     });
     if (search) arr = arr.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
     return { list: arr.sort((a, b) => b.score - a.score), combined };
-  }, [scoped, mergedAwards, schools, search]); // eslint-disable-line
+  }, [scoped, mergedAwards, schools, search, includePrior]); // eslint-disable-line
 
   const coachAwardsBySport = useMemo(() => {
     const m = {};
@@ -6721,6 +6722,12 @@ function AllSportsHof({ schools = [], onUpdate }) {
           <option value="all">🏟️ All sports</option>
           {sportsPresent.map(sp => <option key={sp} value={sp}>{SPORTS[sp]?.icon || ""} {SPORTS[sp]?.label || sp}</option>)}
         </select>
+        {view==="coaches" && (
+          <button onClick={()=>setIncludePrior(v=>!v)} title="Count wins, titles & accomplishments a coach earned at a PREVIOUS school toward their HOF score"
+            style={{ background:includePrior?"#1a3a6b":"#fff", color:includePrior?"#fff":"#6b7280", border:`1px solid ${includePrior?"#1a3a6b":"#e5e7eb"}`, borderRadius:9, padding:"8px 14px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+            {includePrior?"✓ ":""}Include prior schools
+          </button>
+        )}
         <input value={search} onChange={e=>{ setSearch(e.target.value); setPage(1); }} placeholder={`Search ${view==="athletes"?"player":"coach"}...`}
           style={{ border:"1px solid #e5e7eb", borderRadius:8, padding:"8px 12px", fontSize:13, flex:1, minWidth:160 }} />
       </div>
