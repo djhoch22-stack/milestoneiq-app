@@ -327,7 +327,7 @@ function SignupScreen({ onSwitch, onSuccess, initialEmail = '' }) {
             marginTop: 12,
           }}
         >
-          By signing up you agree to our Terms of Service and Privacy Policy.
+          By signing up you agree to our <a href="/terms" target="_blank" rel="noreferrer" style={{ color: '#1a56db' }}>Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: '#1a56db' }}>Privacy Policy</a>.
         </p>
         <div
           style={{
