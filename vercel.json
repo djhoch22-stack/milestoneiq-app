@@ -4,6 +4,8 @@
     { "source": "/teams/:slug", "destination": "/api/team?slug=:slug" },
     { "source": "/school/:slug", "destination": "/api/school?slug=:slug" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/terms", "destination": "/api/terms" },
+    { "source": "/privacy", "destination": "/api/privacy" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
