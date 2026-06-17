@@ -6565,6 +6565,7 @@ const hubSlug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
 function AllSportsHof({ schools = [], onUpdate }) {
   const [view, setView] = useState("athletes");        // athletes | coaches
   const [sportFilter, setSportFilter] = useState("all");
+  const [hofFilter, setHofFilter] = useState("candidates"); // candidates (hide inducted) | all | inducted
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selPlayer, setSelPlayer] = useState(null);
@@ -6685,9 +6686,12 @@ function AllSportsHof({ schools = [], onUpdate }) {
     }
   };
 
-  const list = view === "athletes" ? players : coaches.list;
+  const baseList = view === "athletes" ? players : coaches.list;
+  const confCount = baseList.filter(x => x.confirmed).length;
+  // Confirmed filter: by default hide already-inducted HOF members (the ranking is for *candidates*);
+  // "all" shows everyone, "inducted" shows only confirmed members.
+  const list = hofFilter === "all" ? baseList : hofFilter === "inducted" ? baseList.filter(x => x.confirmed) : baseList.filter(x => !x.confirmed);
   const shown = list.slice(0, page * 25);
-  const confCount = view === "athletes" ? players.filter(p => p.confirmed).length : coaches.list.filter(c => c.confirmed).length;
   const tabBtn = (active, label, on) => (
     <button onClick={on} style={{ padding:"8px 16px", fontSize:13, border:"none", cursor:"pointer", fontWeight: active?700:400, background: active?"#1a3a6b":"#fff", color: active?"#fff":"#6b7280" }}>{label}</button>
   );
@@ -6697,7 +6701,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
       <div style={{ marginBottom:8 }}>
         <h1 style={{ margin:0, fontSize:28, fontWeight:700, color:"#111" }}>🏛️ Hall of Fame</h1>
         <p style={{ margin:"4px 0 0", fontSize:14, color:"#6b7280" }}>
-          All {view==="athletes"?"athletes":"coaches"} across {sportFilter==="all" ? `${schools.length} program${schools.length!==1?"s":""}` : (SPORTS[sportFilter]?.label || sportFilter)} · {confCount} inducted · {list.length} rated
+          All {view==="athletes"?"athletes":"coaches"} across {sportFilter==="all" ? `${schools.length} program${schools.length!==1?"s":""}` : (SPORTS[sportFilter]?.label || sportFilter)} · {confCount} inducted · {baseList.length} rated · showing {list.length} {hofFilter==="candidates"?"candidate"+(list.length!==1?"s":""):hofFilter==="inducted"?"inducted":"total"}
         </p>
       </div>
 
@@ -6705,6 +6709,11 @@ function AllSportsHof({ schools = [], onUpdate }) {
         <div style={{ display:"flex", border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden" }}>
           {tabBtn(view==="athletes","👤 Athletes",()=>{ setView("athletes"); setPage(1); })}
           {tabBtn(view==="coaches","🎓 Coaches",()=>{ setView("coaches"); setPage(1); })}
+        </div>
+        <div style={{ display:"flex", border:"1px solid #e5e7eb", borderRadius:9, overflow:"hidden" }} title="Candidates = not yet inducted · All = everyone · Inducted = confirmed HOF members only">
+          {tabBtn(hofFilter==="candidates","Candidates",()=>{ setHofFilter("candidates"); setPage(1); })}
+          {tabBtn(hofFilter==="all","All",()=>{ setHofFilter("all"); setPage(1); })}
+          {tabBtn(hofFilter==="inducted","🏛️ Inducted",()=>{ setHofFilter("inducted"); setPage(1); })}
         </div>
         <select value={sportFilter} onChange={e=>{ setSportFilter(e.target.value); setPage(1); }}
           title="Filter to one sport, or rank across all of them"
@@ -6788,7 +6797,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
           );
         })}
 
-        {list.length===0 && <div style={{ padding:40, textAlign:"center", color:"#9ca3af" }}>No {view==="athletes"?"players":"coaches"} to rank yet{sportFilter!=="all"?" for this sport":""}.</div>}
+        {list.length===0 && <div style={{ padding:40, textAlign:"center", color:"#9ca3af" }}>No {view==="athletes"?"players":"coaches"} match this filter{sportFilter!=="all"?" in this sport":""}.</div>}
       </div>
 
       {list.length > page*25 && (
