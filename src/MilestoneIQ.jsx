@@ -2862,6 +2862,14 @@ function resolveStatAlias(header, sport) {
   const sp = _ALIAS_SPORT_CI[String(sport || "").replace(/_(boys|girls)$/, "")] || {};
   return sp[lk] || _ALIAS_COMMON_CI[lk] || k;
 }
+// Reject non-player rows that can survive a CSV parse — Hudl's "#" jersey-column header, a bare jersey
+// number, or a "Totals"/"Team" summary row. A real athlete name has at least one letter and isn't a
+// header/summary token. Used by BOTH importers so junk like the "#" player is never created.
+function isImportJunkName(n) {
+  const s = String(n == null ? "" : n).trim();
+  if (!s || s.toLowerCase() === "undefined" || !/[a-z]/i.test(s)) return true;
+  return /^(athletes?|players?|names?|totals?|team|opponent|no\.?|number|jersey)$/i.test(s);
+}
 function remapSeasonStats(stats, valid, sport) {
   const useFilter = valid && valid.size > 0; // never filter against an empty set (would drop everything)
   const out = {};
@@ -3317,7 +3325,7 @@ function ImportSeasons({ school, roster = [] }) {
           for (const line of lines.slice(hIdx + 1)) {
             const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
             const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
-            if (!name) continue;
+            if (isImportJunkName(name)) continue; // skip "#"/jersey/Totals junk rows
             const number = (numIdx >= 0 && String(vals[numIdx] || "").trim() !== "") ? String(vals[numIdx]).trim() : null;
             const raw = {};
             hdr.forEach((h, i) => {
@@ -5654,7 +5662,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
     const hudlPF = parsed.headers.some(h => /^pf$/i.test(String(h).trim())) && parsed.headers.some(h => /^fouls?$/i.test(String(h).trim()));
     const imported = parsed.rows.map((row, i) => {
       const name = nameCol ? String(row[nameCol]).trim() : `Athlete ${i+1}`;
-      if (!name || name === "undefined") return null;
+      if (isImportJunkName(name)) return null; // skip "#"/jersey/Totals junk rows
       const stats = {};
       parsed.headers.forEach(h => {
         if (metaCols.has(h)) return;
@@ -6409,7 +6417,26 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 </p>
               </div>
             </div>
-            <SeasonsTab seasons={school.seasons} onSave={(updatedSeasons) => onUpdate({...school, seasons: updatedSeasons})} coachPrior={school.coachPrior || {}} onSaveCoachPrior={(cp) => onUpdate({...school, coachPrior: cp})} />
+            <SeasonsTab seasons={school.seasons} onSave={async (updatedSeasons) => {
+              // Credit each season's team WINS to every player who has a row for that season, so adding/editing
+              // a season's record auto-updates the roster's win totals (no re-import needed). Only seasons whose
+              // wins actually changed are touched; then recompute career + reload to show the new totals.
+              const oldWins = {}; (school.seasons || []).forEach(s => { oldWins[s.season] = Number(s.wins) || 0; });
+              onUpdate({ ...school, seasons: updatedSeasons });
+              const changed = updatedSeasons.filter(s => (Number(s.wins) || 0) > 0 && (Number(s.wins) || 0) !== (oldWins[s.season] || 0));
+              if (school.id && changed.length) {
+                try {
+                  for (const s of changed) {
+                    const w = Number(s.wins) || 0;
+                    const { data } = await getPlayerSeasonsForSeason(school.id, s.season);
+                    const rows = (data || []).map(r => ({ player_name: r.player_name, stats: { ...(r.stats || {}), Wins: w } }));
+                    if (rows.length) await replacePlayerSeasonRowsForSeason(school.id, s.season, rows);
+                  }
+                  await recomputeCareerFromSeasons(school.id);
+                  window.location.reload(); // refresh so the recomputed player win totals show
+                } catch (e) { /* non-fatal — the season itself is still saved */ }
+              }
+            }} coachPrior={school.coachPrior || {}} onSaveCoachPrior={(cp) => onUpdate({...school, coachPrior: cp})} />
           </div>
         )}
 
