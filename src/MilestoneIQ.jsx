@@ -6422,7 +6422,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               // a season's record auto-updates the roster's win totals (no re-import needed). Only seasons whose
               // wins actually changed are touched; then recompute career + reload to show the new totals.
               const oldWins = {}; (school.seasons || []).forEach(s => { oldWins[s.season] = Number(s.wins) || 0; });
-              onUpdate({ ...school, seasons: updatedSeasons });
+              await onUpdate({ ...school, seasons: updatedSeasons }); // WAIT for the season to persist before any reload below — else the reload reverts the add/edit
               const changed = updatedSeasons.filter(s => (Number(s.wins) || 0) > 0 && (Number(s.wins) || 0) !== (oldWins[s.season] || 0));
               if (school.id && changed.length) {
                 try {
@@ -7031,7 +7031,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
     // Keep the dashboard in sync ONLY if it's already open — never navigate INTO a
     // school view from elsewhere (e.g. editing a logo on the Settings page).
     setActiveSchool(prev => (prev && prev.id === updated.id) ? updated : prev);
-    if (onUpdateSchool) onUpdateSchool(updated);   // persist this program to Supabase
+    return onUpdateSchool ? onUpdateSchool(updated) : undefined;   // persist to Supabase; RETURN the promise so callers can await before reloading
   }, [setSchools, onUpdateSchool]);
 
   const handleSignOut = useCallback(() => {
