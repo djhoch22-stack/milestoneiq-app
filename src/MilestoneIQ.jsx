@@ -5,13 +5,8 @@ import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
 import raftersLogo from '../raftersiq-logo.png';
 
-const STAT_VARIANTS = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Solo only","Assisted only"];
-
 const STAT_VARIANTS_STANDARD = ["Career total","Single season","Single game"];
 const STAT_VARIANTS_WITH_AVG = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
-const STAT_VARIANTS_AVG_ONLY = ["Career total","Single season","Single game","Per game avg (season)"];
-const STAT_VARIANTS_RATE = ["Single season","Career total"];
-const STAT_VARIANTS_LONGEST = ["Single game","Single season","Career total"];
 
 // ONE basketball record-category list shared by boys, girls, AND the legacy generic "basketball"
 // key — so all three expose IDENTICAL records (no drift between boys & girls).
@@ -216,12 +211,6 @@ const SPORTS = {
     ]
   }
 };
-
-// Returns flat list of all stat category names for a sport (for legacy athlete.stats keys)
-function getSportStatNames(sport) {
-  const def = SPORTS[sport] || SPORTS.football;
-  return [...new Set(def.statCategories.map(s => s.name))];
-}
 
 // school.records is now an array of:
 // { id, statName, variant, holderName, holderYear, value, sport }
@@ -2616,13 +2605,8 @@ function parseGameChangerCSV(text, sport) {
   }
   return out.length ? out : null;
 }
-// Match the stat sheet's abbreviated names ("A. Terpstra") to the roster's full names
-// ("Alex Terpstra") by last name + first initial; keep the fuller name as canonical.
-function seasonNameKey(name) {
-  const parts = String(name || "").toLowerCase().replace(/[.,]/g, "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return parts.join(" ");
-  return `${parts[parts.length - 1]}|${parts[0][0] || ""}`;
-}
+// Of two name spellings for the same player, decide which is the "fuller" (canonical) one —
+// e.g. keep "Alex Terpstra" over the stat sheet's abbreviated "A. Terpstra".
 function fullerSeasonName(a, b) {
   const af = String(a).trim().split(/\s+/)[0].replace(/\./g, "");
   const bf = String(b).trim().split(/\s+/)[0].replace(/\./g, "");
