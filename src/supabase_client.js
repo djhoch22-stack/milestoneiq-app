@@ -721,6 +721,18 @@ export const openBillingPortal = async (orgId) => {
   }
 };
 
+// ── Referrals ──────────────────────────────────────────────────────────────────
+// Two-sided referral: applyReferral records who referred a NEW org (+ gives it the 14-day trial);
+// getReferralStats powers the Settings "Refer a school" card (caller's code + counts).
+export const applyReferral = async (orgId, refCode) => {
+  const { data, error } = await supabase.rpc('apply_referral', { p_org_id: orgId, p_ref_code: refCode });
+  return { data, error };
+};
+export const getReferralStats = async () => {
+  const { data, error } = await supabase.rpc('my_referral_stats');
+  return { data: (Array.isArray(data) ? data[0] : data) || null, error };
+};
+
 // ── Promo / beta codes ─────────────────────────────────────────────────────────
 // Redeem a code against a school (validation + apply happen server-side in the RPC).
 // On success `data` is a friendly message; on any invalid case `error` is the reason.
