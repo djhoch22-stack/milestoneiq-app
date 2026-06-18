@@ -1447,7 +1447,7 @@ function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOu
   const [msg, setMsg] = useState("");
   const display = `${first} ${last}`.trim() || userEmail || "Your account";
   const initial = ((first[0] || userEmail[0] || "?")).toUpperCase();
-  const planLabel = ({ program:"Program", school:"School", school_plus:"School Plus" }[tier] || "Program");
+  const planLabel = ({ program:"Program", school:"School", program_plus:"Program+", school_plus:"School Plus" }[tier] || "Program");
   const inp = { width:"100%", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 12px", fontSize:14, boxSizing:"border-box", color:"#111" };
   const lbl = { display:"block", fontSize:13, fontWeight:600, color:"#374151", marginBottom:4 };
 
@@ -6091,7 +6091,7 @@ function saveSchools(data) {
 function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
+  const tierName = { program: "Program", school: "School", program_plus: "Program+", school_plus: "School Plus" }[tier] || "Program";
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : null;
   const planLine = status === "active" ? `${tierName} plan · active`
     : status === "trialing" ? `Free trial${daysLeft != null ? ` — ${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : ""}`
@@ -6104,7 +6104,7 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, o
   const select = async (priceId, t, b) => {
     setErr("");
     if (status === "active" && onChangePlan) {
-      const label = { program: "Program", school: "School", school_plus: "School Plus" }[t] || "selected";
+      const label = { program: "Program", school: "School", program_plus: "Program+", school_plus: "School Plus" }[t] || "selected";
       if (!window.confirm(`Switch to the ${label} plan?\n\nUpgrades charge your card on file the prorated difference right away; downgrades apply as account credit. No second subscription is created.`)) return;
       setBusy(true); const e = await onChangePlan(priceId, t); setBusy(false); if (e) showErr(e);
     } else {
@@ -6802,7 +6802,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
       {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} existingSports={schools.map(sc=>sc.sport)} onAdd={async (s)=>{
         if (orgId) {
           if (tierLimits && schools.length >= tierLimits.maxPrograms) {
-            alert(`Your ${({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"current")} plan includes ${tierLimits.maxPrograms} program${tierLimits.maxPrograms===1?"":"s"}. Upgrade to add more.`);
+            alert(`Your ${({program:"Program",school:"School",program_plus:"Program+",school_plus:"School Plus"}[tier]||"current")} plan includes ${tierLimits.maxPrograms} program${tierLimits.maxPrograms===1?"":"s"}. Upgrade to add more.`);
             return;
           }
           const { data, error } = await createProgram(orgId, { name:s.name, mascot:s.mascot, sport:s.sport, primary_color:s.primaryColor, logo_url:null });
@@ -6831,7 +6831,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
           </div>
           <div style={{ flex:1 }} />
           {totalAlerts>0&&<div style={{ background:"#fef3c7",color:"#92400e",borderRadius:20,padding:"4px 12px",fontSize:12,fontWeight:700 }}>🔔 {totalAlerts} active alerts</div>}
-          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ {({program:"Program",school:"School",school_plus:"School Plus"}[tier]||"Program")} plan</div>
+          <div style={{ background:"#1e293b",color:"#94a3b8",borderRadius:20,padding:"4px 14px",fontSize:12 }}>⭐ {({program:"Program",school:"School",program_plus:"Program+",school_plus:"School Plus"}[tier]||"Program")} plan</div>
           {userEmail && <div style={{ color:"rgba(255,255,255,0.55)",fontSize:12 }}>{userEmail}</div>}
           <button onClick={handleSignOut}
             style={{ background:"none",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,padding:"5px 14px",fontSize:12,cursor:"pointer",color:"rgba(255,255,255,0.7)",fontWeight:600 }}>
