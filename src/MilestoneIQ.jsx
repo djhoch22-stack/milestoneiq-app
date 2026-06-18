@@ -6088,7 +6088,7 @@ function saveSchools(data) {
 
 // Settings → Billing card (admins only). Shows trial/plan status and opens the
 // shared ChoosePlan picker (→ Stripe checkout) or the Stripe billing portal.
-function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner }) {
+function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const tierName = { program: "Program", school: "School", school_plus: "School Plus" }[tier] || "Program";
@@ -6099,7 +6099,18 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onManageBilling
     : status === "canceled" ? "Subscription canceled"
     : (status || "—");
   const showErr = (e) => setErr(typeof e === "string" ? e : (e?.message || "Something went wrong"));
-  const select = async (priceId, t, b) => { setBusy(true); setErr(""); const e = await onCheckout?.(priceId, t, b); setBusy(false); if (e) showErr(e); };
+  // Active subscribers SWITCH their existing sub in place (no new sub → no double-billing);
+  // everyone else (trialing/canceled/new) starts a fresh checkout.
+  const select = async (priceId, t, b) => {
+    setErr("");
+    if (status === "active" && onChangePlan) {
+      const label = { program: "Program", school: "School", school_plus: "School Plus" }[t] || "selected";
+      if (!window.confirm(`Switch to the ${label} plan?\n\nYour existing subscription is updated in place and your next invoice is prorated automatically — no second subscription is created.`)) return;
+      setBusy(true); const e = await onChangePlan(priceId, t); setBusy(false); if (e) showErr(e);
+    } else {
+      setBusy(true); const e = await onCheckout?.(priceId, t, b); setBusy(false); if (e) showErr(e);
+    }
+  };
   const manage = async () => { setErr(""); const e = await onManageBilling?.(); if (e) showErr(e); };
   const [code, setCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
@@ -6501,7 +6512,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
   );
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
+export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -6680,7 +6691,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
           <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} tierLimits={tierLimits} />
         </Section>
 
-        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
+        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onChangePlan={onChangePlan} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
 
         {role === "admin" && (
           <Section title="🎁 Refer a school">
