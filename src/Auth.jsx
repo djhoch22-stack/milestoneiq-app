@@ -918,7 +918,8 @@ function LandingPage({ onStartTrial, onSignIn }) {
 export default function Auth({ onAuthenticated, seedSchools }) {
   const params = new URLSearchParams(window.location.search);
   const invitedEmail = params.get('invite') || '';
-  const [screen, setScreen] = useState(invitedEmail ? 'signup' : 'landing');
+  const hasRef = !!params.get('ref');   // a referral link is for a NEW school → open Create account directly
+  const [screen, setScreen] = useState((invitedEmail || hasRef) ? 'signup' : 'landing');
   const [userId, setUserId] = useState(null);
 
   const handleLoginSuccess = () => window.location.reload();
