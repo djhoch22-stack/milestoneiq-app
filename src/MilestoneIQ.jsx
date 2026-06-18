@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -1424,6 +1424,30 @@ function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
 }
 
 // ── Add School Modal ───────────────────────────────────────────────────────────
+// "Refer a school" settings card — two-sided referral. Shows the org's referral link + counts.
+function ReferralSection() {
+  const [stats, setStats] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { getReferralStats().then(({ data }) => setStats(data)).catch(() => {}); }, []);
+  const link = stats && stats.referral_code ? `${window.location.origin}/?ref=${stats.referral_code}` : "";
+  const copy = () => { try { navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {} };
+  return (
+    <div>
+      <p style={{ margin:"0 0 12px", fontSize:13, color:"#6b7280" }}>Invite another school with your link. When a school you refer subscribes, <strong>you get a free month</strong> and <strong>they get a 14-day trial</strong>.</p>
+      {link ? (
+        <>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+            <input readOnly value={link} onFocus={e=>e.target.select()} style={{ flex:1, minWidth:220, border:"1px solid #e5e7eb", borderRadius:8, padding:"8px 12px", fontSize:13, color:"#374151", background:"#f9fafb" }} />
+            <button onClick={copy} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>{copied ? "Copied ✓" : "Copy link"}</button>
+          </div>
+          <div style={{ marginTop:12, fontSize:13, color:"#374151" }}>
+            <strong>{stats.referred_count || 0}</strong> school{(stats.referred_count||0)===1?"":"s"} referred · <strong>{stats.rewarded_count || 0}</strong> free month{(stats.rewarded_count||0)===1?"":"s"} earned
+          </div>
+        </>
+      ) : <p style={{ fontSize:13, color:"#9ca3af" }}>Loading your referral link…</p>}
+    </div>
+  );
+}
 // Account section — real name (from registration), saves to the profile.
 function AccountSection({ userId, userName, userEmail, userPhone, tier, onSignOut }) {
   const parts = (userName || "").trim().split(/\s+/).filter(Boolean);
@@ -6673,6 +6697,12 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
         </Section>
 
         {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
+
+        {role === "admin" && (
+          <Section title="🎁 Refer a school">
+            <ReferralSection />
+          </Section>
+        )}
 
         {/* Notifications */}
         <Section title="🔔 Notifications">
