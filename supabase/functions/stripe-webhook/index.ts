@@ -44,6 +44,31 @@ Deno.serve(async (req) => {
   const tierOf = (sub: any) => sub?.metadata?.tier || PRICE_TIER[priceOf(sub) || ""] || "program";
   const orgOf = (sub: any) => sub?.metadata?.org_id || "";
   const periodEnd = (sub: any) => (sub?.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null);
+  // Two-sided referral reward: when a REFERRED org first pays, give the referrer one free month — a Stripe
+  // account credit if they're already a paying customer, otherwise +30 trial days. Flag-guarded (idempotent).
+  const rewardReferrer = async (refereeOrgId: string) => {
+    if (!refereeOrgId) return;
+    const { data: ref } = await admin.from("organizations").select("referred_by_org, referral_rewarded").eq("id", refereeOrgId).single();
+    if (!ref || !ref.referred_by_org || ref.referral_rewarded) return;
+    await admin.from("organizations").update({ referral_rewarded: true }).eq("id", refereeOrgId); // set first → a Stripe retry can't double-credit
+    const { data: r } = await admin.from("organizations").select("id, stripe_customer_id, trial_ends_at").eq("id", ref.referred_by_org).single();
+    if (!r) return;
+    if (r.stripe_customer_id) {
+      try {
+        const subs = await stripe.subscriptions.list({ customer: r.stripe_customer_id, status: "active", limit: 1 });
+        const price = subs?.data?.[0]?.items?.data?.[0]?.price;
+        const unit = price?.unit_amount || 0;
+        const amount = price?.recurring?.interval === "year" ? Math.round(unit / 12) : unit; // one MONTH's worth, even if they pay annually
+        if (amount > 0) await stripe.customers.createBalanceTransaction(r.stripe_customer_id, {
+          amount: -amount, currency: "usd", description: "RaftersIQ referral reward — one free month",
+        });
+      } catch (_e) { /* non-fatal — referee already marked rewarded */ }
+    } else {
+      const base = (r.trial_ends_at && new Date(r.trial_ends_at) > new Date()) ? new Date(r.trial_ends_at) : new Date();
+      base.setDate(base.getDate() + 30);
+      await admin.from("organizations").update({ trial_ends_at: base.toISOString() }).eq("id", r.id);
+    }
+  };
 
   try {
     switch (event.type) {
@@ -57,6 +82,7 @@ Deno.serve(async (req) => {
           org_id: orgId, status: "active", stripe_customer_id: session.customer,
           stripe_subscription_id: sub.id, price_id: priceOf(sub), current_period_end: periodEnd(sub),
         });
+        await rewardReferrer(orgId); // two-sided referral: credit the referrer one free month
         break;
       }
       case "customer.subscription.updated": {
