@@ -38,8 +38,18 @@ Deno.serve(async (req) => {
   const setOrg = async (orgId: string, fields: Record<string, unknown>) => {
     if (orgId) await admin.from("organizations").update(fields).eq("id", orgId);
   };
-  const upsertSub = async (row: Record<string, unknown>) =>
-    admin.from("subscriptions").upsert(row, { onConflict: "stripe_subscription_id" });
+  // Audit row in `subscriptions`. The table's PK is `id text` (no default) and there is NO unique
+  // constraint on stripe_subscription_id — so an upsert with onConflict:"stripe_subscription_id" both
+  // 42P10s AND violates the NOT NULL id. Key on the natural Stripe id instead: id = subscription id,
+  // conflict on the real PK. Empty/null fields are dropped so a missing org_id ("") never hits the
+  // uuid column and a later event can't overwrite good data with blanks.
+  const upsertSub = async (row: Record<string, unknown>) => {
+    const sid = row.stripe_subscription_id;
+    if (!sid) return;
+    const clean: Record<string, unknown> = { id: sid };
+    for (const k in row) { const v = row[k]; if (v !== "" && v != null) clean[k] = v; }
+    return admin.from("subscriptions").upsert(clean, { onConflict: "id" });
+  };
   const priceOf = (sub: any) => sub?.items?.data?.[0]?.price?.id || null;
   const tierOf = (sub: any) => sub?.metadata?.tier || PRICE_TIER[priceOf(sub) || ""] || "program";
   const orgOf = (sub: any) => sub?.metadata?.org_id || "";
