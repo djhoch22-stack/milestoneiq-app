@@ -21,6 +21,7 @@ import {
   getSeasons,
   getAwards,
   createCheckout,
+  changePlan,
   openBillingPortal,
   redeemPromoCode,
 } from './supabase_client';
@@ -460,6 +461,15 @@ export default function AppWrapper() {
     if (data?.url) { window.location.href = data.url; return null; }
     return error || 'Could not open billing portal';
   };
+  // Switch an ACTIVE school to a different plan by editing its existing subscription in place
+  // (no second subscription → no double-billing). Falls back to checkout if there's no live sub.
+  const goChangePlan = async (priceId, tierId) => {
+    const { data, error } = await changePlan(orgId, priceId, tierId);
+    if (error) return error;
+    if (data?.needsCheckout) return goCheckout(priceId, tierId);
+    await loadUserData(session.user.id); // refresh tier/gate in place
+    return null;
+  };
   // Redeem a beta/promo code against this school, then refresh the gate (unlock/extend).
   const goRedeem = async (code) => {
     const { data, error } = await redeemPromoCode((code || '').trim(), orgId);
@@ -534,6 +544,7 @@ export default function AppWrapper() {
         subscriptionStatus={status}
         trialEndsAt={org?.trial_ends_at || null}
         onCheckout={goCheckout}
+        onChangePlan={goChangePlan}
         onManageBilling={goPortal}
         onRedeemCode={goRedeem}
         isPlatformOwner={!!profile?.is_platform_owner}
