@@ -704,6 +704,25 @@ export const createCheckout = async (orgId, priceId, tier, billing) => {
   }
 };
 
+// Switch an active org's existing subscription to a different plan IN PLACE (no new sub →
+// no double-billing). Returns { data:{ ok?, unchanged?, needsCheckout? }, error }. When
+// data.needsCheckout is set the org has no live Stripe sub yet, so the caller starts a checkout.
+export const changePlan = async (orgId, priceId, tier) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'no session' };
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/change-plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ orgId, priceId, tier }),
+    });
+    const out = await res.json().catch(() => ({}));
+    return { data: out, error: res.ok ? null : (out.error || 'plan change failed') };
+  } catch (e) {
+    return { error: String(e?.message || e) };
+  }
+};
+
 // Open the Stripe billing portal for a school (org) to manage/cancel a subscription.
 export const openBillingPortal = async (orgId) => {
   try {
