@@ -261,7 +261,7 @@ function LoginScreen({ onSwitch, onSuccess }) {
   );
 }
 
-function SignupScreen({ onSwitch, onSuccess, initialEmail = '' }) {
+function SignupScreen({ onSwitch, onSuccess, initialEmail = '', referred = false }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState(initialEmail);
   const [pass, setPass] = useState('');
@@ -285,7 +285,7 @@ function SignupScreen({ onSwitch, onSuccess, initialEmail = '' }) {
       <div style={s.card}>
         <Logo />
         <h1 style={s.h1}>{initialEmail ? 'Set up your account' : 'Start your free trial'}</h1>
-        <p style={s.sub}>{initialEmail ? 'Create a password to finish joining your team on RaftersIQ.' : '7 days free — no charge until trial ends'}</p>
+        <p style={s.sub}>{initialEmail ? 'Create a password to finish joining your team on RaftersIQ.' : (referred ? '🎁 You were referred — 14 days free, no charge until trial ends' : '7 days free — no charge until trial ends')}</p>
         {err && <div style={s.err}>{err}</div>}
         <div style={s.field}>
           <label style={s.label}>Full name</label>
@@ -929,7 +929,7 @@ export default function Auth({ onAuthenticated, seedSchools }) {
   const handleSignupDone = () => window.location.reload();
 
   if (screen === 'signup')
-    return <SignupScreen onSwitch={setScreen} onSuccess={handleSignupDone} initialEmail={invitedEmail} />;
+    return <SignupScreen onSwitch={setScreen} onSuccess={handleSignupDone} initialEmail={invitedEmail} referred={hasRef} />;
   if (screen === 'forgot') return <ForgotScreen onSwitch={setScreen} />;
   if (screen === 'onboarding')
     return (
