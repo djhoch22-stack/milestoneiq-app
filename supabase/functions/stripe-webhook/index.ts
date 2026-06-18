@@ -107,8 +107,16 @@ Deno.serve(async (req) => {
       }
       case "customer.subscription.deleted": {
         const sub = event.data.object;
-        await setOrg(orgOf(sub), { subscription_status: "canceled" });
-        await upsertSub({ org_id: orgOf(sub), status: "canceled", stripe_subscription_id: sub.id });
+        const orgId = orgOf(sub);
+        await upsertSub({ org_id: orgId, status: "canceled", stripe_subscription_id: sub.id });
+        // Don't lock the org if the customer still has another live sub (a duplicate was canceled,
+        // or a plan change left a second sub active). Re-derive the org's state from what remains.
+        const others = sub.customer
+          ? ((await stripe.subscriptions.list({ customer: sub.customer, status: "all", limit: 10 })).data || [])
+              .filter((s: any) => s.id !== sub.id && ["active", "trialing", "past_due"].includes(s.status))
+          : [];
+        if (others.length) await setOrg(orgId, { subscription_status: others[0].status, subscription_tier: tierOf(others[0]) });
+        else await setOrg(orgId, { subscription_status: "canceled" });
         break;
       }
       case "invoice.payment_failed": {
