@@ -52,9 +52,14 @@ Deno.serve(async (req) => {
     if (item?.price?.id === priceId) return json({ ok: true, unchanged: true });
 
     // Swap the price on the existing item — NO new subscription is created.
+    // proration_behavior:"always_invoice" + payment_behavior:"error_if_incomplete" charge the
+    // prorated difference to the card on file RIGHT NOW (no "upgrade, use it, downgrade before the
+    // bill" free window). On an upgrade the update only applies if that charge succeeds; a downgrade
+    // nets to a credit (no payment due) and still passes.
     await stripe.subscriptions.update(sub.id, {
       items: [{ id: item.id, price: priceId }],
-      proration_behavior: "create_prorations", // difference settles on the next invoice
+      proration_behavior: "always_invoice",
+      payment_behavior: "error_if_incomplete",
       metadata: { org_id: orgId, tier: tier || "" }, // keep tier in sync for the webhook's tierOf()
     });
     // Reflect the new tier immediately; the customer.subscription.updated webhook also syncs it.
