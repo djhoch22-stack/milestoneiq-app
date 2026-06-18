@@ -120,6 +120,8 @@ export default function AppWrapper() {
 
   const params = new URLSearchParams(window.location.search);
   const checkoutResult = params.get('checkout');
+  const _ref = params.get('ref');
+  if (_ref) { try { localStorage.setItem('rq_ref', _ref); } catch (e) {} }   // remember the referral code through signup + onboarding
 
   useEffect(() => {
     const _icon = document.querySelector("link[rel='icon']");
