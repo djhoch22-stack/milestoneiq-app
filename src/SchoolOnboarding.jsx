@@ -12,6 +12,7 @@ import {
   createProgram,
   redeemPromoCode,
   onboardNewSchool,
+  applyReferral,
 } from './supabase_client';
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -113,6 +114,11 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
       const { error: rErr } = await redeemPromoCode(promoCode.trim(), targetOrg);
       if (rErr) { setBusy(false); setErr('Promo code: ' + (rErr.message || rErr)); return; }
       setRedeemed(true);
+    }
+    // Referral: if they arrived via a ?ref= link, credit the referrer + extend this NEW school's trial to 14 days.
+    if (isCreator && targetOrg) {
+      let _ref = null; try { _ref = localStorage.getItem('rq_ref'); } catch (e) {}
+      if (_ref) { try { await applyReferral(targetOrg, _ref); localStorage.removeItem('rq_ref'); } catch (e) {} }
     }
     setBusy(false);
     onComplete();
