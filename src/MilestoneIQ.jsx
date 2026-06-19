@@ -6564,7 +6564,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
 
 // In-app AI help assistant — a floating "💬 Help" bubble that answers RaftersIQ how-to
 // questions via the support-chat edge function. Rendered app-wide for logged-in users (AppWrapper).
-export function SupportChat() {
+export function SupportChat({ orgId } = {}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([{ role: "assistant", content: "Hi! I'm the RaftersIQ helper. Ask me anything — importing stats, records, Hall of Fame, billing…" }]);
@@ -6578,7 +6578,7 @@ export function SupportChat() {
     const next = [...msgs, { role: "user", content: q }];
     setMsgs(next); setInput(""); setBusy(true);
     const firstUser = next.findIndex((m) => m.role === "user"); // drop the canned greeting; API must start with a user turn
-    const { data, error } = await supportChat(next.slice(firstUser < 0 ? 0 : firstUser));
+    const { data, error } = await supportChat(next.slice(firstUser < 0 ? 0 : firstUser), orgId);
     setBusy(false);
     setMsgs((m) => [...m, { role: "assistant", content: error ? `Sorry — ${error} You can also email support@raftersiq.com.` : (data?.reply || "…") }]);
   };
