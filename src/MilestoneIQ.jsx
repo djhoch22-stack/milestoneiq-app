@@ -2824,63 +2824,87 @@ function MergePlayersModal({ school, roster = [], onClose }) {
     </div>
   );
 }
-// Coach-facing "How to import" guide — opened from the import toolbar. Encodes the lessons that matter most:
-// upload the roster + stats TOGETHER (so initials resolve to full names), name files by season, imports merge.
+// Coach-facing "How to import" guide — opened from the import toolbar. SPORT-AWARE: shows the exact
+// export steps for the program's sport (MaxPreps PDF / Hudl CSV / GameChanger CSV) plus the universal
+// rules — one season at a time, roster+stats together so initials resolve, team wins from the Seasons tab.
 function ImportHelpModal({ sport, onClose }) {
   const tHead = { fontSize: 14, fontWeight: 700, color: "#111", margin: "0 0 5px" };
   const tBody = { fontSize: 13, color: "#374151", lineHeight: 1.5, margin: 0 };
   const block = { marginBottom: 16 };
   const ul = { margin: "4px 0 0", paddingLeft: 18 };
+  const ol = { margin: "6px 0 0", paddingLeft: 20 };
+  // Per-source export steps; SPORT_SOURCES picks which sources a sport uses (first = recommended).
+  const METHODS = {
+    maxpreps: { title: "📄 MaxPreps — PDF (recommended)", steps: [
+      "On MaxPreps, open the season → tap Roster → scroll to the bottom → Print → Save as PDF.",
+      "Same season → tap Stats → scroll to the bottom → Print → Save as PDF.",
+      "Here in RaftersIQ: the All-Time tab → 📥 Import season stats → select the roster PDF AND the stats PDF together.",
+    ] },
+    gamechanger: { title: "⚾ GameChanger — CSV", steps: [
+      "In GameChanger, open the season → Stats → scroll down → Export Stats.",
+      "Here in RaftersIQ: the All-Time tab → 📥 Import season stats → upload the CSV.",
+    ] },
+    hudl: { title: "🎬 Hudl — CSV", steps: [
+      "In Hudl: open Reports → Stats.",
+      "Filters: Group By → Athlete, and Stat Type → Totals (NOT Averages — we calculate averages for you).",
+      "Pick the season under \"View Other Matches\" (include all of its matches).",
+      "Click Export to download the CSV.",
+      "Here in RaftersIQ: the All-Time tab → 📥 Import season stats → upload the CSV.",
+    ] },
+  };
+  const norm = String(sport || "").replace(/_(boys|girls)$/, "");
+  const SPORT_SOURCES = {
+    football: ["maxpreps"], baseball: ["maxpreps", "gamechanger"], softball: ["maxpreps", "gamechanger"],
+    soccer: ["maxpreps", "hudl"], basketball: ["maxpreps", "hudl"], volleyball: ["maxpreps", "hudl"],
+  };
+  const sources = SPORT_SOURCES[norm] || ["maxpreps"];
+  const goalieWarn = norm === "soccer"; // Hudl player exports omit keeper stats
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 580, maxHeight: "88vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: "#111" }}>📥 How to import your stats</div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>✕</button>
         </div>
-        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Upload a season's PDFs, a Hudl / GameChanger CSV or TXT export, or an Excel file — we read the players and stats automatically.</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>Follow the steps for wherever your stats live. We read the players and stats automatically.</div>
 
-        <div style={{ ...block, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 14px" }}>
-          <p style={tHead}>⭐ The #1 tip: upload the roster AND the stat sheet together</p>
-          <p style={tBody}>Stat sheets often list players by first initial (“J. Smith”). Adding your team <strong>roster</strong> (full names + jersey numbers) in the <strong>same</strong> import lets us match them up — so you get “John Smith,” not “J. Smith.” Just select both files at once.</p>
+        <div style={{ ...block, background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "12px 14px" }}>
+          <p style={{ ...tBody, fontWeight: 700, color: "#9a3412" }}>📌 Import ONE season at a time.</p>
+          <p style={{ ...tBody, marginTop: 4 }}>Finish a season, then repeat for the next. For MaxPreps, upload that season's <strong>roster + stats PDFs together</strong> so first-initial names (e.g. "J. Smith") match to full names.</p>
+        </div>
+
+        {sources.map((key) => {
+          const m = METHODS[key];
+          return (
+            <div key={key} style={{ ...block, border: "1px solid #e5e7eb", borderRadius: 10, padding: "12px 14px" }}>
+              <p style={tHead}>{m.title}</p>
+              <ol style={ol}>{m.steps.map((s, i) => <li key={i} style={{ ...tBody, marginBottom: 3 }}>{s}</li>)}</ol>
+              {key === "hudl" && goalieWarn && (
+                <p style={{ ...tBody, marginTop: 8, color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 10px" }}>⚠️ Hudl player exports don't include goalie stats (saves, shutouts, goals against). Enter those by hand on each keeper's profile.</p>
+              )}
+            </div>
+          );
+        })}
+
+        <div style={block}>
+          <p style={tHead}>🏆 Team wins come from the Seasons tab</p>
+          <p style={tBody}>Stat exports don't carry team W–L. Add each season's record on the <strong>Seasons</strong> tab and every player on that roster is credited automatically — no need to put wins in the file.</p>
         </div>
 
         <div style={block}>
-          <p style={tHead}>🗓 Put the season in the file name</p>
-          <p style={tBody}>Name files like “2025-2026 {sport === "football" ? "Football" : "Stats"}.pdf” and we detect the season automatically. No year in the name? We'll ask you which season it's for.</p>
+          <p style={tHead}>🛡️ Imports merge — they never erase</p>
+          <p style={tBody}>Re-uploading <strong>updates</strong> players and keeps everything else, so a corrected re-upload is always safe. No year in the file name? We'll just ask which season it's for.</p>
         </div>
 
         <div style={block}>
-          <p style={tHead}>📄 What you can upload</p>
+          <p style={tHead}>✏️ Fixing a name, adding or merging players</p>
           <ul style={ul}>
-            <li style={tBody}><strong>PDF stat sheets</strong> — MaxPreps printouts work great; our AI reads them.</li>
-            <li style={tBody}><strong>Hudl / GameChanger CSV or TXT</strong> — export one season's stats (in Hudl, set the view to <strong>Totals</strong>, NOT Averages — we calculate per-game averages for you) and upload the file; we auto-match the columns to your sport.</li>
-            <li style={tBody}><strong>PDF rosters</strong> — jersey #, full name, position.</li>
-            <li style={tBody}><strong>Excel template</strong> — click <strong>Download template</strong> to type stats in by hand.</li>
-          </ul>
-          <p style={{ ...tBody, marginTop: 6 }}>You can select several files at once (e.g. a roster + multiple seasons).</p>
-        </div>
-
-        <div style={block}>
-          <p style={tHead}>🛡️ Your data is safe — imports merge, never erase</p>
-          <p style={tBody}>Re-uploading <strong>updates</strong> players and keeps everything else (new stats win on conflicts; nothing you've already entered gets wiped). A corrected re-upload is always safe.</p>
-        </div>
-
-        <div style={block}>
-          <p style={tHead}>✏️ Fixing a name or combining duplicates</p>
-          <ul style={ul}>
-            <li style={tBody}>Name shows as initials only? Upload that season's <strong>roster</strong> and re-import.</li>
+            <li style={tBody}>Name shows as initials only? Re-import that season <strong>with the roster PDF</strong> included.</li>
             <li style={tBody}>Open any player → <strong>Edit</strong> to rename, or <strong>+ Add player</strong> to enter one by hand.</li>
-            <li style={tBody}>Two entries for one athlete? Use <strong>🔗 Merge players</strong> to combine them (you pick the name to keep).</li>
+            <li style={tBody}>Two entries for one athlete? Use <strong>🔗 Merge players</strong> (you pick the name to keep).</li>
+            <li style={tBody}>Prefer to type stats yourself? Use <strong>Download template</strong> (Excel) on the import bar.</li>
           </ul>
         </div>
-
-        {sport === "football" && (
-          <div style={block}>
-            <p style={tHead}>🏈 Football tip</p>
-            <p style={tBody}>Football sheets have many sections (passing, rushing, receiving, defense, kicking, returns…). Upload the <strong>full multi-section MaxPreps printout</strong> and we pull every category — including the “Lng” longest-play records.</p>
-          </div>
-        )}
 
         <button onClick={onClose} style={{ marginTop: 6, width: "100%", background: "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>Got it</button>
       </div>
