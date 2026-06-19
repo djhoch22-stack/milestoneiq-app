@@ -111,7 +111,7 @@ export function allStatsFor(roster) {
 // Stats a program should ALWAYS surface (even before data exists). Mirrors MilestoneIQ.jsx.
 // Sports not listed fall back to "stats present in the data" (no behavior change).
 const BBALL_DISPLAY = ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"];
-const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"];
+const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Shots on Goal", "Saves", "Shutouts"];
 export const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
