@@ -284,7 +284,7 @@ function allStatsFor(roster) {
 // Stats a program should ALWAYS surface on its tabs — even before any data is entered.
 // Sports NOT listed here fall back to "stats present in the data" (no behavior change).
 const BBALL_DISPLAY = ["Games Played", "Wins", "Points", "Assists", "Total Rebounds", "Offensive Rebounds", "Defensive Rebounds", "Steals", "Blocks", "Field Goals Made", "Field Goals Attempted", "Three Pointers Made", "Three Pointers Attempted", "Free Throws Made", "Free Throws Attempted"];
-const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Saves", "Shutouts"];
+const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "Shots", "Shots on Goal", "Saves", "Shutouts"];
 const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
@@ -2472,9 +2472,13 @@ const STAT_ALIASES_BY_SPORT = {
     "ftm": "Free Throws Made", "fta": "Free Throws Attempted",
   },
   soccer: {
+    // Hudl/GameChanger soccer "Totals" export columns: MP, G, A, S (shots), SOT (shots on goal).
+    // S/G and SOT% are DERIVED (the app computes per-game + accuracy) and drop out automatically.
+    "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
     "g": "Goals", "gls": "Goals", "goals": "Goals",
     "a": "Assists", "ast": "Assists", "assists": "Assists",
-    "sh": "Shots", "sht": "Shots", "shts": "Shots", "shots": "Shots",
+    "s": "Shots", "sh": "Shots", "sht": "Shots", "shts": "Shots", "shots": "Shots",
+    "sot": "Shots on Goal", "sog": "Shots on Goal", "shots on goal": "Shots on Goal", "shots on target": "Shots on Goal",
     "sv": "Saves", "svs": "Saves", "saves": "Saves",
     "so": "Shutouts", "sho": "Shutouts", "shutout": "Shutouts", "shutouts": "Shutouts",
   },
