@@ -6105,7 +6105,7 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, o
     setErr("");
     if (status === "active" && onChangePlan) {
       const label = { program: "Program", school: "School", program_plus: "Program+", school_plus: "School Plus" }[t] || "selected";
-      if (!window.confirm(`Switch to the ${label} plan?\n\nUpgrades charge your card on file the prorated difference right away; downgrades apply as account credit. No second subscription is created.`)) return;
+      if (!window.confirm(`Switch to the ${label} plan?\n\nUpgrades charge the prorated difference to your card now. Downgrades bill the lower rate next cycle — no refund or credit. No second subscription is created.`)) return;
       setBusy(true); const e = await onChangePlan(priceId, t); setBusy(false); if (e) showErr(e);
     } else {
       setBusy(true); const e = await onCheckout?.(priceId, t, b); setBusy(false); if (e) showErr(e);
