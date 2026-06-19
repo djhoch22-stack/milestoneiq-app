@@ -222,7 +222,7 @@ export default function SchoolOnboarding({ userId, fullName, onComplete, onSignO
             </div>
             <div style={s.field}><label style={s.label}>Team name / mascot</label><input style={s.input} value={prog.mascot} onChange={e => setProg(p => ({ ...p, mascot: e.target.value }))} /></div>
             <div style={s.field}><label style={s.label}>Team color</label><input type="color" value={prog.color} onChange={e => setProg(p => ({ ...p, color: e.target.value }))} style={{ width:60, height:38, border:'1px solid #d1d5db', borderRadius:8, cursor:'pointer', background:'#fff' }} /></div>
-            {isCreator && <div style={s.field}><label style={s.label}>Beta / promo code <span style={{ color:'#9ca3af', fontWeight:400 }}>(optional)</span></label><input style={{ ...s.input, textTransform:'uppercase' }} value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="e.g. BETA90" /></div>}
+            {isCreator && <div style={s.field}><label style={s.label}>Beta / promo code <span style={{ color:'#9ca3af', fontWeight:400 }}>(optional)</span></label><input style={{ ...s.input, textTransform:'uppercase' }} value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="Enter code" /></div>}
             <button style={s.btn} onClick={createMyProgram} disabled={busy}>{busy ? 'Setting up…' : 'Finish & open RaftersIQ →'}</button>
           </>
         )}
