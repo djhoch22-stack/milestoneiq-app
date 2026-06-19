@@ -222,9 +222,14 @@ const BASEBALL_RATE_DEFS = [
   { name: "ERA", short: "ERA", after: "Innings Pitched", fmt: "era2", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40, noteAbbr: "IP", lowerIsBetter: true,
     spec: { kind: "era" } },
 ];
+const SOCCER_RATE_DEFS = [
+  { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "pct", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25, noteAbbr: "SOG",
+    spec: { kind: "ratio", num: [["Shots on Goal", 1]], den: [["Shots", 1]] } },
+];
 export function rateDefsFor(sport) {
   if (sport === "baseball") return BASEBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
+  if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
   return [];
 }
 export function rateValue(d, stats) { return evalRateSpec(d.spec, stats); }
