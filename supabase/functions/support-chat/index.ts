@@ -81,23 +81,26 @@ const textOf = (data: any) => (data.content || []).filter((b: any) => b.type ===
 async function recordFeedback(admin: any, fb: any, user: any, orgId: string | null) {
   const kind = String(fb?.kind || "other"); const summary = String(fb?.summary || "").slice(0, 200);
   const detail = String(fb?.detail || summary).slice(0, 4000);
-  // Best-effort log (table is optional — see supabase/add_feedback.sql). Never blocks the email.
-  try { await admin.from("feedback").insert({ org_id: orgId || null, user_id: user?.id || null, user_email: user?.email || null, kind, summary, detail, status: "new" }); } catch (_e) { /* table may not exist yet */ }
-  // Email the founder via Resend (same setup as send-alert).
+  console.log("record_feedback fired:", kind, "-", summary);
+  // Best-effort log (table optional — see supabase/add_feedback.sql). Never blocks the email.
+  try { await admin.from("feedback").insert({ org_id: orgId || null, user_id: user?.id || null, user_email: user?.email || null, kind, summary, detail, status: "new" }); }
+  catch (e) { console.error("feedback insert skipped (table may not exist):", String(e)); }
+  // Email the founder via Resend — mirrors the working send-alert call: `to` is an ARRAY, errors are logged.
   const key = Deno.env.get("RESEND_API_KEY"); const from = Deno.env.get("RESEND_FROM");
-  if (key && from) {
-    try {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from, to: FEEDBACK_TO, reply_to: user?.email || undefined,
-          subject: `RaftersIQ ${kind}: ${summary}`.slice(0, 150),
-          text: `New ${kind} from the in-app helper\n\nSummary: ${summary}\n\nDetail:\n${detail}\n\n— ${user?.email || "a user"}${orgId ? ` · org ${orgId}` : ""}`,
-        }),
-      });
-    } catch (_e) { /* non-fatal */ }
-  }
+  if (!key || !from) { console.error("feedback email NOT sent — RESEND_API_KEY or RESEND_FROM missing on this project"); return; }
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from, to: [FEEDBACK_TO],
+        subject: `RaftersIQ ${kind}: ${summary}`.slice(0, 150),
+        text: `New ${kind} via the in-app helper\n\nSummary: ${summary}\n\nDetail:\n${detail}\n\n— ${user?.email || "a user"}${orgId ? ` · org ${orgId}` : ""}`,
+      }),
+    });
+    if (!resp.ok) { const d = await resp.text().catch(() => ""); console.error("feedback email FAILED:", resp.status, d.slice(0, 400)); }
+    else console.log("feedback email sent to", FEEDBACK_TO);
+  } catch (e) { console.error("feedback email threw:", String(e)); }
 }
 
 Deno.serve(async (req) => {
