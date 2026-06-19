@@ -1823,7 +1823,7 @@ function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
 
 
 // ── All-Time Leaderboard Tab ───────────────────────────────────────────────────
-function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = [], seasonOptions = [], careerStats = {}, canEdit = true, onSaved }) {
+function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = [], seasonOptions = [], teamSeasons = [], careerStats = {}, canEdit = true, onSaved }) {
   const [rows, setRows] = useState(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState([]);
@@ -1863,6 +1863,11 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
       if (!String(row.season || "").trim()) continue;
       const stats = {};
       for (const k in (row.stats || {})) { const v = row.stats[k]; if (v !== "" && v != null && !isNaN(Number(v))) stats[k] = Number(v); }
+      // Auto-assign the team's wins for this season — a player on a season's roster shares that season's
+      // team win total (same rule the season import + Seasons editor use). Overrides Wins so it can't
+      // drift from the team's record when a matching program season exists.
+      const teamWins = Number(((teamSeasons || []).find((x) => sameSeason(x.season, row.season)) || {}).wins) || 0;
+      if (teamWins > 0) stats.Wins = teamWins;
       const { error } = await savePlayerSeason({
         id: row.id, program_id: programId, player_name: playerName,
         season: String(row.season).trim(), grade: row.grade ? String(row.grade).trim() : null, stats,
@@ -2289,6 +2294,7 @@ function PlayerProfileModal({ player: player0, school: school0, allSchools = [],
             columns={statsToShow}
             allStats={ALL_STATS}
             seasonOptions={(school.seasons || []).map(s => s.season).filter(Boolean)}
+            teamSeasons={school.seasons || []}
             careerStats={player.stats}
             onSaved={(career, years) => {
               // Push the recomputed career + year range into the all-time roster + active roster so the
