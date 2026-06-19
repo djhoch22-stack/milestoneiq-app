@@ -54,26 +54,31 @@ Deno.serve(async (req) => {
   const tierOf = (sub: any) => sub?.metadata?.tier || PRICE_TIER[priceOf(sub) || ""] || "program";
   const orgOf = (sub: any) => sub?.metadata?.org_id || "";
   const periodEnd = (sub: any) => (sub?.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null);
-  // Two-sided referral reward: when a REFERRED org first pays, give the referrer one free month — a Stripe
-  // account credit if they're already a paying customer, otherwise +30 trial days. Flag-guarded (idempotent).
+  // Two-sided referral reward: when a REFERRED org first pays, give the referrer one FREE MONTH — never an
+  // account credit. A paying referrer's subscription (monthly OR annual) has its paid-through date pushed out
+  // ~30 days via trial_end (no proration); a not-yet-paying referrer gets +30 app-trial days. Flag-guarded.
+  const MONTH_SECS = 30 * 24 * 60 * 60;
   const rewardReferrer = async (refereeOrgId: string) => {
     if (!refereeOrgId) return;
     const { data: ref } = await admin.from("organizations").select("referred_by_org, referral_rewarded").eq("id", refereeOrgId).single();
     if (!ref || !ref.referred_by_org || ref.referral_rewarded) return;
-    await admin.from("organizations").update({ referral_rewarded: true }).eq("id", refereeOrgId); // set first → a Stripe retry can't double-credit
+    await admin.from("organizations").update({ referral_rewarded: true }).eq("id", refereeOrgId); // set first → a Stripe retry can't double-reward
     const { data: r } = await admin.from("organizations").select("id, stripe_customer_id, trial_ends_at").eq("id", ref.referred_by_org).single();
     if (!r) return;
+    let sub: any = null;
     if (r.stripe_customer_id) {
+      try { sub = (await stripe.subscriptions.list({ customer: r.stripe_customer_id, status: "active", limit: 1 }))?.data?.[0] || null; } catch (_e) { /* fall through to trial extension */ }
+    }
+    if (sub) {
+      // Paying referrer (monthly OR annual): push the next charge out ~30 days = one free month, no credit.
+      const curEnd = sub.current_period_end || sub.items?.data?.[0]?.current_period_end || Math.floor(Date.now() / 1000);
+      const newEnd = curEnd + MONTH_SECS;
       try {
-        const subs = await stripe.subscriptions.list({ customer: r.stripe_customer_id, status: "active", limit: 1 });
-        const price = subs?.data?.[0]?.items?.data?.[0]?.price;
-        const unit = price?.unit_amount || 0;
-        const amount = price?.recurring?.interval === "year" ? Math.round(unit / 12) : unit; // one MONTH's worth, even if they pay annually
-        if (amount > 0) await stripe.customers.createBalanceTransaction(r.stripe_customer_id, {
-          amount: -amount, currency: "usd", description: "RaftersIQ referral reward — one free month",
-        });
+        await stripe.subscriptions.update(sub.id, { trial_end: newEnd, proration_behavior: "none" });
+        await admin.from("organizations").update({ trial_ends_at: new Date(newEnd * 1000).toISOString() }).eq("id", r.id);
       } catch (_e) { /* non-fatal — referee already marked rewarded */ }
     } else {
+      // Referrer hasn't subscribed yet → extend their app trial by 30 days.
       const base = (r.trial_ends_at && new Date(r.trial_ends_at) > new Date()) ? new Date(r.trial_ends_at) : new Date();
       base.setDate(base.getDate() + 30);
       await admin.from("organizations").update({ trial_ends_at: base.toISOString() }).eq("id", r.id);
@@ -98,7 +103,10 @@ Deno.serve(async (req) => {
       case "customer.subscription.updated": {
         const sub = event.data.object;
         const orgId = orgOf(sub);
-        await setOrg(orgId, { subscription_status: sub.status, subscription_tier: tierOf(sub) });
+        const fields: Record<string, unknown> = { subscription_status: sub.status, subscription_tier: tierOf(sub) };
+        // During a gifted referral free month the sub is "trialing" — sync trial_ends_at so the org gate stays unlocked.
+        if (sub.status === "trialing" && sub.trial_end) fields.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+        await setOrg(orgId, fields);
         await upsertSub({
           org_id: orgId, status: sub.status, stripe_customer_id: sub.customer,
           stripe_subscription_id: sub.id, price_id: priceOf(sub), current_period_end: periodEnd(sub),
