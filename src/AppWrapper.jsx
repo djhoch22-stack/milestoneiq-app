@@ -26,7 +26,7 @@ import {
   redeemPromoCode,
 } from './supabase_client';
 import Auth, { LockedScreen } from './Auth';
-import App from './MilestoneIQ';
+import App, { SupportChat } from './MilestoneIQ';
 import SchoolOnboarding from './SchoolOnboarding';
 
 // maxUsers = total members per school INCLUDING the AD (enforced at invite time).
@@ -551,6 +551,7 @@ export default function AppWrapper() {
         isPlatformOwner={!!profile?.is_platform_owner}
         onSignOut={() => supabase.auth.signOut()}
       />
+      <SupportChat />
     </>
   );
 }
