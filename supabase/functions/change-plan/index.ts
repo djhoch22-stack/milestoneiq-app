@@ -51,15 +51,22 @@ Deno.serve(async (req) => {
     const item = sub.items.data[0];
     if (item?.price?.id === priceId) return json({ ok: true, unchanged: true });
 
-    // Swap the price on the existing item — NO new subscription is created.
-    // proration_behavior:"always_invoice" + payment_behavior:"error_if_incomplete" charge the
-    // prorated difference to the card on file RIGHT NOW (no "upgrade, use it, downgrade before the
-    // bill" free window). On an upgrade the update only applies if that charge succeeds; a downgrade
-    // nets to a credit (no payment due) and still passes.
+    // Upgrade or downgrade? Compare the target price to the current one.
+    const currentAmount = item?.price?.unit_amount ?? 0;
+    let newAmount = currentAmount + 1; // default to the "upgrade" path (charge now) if the lookup fails
+    try { const np = await stripe.prices.retrieve(priceId); newAmount = np?.unit_amount ?? newAmount; } catch (_e) { /* keep upgrade default */ }
+    const isUpgrade = newAmount > currentAmount;
+
+    // Swap the price on the existing item — NO new subscription, and NO account credit, ever.
+    // UPGRADE: proration_behavior "always_invoice" + payment_behavior "error_if_incomplete" charge the
+    //   prorated difference to the card on file RIGHT NOW, and the change only applies if that charge
+    //   clears (closes the "upgrade, use it, downgrade before the bill" window).
+    // DOWNGRADE: proration_behavior "none" — no credit and no refund; the lower price simply bills at
+    //   the next renewal (we never want to hand out account credit).
     await stripe.subscriptions.update(sub.id, {
       items: [{ id: item.id, price: priceId }],
-      proration_behavior: "always_invoice",
-      payment_behavior: "error_if_incomplete",
+      proration_behavior: isUpgrade ? "always_invoice" : "none",
+      ...(isUpgrade ? { payment_behavior: "error_if_incomplete" } : {}),
       metadata: { org_id: orgId, tier: tier || "" }, // keep tier in sync for the webhook's tierOf()
     });
     // Reflect the new tier immediately; the customer.subscription.updated webhook also syncs it.
