@@ -860,9 +860,31 @@ function LandingPage({ onStartTrial, onSignIn }) {
         <p style={{ fontSize: isMobile ? 16 : 20, color:"#4b5563", lineHeight:1.5, margin:"0 0 28px" }}>RaftersIQ tracks careers, seasons, records, and milestones — and auto-builds your Hall of Fame for athletes and coaches across every sport.</p>
         <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
           <button onClick={onStartTrial} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:10, padding:"14px 28px", fontSize:16, fontWeight:700, cursor:"pointer" }}>Start your 7-day free trial →</button>
-          <button onClick={onSignIn} style={{ background:"#fff", color:"#374151", border:"1px solid #d1d5db", borderRadius:10, padding:"14px 24px", fontSize:16, fontWeight:600, cursor:"pointer" }}>Sign in</button>
+          <a href="/teams/denver-christian-basketball-boys" target="_blank" rel="noreferrer" style={{ background:"#fff", color:"#1a56db", border:"1px solid #bfdbfe", borderRadius:10, padding:"14px 24px", fontSize:16, fontWeight:600, cursor:"pointer", textDecoration:"none", display:"inline-block" }}>▶ See a live example</a>
         </div>
         <div style={{ fontSize:13, color:"#9ca3af", marginTop:14 }}>No credit card required · Cancel anytime</div>
+      </div>
+
+      {/* How it works */}
+      <div style={{ padding: wrapPad, maxWidth:1120, margin:"0 auto" }}>
+        <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 8px" }}>From a stat sheet to your record book in minutes</h2>
+        <p style={{ textAlign:"center", fontSize:16, color:"#6b7280", margin:"0 0 36px" }}>No spreadsheets. No manual entry.</p>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap:16 }}>
+          {[
+            { n:"1", icon:"📥", title:"Import your stats", desc:"Upload a MaxPreps PDF or a Hudl / GameChanger export — one season at a time. Our AI reads the players and stats for you." },
+            { n:"2", icon:"🏆", title:"We build your record book", desc:"Career & season stats, school records, per-game averages, and an auto-scored Hall of Fame — all computed automatically." },
+            { n:"3", icon:"🌐", title:"Share your public page", desc:"Every program gets a clean, shareable record book — perfect for banquets, recruiting, and alumni." },
+          ].map(st => (
+            <div key={st.n} style={{ background:"#fff", border:"1px solid #f0eeea", borderRadius:14, padding:"22px 20px", textAlign:"center" }}>
+              <div style={{ fontSize:28, marginBottom:8 }}>{st.icon}</div>
+              <div style={{ fontWeight:700, fontSize:17, marginBottom:6 }}>{st.n}. {st.title}</div>
+              <div style={{ fontSize:14, color:"#6b7280", lineHeight:1.5 }}>{st.desc}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ textAlign:"center", marginTop:28 }}>
+          <a href="/teams/denver-christian-basketball-boys" target="_blank" rel="noreferrer" style={{ color:"#1a56db", fontWeight:700, fontSize:15, textDecoration:"none" }}>▶ Explore a real record book — Denver Christian boys basketball →</a>
+        </div>
       </div>
 
       {/* Features */}
@@ -898,6 +920,26 @@ function LandingPage({ onStartTrial, onSignIn }) {
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 {p.features.map(ft => <div key={ft} style={{ fontSize:13, color:"#374151" }}>✓ {ft}</div>)}
               </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* FAQ */}
+      <div style={{ background:"#fff", borderTop:"1px solid #e8e4dd", padding: wrapPad }}>
+        <div style={{ maxWidth:820, margin:"0 auto" }}>
+          <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 28px" }}>Questions, answered</h2>
+          {[
+            { q:"Which sports are supported?", a:"Football, boys & girls basketball, boys & girls soccer, baseball, softball, volleyball, wrestling and more — each with sport-specific stats and records." },
+            { q:"Can I bring in our old stats?", a:"Yes. Upload MaxPreps PDFs or Hudl / GameChanger CSV exports and our AI reads them, or type them into our Excel template. Imports merge, so re-uploading never erases anything." },
+            { q:"Do we get a public record book?", a:"Yes — every program gets a clean, shareable public page and Hall of Fame. You choose which programs are public." },
+            { q:"Is our athletes' data safe?", a:"Records are per-school with role-based access for your AD and coaches. Nothing is public unless you publish it." },
+            { q:"What does it cost?", a:"Plans start at $15/mo with a 7-day free trial and no card required. Save ~17% with annual billing, and cancel anytime." },
+            { q:"Can our whole staff use it?", a:"Yes — an Athletic Director dashboard, role-based access for every coach, and cross-sport athlete profiles across all your programs." },
+          ].map(f => (
+            <div key={f.q} style={{ borderBottom:"1px solid #f0eeea", padding:"16px 0" }}>
+              <div style={{ fontWeight:700, fontSize:16, marginBottom:6 }}>{f.q}</div>
+              <div style={{ fontSize:14, color:"#6b7280", lineHeight:1.6 }}>{f.a}</div>
             </div>
           ))}
         </div>
