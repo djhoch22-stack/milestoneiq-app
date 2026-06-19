@@ -725,14 +725,14 @@ export const changePlan = async (orgId, priceId, tier) => {
 
 // In-app AI support assistant. Sends the conversation (array of { role, content }) to the
 // support-chat edge function and returns { data:{ reply }, error }.
-export const supportChat = async (messages) => {
+export const supportChat = async (messages, orgId) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return { error: 'Please sign in to use chat.' };
     const res = await fetch(`${SUPABASE_URL}/functions/v1/support-chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, orgId }),
     });
     const out = await res.json().catch(() => ({}));
     return { data: out, error: res.ok ? null : (out.error || 'chat failed') };
