@@ -545,6 +545,7 @@ export default function AppWrapper() {
         trialEndsAt={org?.trial_ends_at || null}
         onCheckout={goCheckout}
         onChangePlan={goChangePlan}
+        hasStripeCustomer={!!org?.stripe_customer_id}
         onManageBilling={goPortal}
         onRedeemCode={goRedeem}
         isPlatformOwner={!!profile?.is_platform_owner}
