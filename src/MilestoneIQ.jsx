@@ -2886,9 +2886,10 @@ function ImportHelpModal({ sport, onClose }) {
           );
         })}
 
-        <div style={block}>
-          <p style={tHead}>🏆 Team wins come from the Seasons tab</p>
-          <p style={tBody}>Stat exports don't carry team W–L. Add each season's record on the <strong>Seasons</strong> tab and every player on that roster is credited automatically — no need to put wins in the file.</p>
+        <div style={{ ...block, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 14px" }}>
+          <p style={tHead}>🏆 Add each season's record (W–L) on the Seasons tab</p>
+          <p style={tBody}>Stat files don't include team wins — enter the season's W–L on the <strong>Seasons</strong> tab and every player who played that season is credited with the team's wins automatically.</p>
+          <p style={{ ...tBody, marginTop: 6 }}><strong>Order doesn't matter.</strong> Do it before or after importing: if the record is already there, the upload picks it up; if you import first, the wins fill in the moment you save the season's record.</p>
         </div>
 
         <div style={block}>
