@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -6562,6 +6562,49 @@ function AllSportsHof({ schools = [], onUpdate }) {
   );
 }
 
+// In-app AI help assistant — a floating "💬 Help" bubble that answers RaftersIQ how-to
+// questions via the support-chat edge function. Rendered app-wide for logged-in users (AppWrapper).
+export function SupportChat() {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([{ role: "assistant", content: "Hi! I'm the RaftersIQ helper. Ask me anything — importing stats, records, Hall of Fame, billing…" }]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const bodyRef = useRef(null);
+  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs, open, busy]);
+  const send = async () => {
+    const q = input.trim();
+    if (!q || busy) return;
+    const next = [...msgs, { role: "user", content: q }];
+    setMsgs(next); setInput(""); setBusy(true);
+    const firstUser = next.findIndex((m) => m.role === "user"); // drop the canned greeting; API must start with a user turn
+    const { data, error } = await supportChat(next.slice(firstUser < 0 ? 0 : firstUser));
+    setBusy(false);
+    setMsgs((m) => [...m, { role: "assistant", content: error ? `Sorry — ${error} You can also email support@raftersiq.com.` : (data?.reply || "…") }]);
+  };
+  const onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+  if (!open) return (
+    <button onClick={() => setOpen(true)} title="RaftersIQ Help" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 1000, background: "#1a56db", color: "#fff", border: "none", borderRadius: 999, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 20px rgba(26,86,219,0.35)" }}>💬 Help</button>
+  );
+  return (
+    <div style={{ position: "fixed", right: isMobile ? 10 : 20, bottom: isMobile ? 10 : 20, zIndex: 1000, width: isMobile ? "calc(100vw - 20px)" : 380, maxWidth: "96vw", height: isMobile ? "72vh" : 520, maxHeight: "82vh", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, boxShadow: "0 14px 44px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ background: "#1a3a6b", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>💬 RaftersIQ Help</div>
+        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+      </div>
+      <div ref={bodyRef} style={{ flex: 1, overflowY: "auto", padding: 14, background: "#f8fafc", display: "flex", flexDirection: "column", gap: 10 }}>
+        {msgs.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", background: m.role === "user" ? "#1a56db" : "#fff", color: m.role === "user" ? "#fff" : "#111", border: m.role === "user" ? "none" : "1px solid #e5e7eb", borderRadius: 12, padding: "9px 12px", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.content}</div>
+        ))}
+        {busy && <div style={{ alignSelf: "flex-start", color: "#9ca3af", fontSize: 13, padding: "4px 6px" }}>typing…</div>}
+      </div>
+      <div style={{ borderTop: "1px solid #eee", padding: 10, display: "flex", gap: 8, background: "#fff" }}>
+        <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} rows={1} placeholder="Ask a question…" style={{ flex: 1, resize: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 11px", fontSize: 13.5, fontFamily: "inherit", maxHeight: 90 }} />
+        <button onClick={send} disabled={busy || !input.trim()} style={{ background: (busy || !input.trim()) ? "#9cb6ef" : "#1a56db", color: "#fff", border: "none", borderRadius: 8, padding: "0 16px", fontSize: 16, fontWeight: 700, cursor: (busy || !input.trim()) ? "default" : "pointer" }}>↑</button>
+      </div>
+    </div>
+  );
+}
 export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, hasStripeCustomer, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
