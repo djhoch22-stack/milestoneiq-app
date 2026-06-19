@@ -6567,7 +6567,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
 export function SupportChat({ orgId } = {}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState([{ role: "assistant", content: "Hi! I'm the RaftersIQ helper. Ask me anything — importing stats, records, Hall of Fame, billing…" }]);
+  const [msgs, setMsgs] = useState([{ role: "assistant", content: "Hi! I'm the RaftersIQ helper. Ask me anything about the app — or share a suggestion or bug and I'll pass it straight to the team." }]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef(null);
@@ -6584,12 +6584,12 @@ export function SupportChat({ orgId } = {}) {
   };
   const onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   if (!open) return (
-    <button onClick={() => setOpen(true)} title="RaftersIQ Help" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 1000, background: "#1a56db", color: "#fff", border: "none", borderRadius: 999, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 20px rgba(26,86,219,0.35)" }}>💬 Help</button>
+    <button onClick={() => setOpen(true)} title="RaftersIQ Help" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 1000, background: "#1a56db", color: "#fff", border: "none", borderRadius: 999, padding: "12px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 20px rgba(26,86,219,0.35)" }}>💬 Help &amp; Suggestions</button>
   );
   return (
     <div style={{ position: "fixed", right: isMobile ? 10 : 20, bottom: isMobile ? 10 : 20, zIndex: 1000, width: isMobile ? "calc(100vw - 20px)" : 380, maxWidth: "96vw", height: isMobile ? "72vh" : 520, maxHeight: "82vh", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, boxShadow: "0 14px 44px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ background: "#1a3a6b", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>💬 RaftersIQ Help</div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>💬 Help &amp; Suggestions</div>
         <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "#cbd5e1", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
       </div>
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto", padding: 14, background: "#f8fafc", display: "flex", flexDirection: "column", gap: 10 }}>
