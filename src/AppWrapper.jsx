@@ -551,7 +551,7 @@ export default function AppWrapper() {
         isPlatformOwner={!!profile?.is_platform_owner}
         onSignOut={() => supabase.auth.signOut()}
       />
-      <SupportChat />
+      <SupportChat orgId={orgId} />
     </>
   );
 }
