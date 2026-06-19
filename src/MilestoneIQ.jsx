@@ -6088,22 +6088,28 @@ function saveSchools(data) {
 
 // Settings → Billing card (admins only). Shows trial/plan status and opens the
 // shared ChoosePlan picker (→ Stripe checkout) or the Stripe billing portal.
-function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner }) {
+function BillingSection({ tier, status, trialEndsAt, hasStripeCustomer, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const tierName = { program: "Program", school: "School", program_plus: "Program+", school_plus: "School Plus" }[tier] || "Program";
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : null;
-  const planLine = status === "active" ? `${tierName} plan · active`
+  const trialEndStr = trialEndsAt ? new Date(trialEndsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
+  // A paying subscriber (has a Stripe customer) shown as "trialing" is in a gifted referral free month —
+  // not a signup trial. They still have a subscription, so plan switches must go through change-plan.
+  const freeMonth = status === "trialing" && hasStripeCustomer;
+  const subscribed = status === "active" || freeMonth;
+  const planLine = freeMonth ? `${tierName} plan · referral free month${trialEndStr ? ` through ${trialEndStr}` : ""}`
+    : status === "active" ? `${tierName} plan · active`
     : status === "trialing" ? `Free trial${daysLeft != null ? ` — ${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : ""}`
     : status === "past_due" ? "Payment past due"
     : status === "canceled" ? "Subscription canceled"
     : (status || "—");
   const showErr = (e) => setErr(typeof e === "string" ? e : (e?.message || "Something went wrong"));
-  // Active subscribers SWITCH their existing sub in place (no new sub → no double-billing);
-  // everyone else (trialing/canceled/new) starts a fresh checkout.
+  // Existing subscribers (active OR in a gifted free month) SWITCH their sub in place (no new sub →
+  // no double-billing); brand-new / canceled accounts start a fresh checkout.
   const select = async (priceId, t, b) => {
     setErr("");
-    if (status === "active" && onChangePlan) {
+    if (subscribed && onChangePlan) {
       const label = { program: "Program", school: "School", program_plus: "Program+", school_plus: "School Plus" }[t] || "selected";
       if (!window.confirm(`Switch to the ${label} plan?\n\nUpgrades charge the prorated difference to your card now. Downgrades bill the lower rate next cycle — no refund or credit. No second subscription is created.`)) return;
       setBusy(true); const e = await onChangePlan(priceId, t); setBusy(false); if (e) showErr(e);
@@ -6130,12 +6136,12 @@ function BillingSection({ tier, status, trialEndsAt, onCheckout, onChangePlan, o
         <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10,marginBottom:16 }}>
           <div>
             <div style={{ fontSize:14,fontWeight:600,color:"#111" }}>{planLine}</div>
-            <div style={{ fontSize:13,color:"#6b7280" }}>{status === "active" ? "You're subscribed. Pick a different plan below, or manage your card / cancel." : "Pick a plan below to subscribe — your data stays put either way."}</div>
+            <div style={{ fontSize:13,color:"#6b7280" }}>{subscribed ? "You're subscribed. Pick a different plan below, or manage your card / cancel." : "Pick a plan below to subscribe — your data stays put either way."}</div>
           </div>
-          {status === "active" && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Manage billing</button>}
+          {subscribed && <button onClick={manage} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"9px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Manage billing</button>}
         </div>
         {err && <div style={{ ...errStyle, marginBottom:14 }}>{err}</div>}
-        <ChoosePlan onSelect={select} busy={busy} initial={tier} currentTier={status === "active" ? tier : undefined} ctaLabel={status === "active" ? "Switch to selected plan →" : "Subscribe & continue →"} />
+        <ChoosePlan onSelect={select} busy={busy} initial={tier} currentTier={subscribed ? tier : undefined} ctaLabel={subscribed ? "Switch to selected plan →" : "Subscribe & continue →"} />
         <div style={{ borderTop:"1px solid #f3f0ea",marginTop:18,paddingTop:16 }}>
           <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:6 }}>Have a beta or promo code?</div>
           {redeemMsg && <div style={{ background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#166534",marginBottom:8 }}>{redeemMsg}</div>}
@@ -6512,7 +6518,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
   );
 }
 
-export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
+export default function App({ initialSchools, onUpdateSchool, orgId, orgName, tier, tierLimits, userEmail, onSignOut, role, userName, userId, userPhone, subscriptionStatus, trialEndsAt, hasStripeCustomer, onCheckout, onChangePlan, onManageBilling, onRedeemCode, isPlatformOwner } = {}) {
   const supabaseMode = !!orgId;
   // "authed" = rendered by AppWrapper (the user is logged in), even if they have no org yet.
   // For ANY logged-in user, schools come ONLY from the DB (initialSchools). We must NEVER
@@ -6691,7 +6697,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
           <MembersSection orgId={orgId} role={role} userId={userId} programs={schools} tierLimits={tierLimits} />
         </Section>
 
-        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} onCheckout={onCheckout} onChangePlan={onChangePlan} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
+        {role === "admin" && <BillingSection tier={tier} status={subscriptionStatus} trialEndsAt={trialEndsAt} hasStripeCustomer={hasStripeCustomer} onCheckout={onCheckout} onChangePlan={onChangePlan} onManageBilling={onManageBilling} onRedeemCode={onRedeemCode} isPlatformOwner={isPlatformOwner} />}
 
         {role === "admin" && (
           <Section title="🎁 Refer a school">
