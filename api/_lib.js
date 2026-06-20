@@ -146,7 +146,7 @@ export function statsToDisplay(roster, sport) {
     .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
   // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
   // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
-  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s) || base.includes(s)).sort((a, b) => byStatOrder(a, b, sport));
+  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
@@ -189,6 +189,7 @@ const statG = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) 
 export function evalRateSpec(spec, stats) {
   const g = statG(stats);
   if (spec.kind === "pct") return shootingPct(stats, spec.made, spec.att);
+  if (spec.kind === "pctIn") { const a = g(spec.att); return a > 0 ? Math.round(((a - g(spec.errs)) / a) * 1000) / 10 : null; } // (att - errs)/att × 100, e.g. Serve %
   if (spec.kind === "ratio") {
     let n = 0, d = 0;
     for (const [k, w] of spec.num) n += w * g(k);
