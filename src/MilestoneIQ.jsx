@@ -2068,17 +2068,26 @@ function activeAlerts(school, bestByName = {}, records = (school.records || []))
 }
 function activeAlertCount(school, bestByName = {}, records = (school.records || [])) { return activeAlerts(school, bestByName, records).reduce((n, x) => n + x.alerts.length, 0); }
 // Inducted Hall-of-Fame members (school or state).
-function hofMemberCount(school, allSchools) {
-  // Count this program's roster players who are HOF members in THIS sport OR any gender-compatible one
-  // (girls↔girls, boys↔boys, football bridges) — matches the HOF tab's cross-sport recognition, so a
-  // multi-sport inductee (e.g. inducted in girls basketball) is counted on her girls-soccer tile too.
+// Names inducted into the School / State HOF in THIS sport OR any gender-compatible one (girls↔girls,
+// boys↔boys, football bridges) — the same cross-sport recognition the HOF tab uses. Returns
+// normalized-name Sets so a multi-sport inductee (e.g. inducted in girls basketball) shows the HOF
+// badge on every one of her programs' tiles, not just the program she happened to be inducted under.
+function hofInductedNames(school, allSchools) {
   const schools = (allSchools && allSchools.length) ? allSchools : [school];
-  const inducted = new Set();
+  const schoolNames = new Set(), stateNames = new Set();
   schools.forEach(p => {
     if (!sportsLinkable(school.sport, p.sport)) return;
-    (p.allTimeRoster || []).forEach(pl => { if (pl.schoolHallOfFame || pl.stateHallOfFame) inducted.add(normName(pl.name)); });
+    (p.allTimeRoster || []).forEach(pl => {
+      const nm = normName(pl.name);
+      if (pl.schoolHallOfFame) schoolNames.add(nm);
+      if (pl.stateHallOfFame)  stateNames.add(nm);
+    });
   });
-  return (school.allTimeRoster || []).filter(p => inducted.has(normName(p.name))).length;
+  return { schoolNames, stateNames };
+}
+function hofMemberCount(school, allSchools) {
+  const { schoolNames, stateNames } = hofInductedNames(school, allSchools);
+  return (school.allTimeRoster || []).filter(p => { const nm = normName(p.name); return schoolNames.has(nm) || stateNames.has(nm); }).length;
 }
 // Records used for "about to break a record" alerts: stored records + auto-computed CAREER and
 // SINGLE-SEASON counting records (the current leaders), deduped. Covers every stat, so a sport with no
@@ -2152,6 +2161,9 @@ function PlayerProfileModal({ player: player0, school: school0, allSchools = [],
   useEffect(() => { setActiveId(school0.id); }, [school0.id, player0.name]); // reset toggle when a new player opens
   const active = sports.find(x => x.school.id === activeId) || { school: school0, player: player0 };
   const school = active.school, player = active.player;
+  // HOF badge reflects induction in ANY of her gender-compatible sports, not just the one currently open.
+  const anySchoolHof = sports.some(x => x.player && x.player.schoolHallOfFame);
+  const anyStateHof  = sports.some(x => x.player && x.player.stateHallOfFame);
   // Per-sport helpers — stats grid, all-time rank, and active flag are computed for the ACTIVE program.
   const ALL_STATS = statsToDisplay(school.allTimeRoster || [], school.sport);
   const effectiveIsActive = makeEffectiveIsActive(school.athletes || []);
@@ -2219,8 +2231,8 @@ function PlayerProfileModal({ player: player0, school: school0, allSchools = [],
               <div style={{color:"#fff",fontWeight:700,fontSize:20,display:"flex",alignItems:"center",gap:8}}>
                 {player.name}
                 {isActive && <span style={{background:"rgba(255,255,255,0.25)",color:"#fff",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>Active</span>}
-                {player.schoolHallOfFame && <span title="School Hall of Fame" style={{fontSize:18}}>🏛️</span>}
-                {player.stateHallOfFame  && <span title="State Hall of Fame"  style={{fontSize:18}}>⭐</span>}
+                {anySchoolHof && <span title="School Hall of Fame" style={{fontSize:18}}>🏛️</span>}
+                {anyStateHof  && <span title="State Hall of Fame"  style={{fontSize:18}}>⭐</span>}
               </div>
               <div style={{color:"rgba(255,255,255,0.75)",fontSize:13,marginTop:3,display:"flex",gap:12}}>
                 {years && <span>🗓 {years}</span>}
@@ -2248,14 +2260,14 @@ function PlayerProfileModal({ player: player0, school: school0, allSchools = [],
         <div style={{padding:24}}>
 
           {/* Hall of fame badges */}
-          {(player.schoolHallOfFame || player.stateHallOfFame) && (
+          {(anySchoolHof || anyStateHof) && (
             <div style={{display:"flex",gap:8,marginBottom:18}}>
-              {player.schoolHallOfFame && (
+              {anySchoolHof && (
                 <div style={{display:"flex",alignItems:"center",gap:6,background:"#fef9c3",border:"1px solid #fde68a",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,color:"#92400e"}}>
                   🏛️ School Hall of Fame
                 </div>
               )}
-              {player.stateHallOfFame && (
+              {anyStateHof && (
                 <div style={{display:"flex",alignItems:"center",gap:6,background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,color:"#166534"}}>
                   ⭐ State Hall of Fame
                 </div>
@@ -3240,6 +3252,8 @@ function ImportSeasons({ school, roster = [] }) {
 }
 
 function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [], allSchools = [] }) {
+  // Cross-sport HOF recognition so a multi-sport inductee shows the 🏛️/⭐ badge on this sport's leaderboard too.
+  const { schoolNames: hofSchoolSet, stateNames: hofStateSet } = hofInductedNames(school, allSchools);
   const ALL_STATS = statsToDisplay(roster, school?.sport);
   // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
   // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
@@ -3416,8 +3430,8 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontWeight:600,color:"#111"}}>{p.name}</span>
                       {active && <span style={{background:"#dbeafe",color:"#1e40af",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:700}}>Active</span>}
-                      {p.schoolHallOfFame && <span title="School Hall of Fame" style={{fontSize:13}}>🏛️</span>}
-                      {p.stateHallOfFame  && <span title="State Hall of Fame"  style={{fontSize:13}}>⭐</span>}
+                      {(p.schoolHallOfFame || hofSchoolSet.has(normName(p.name))) && <span title="School Hall of Fame" style={{fontSize:13}}>🏛️</span>}
+                      {(p.stateHallOfFame  || hofStateSet.has(normName(p.name)))  && <span title="State Hall of Fame"  style={{fontSize:13}}>⭐</span>}
                     </div>
                   </td>
                   <td style={{padding:"9px 16px",color:"#9ca3af",fontSize:12,whiteSpace:"nowrap"}}>
