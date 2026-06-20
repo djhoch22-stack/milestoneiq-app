@@ -2650,6 +2650,53 @@ function splitCSVRows(text) {
   return rows;
 }
 
+// Bulk-paste team season records copied from a spreadsheet (tab-separated) or CSV. Maps columns from a
+// header row when present (Season, Wins/Overall W, Losses, League W, League L, Coach, Notes — any order;
+// extra/blank columns ignored), else assumes that order. Skips header/totals/career/blank rows.
+function parseSeasonsPaste(text) {
+  const rows = splitCSVRows(String(text || "").trim()).map((r) => r.map((c) => String(c == null ? "" : c).trim()));
+  if (!rows.length) return [];
+  const num = (v) => { if (v == null || v === "" || v === "-") return null; const n = Number(String(v).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? null : n; };
+  const h0 = rows[0].map((c) => c.toLowerCase());
+  const isHeader = h0.some((c) => /season|coach|overall|league|record|accomplish|note/.test(c)) && num(rows[0][1]) == null;
+  let col = { season: 0, wins: 1, losses: 2, leagueWins: 3, leagueLosses: 4, coach: 5, notes: 6 };
+  let data = rows;
+  if (isHeader) {
+    const find = (re, not) => h0.findIndex((c) => c && re.test(c) && !(not && not.test(c)));
+    col = {
+      season:       Math.max(0, find(/season|year/)),
+      wins:         find(/overall\s*w|^w$|^wins$|\bwins\b/, /league|loss/),
+      losses:       find(/overall\s*l|^l$|^losses$|\blosses\b/, /league/),
+      leagueWins:   find(/league.*w|conf.*w/),
+      leagueLosses: find(/league.*l|conf.*l/),
+      coach:        find(/coach/),
+      notes:        find(/note|accomplish|result|championship|finish|honors/),
+    };
+    if (col.notes < 0 && col.coach >= 0) col.notes = col.coach + 1; // headerless notes column right after Coach
+    data = rows.slice(1);
+  }
+  const out = [];
+  for (const r of data) {
+    const season = (r[col.season] || "").trim();
+    if (!season || /^(season|year|total|career|overall|grand)\b/i.test(season)) continue;
+    const w = col.wins >= 0 ? num(r[col.wins]) : null;
+    const l = col.losses >= 0 ? num(r[col.losses]) : null;
+    const coach = col.coach >= 0 ? (r[col.coach] || "").trim() : "";
+    if (w == null && l == null && !coach) continue; // year-only / blank row
+    out.push({
+      season,
+      wins: w, losses: l, ties: 0,
+      leagueWins:   col.leagueWins   >= 0 ? num(r[col.leagueWins])   : null,
+      leagueLosses: col.leagueLosses >= 0 ? num(r[col.leagueLosses]) : null,
+      leagueTies: 0,
+      coach: coach || null,
+      notes: col.notes >= 0 ? ((r[col.notes] || "").trim() || null) : null,
+      winPct: w != null && l != null && (w + l) > 0 ? Math.round((w / (w + l)) * 1000) / 10 : null,
+    });
+  }
+  return out;
+}
+
 // GameChanger (baseball/softball) exports stack Batting / Pitching / Fielding sections side-by-side with a
 // SECTION-LABEL row sitting above the real header row, split the player name into Last + First columns, and
 // REPEAT abbreviations across sections ("H" = hits in Batting but hits-allowed in Pitching; "2B"/"SF"/"SB"
@@ -3574,6 +3621,51 @@ function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
   );
 }
 
+// Collapsible "paste your season history" importer — drops into SeasonsTab. Parses pasted rows and
+// merges them into the program's seasons (same-year rows replace, new years are added).
+function BulkSeasonsImport({ seasons = [], onSave }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [err, setErr] = useState("");
+  const parsedCount = open && text.trim() ? parseSeasonsPaste(text).length : 0;
+  const doImport = () => {
+    const parsed = parseSeasonsPaste(text);
+    if (!parsed.length) { setErr("Couldn't read any seasons. Use columns: Season, Wins, Losses, League W, League L, Coach, Notes (a header row is fine)."); return; }
+    const labels = new Set(parsed.map((s) => String(s.season)));
+    const kept = (seasons || []).filter((s) => !labels.has(String(s.season)));
+    const yr = (s) => parseInt(String(s.season).match(/\d{4}/)?.[0] || "0", 10);
+    const merged = [...parsed, ...kept].sort((a, b) => yr(b) - yr(a));
+    onSave(merged);
+    setText(""); setErr(""); setOpen(false);
+  };
+  if (!open) return (
+    <button onClick={() => { setOpen(true); setErr(""); }}
+      style={{ background:"#fff", color:"#1a56db", border:"1px solid #1a56db", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+      📋 Paste seasons
+    </button>
+  );
+  return (
+    <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", padding:16, marginBottom:16 }}>
+      <div style={{ fontSize:14, fontWeight:700, color:"#111", marginBottom:6 }}>📋 Paste season history</div>
+      <div style={{ fontSize:12, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>
+        Copy rows straight from a spreadsheet (or CSV). Columns: <strong>Season, Wins, Losses, League W, League L, Coach, Notes</strong> — keep the header row, extra columns are ignored. A season whose year matches an existing one replaces it.
+      </div>
+      <textarea value={text} onChange={(e) => { setText(e.target.value); setErr(""); }} rows={8}
+        placeholder={"Season\tWins\tLosses\tLeague W\tLeague L\tCoach\tNotes\n2025\t22\t6\t7\t3\tRuss Haman\tRegion Champs\n2024\t16\t9\t7\t3\tVictoria Kassebaum\tRegion Host"}
+        style={{ width:"100%", boxSizing:"border-box", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 10px", fontSize:12, fontFamily:"monospace", resize:"vertical" }} />
+      {err && <div style={{ color:"#b91c1c", fontSize:12, marginTop:6 }}>{err}</div>}
+      <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:10 }}>
+        <button onClick={doImport} disabled={!text.trim()}
+          style={{ background: text.trim() ? "#1a56db" : "#cbd5e1", color:"#fff", border:"none", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor: text.trim() ? "pointer" : "default" }}>
+          Import{parsedCount ? ` ${parsedCount} season${parsedCount === 1 ? "" : "s"}` : ""}
+        </button>
+        <button onClick={() => { setOpen(false); setText(""); setErr(""); }}
+          style={{ background:"none", border:"none", color:"#6b7280", fontSize:13, cursor:"pointer" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior }) {
   const isMobile = useIsMobile();
   const [sortDir, setSortDir] = useState("desc");
@@ -3658,6 +3750,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
           </button>
         )}
       </div>
+      {!showAddForm && <BulkSeasonsImport seasons={seasons} onSave={onSave} />}
       {showAddForm && <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleAdd} submitLabel="Add season" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />}
       {!showAddForm && (
         <div style={{padding:40,textAlign:"center",color:"#9ca3af",background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb"}}>
@@ -3768,6 +3861,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
           </button>
         )}
       </div>
+      {!showAddForm && !editingId && <BulkSeasonsImport seasons={seasons} onSave={onSave} />}
       {showAddForm && <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleAdd} submitLabel="Add season" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />}
 
       {/* Summary stats — top row */}
