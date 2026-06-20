@@ -170,6 +170,8 @@ export const RATE_FMT = {
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
   "Kill Percentage": "pct",
+  "Serve Percentage": "pct",
+  "Ace Percentage": "pct",
 };
 export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
@@ -236,6 +238,10 @@ const SOCCER_RATE_DEFS = [
 const VBALL_RATE_DEFS = [
   { name: "Kill Percentage", short: "KILL%", after: "Attack Attempts", fmt: "pct", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300, noteAbbr: "att",
     spec: { kind: "pct", made: "Kills", att: "Attack Attempts" } },
+  { name: "Serve Percentage", short: "SERVE%", after: "Total Serves", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300, noteAbbr: "serves",
+    spec: { kind: "pctIn", att: "Total Serves", errs: "Serve Errors" } },
+  { name: "Ace Percentage", short: "ACE%", after: "Aces", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300, noteAbbr: "serves",
+    spec: { kind: "pct", made: "Aces", att: "Total Serves" } },
 ];
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
