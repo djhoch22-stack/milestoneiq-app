@@ -3039,20 +3039,20 @@ function ImportSeasons({ school, roster = [] }) {
             for (const rec of gc) arr.push({ name: rec.name, number: rec.number, stats: remapSeasonStats(rec.stats, seasonValid, school.sport) });
             continue;
           }
-          const lines = String(text).replace(/\r\n?/g, "\n").trim().split("\n").filter((l) => l.trim());
-          if (lines.length < 2) { errs.push(`${f.name}: no player rows`); continue; }
-          const delim = lines[0].split("\t").length > lines[0].split(",").length ? "\t" : ",";
-          // Skip a leading TITLE row (Hudl/GameChanger): header row = the one with the most fields.
+          // Quote-aware (splitCSVRows) so values with embedded commas like "1,198" keep their column —
+          // a naive comma split shifts every later column and breaks header/name detection (→ 0 players).
+          const rows = splitCSVRows(text).filter((r) => r.some((c) => String(c == null ? "" : c).trim()));
+          if (rows.length < 2) { errs.push(`${f.name}: no player rows`); continue; }
+          // Skip a leading TITLE row (Hudl/GameChanger): header row = the one with the most non-empty fields.
           let hIdx = 0, best = -1;
-          for (let i = 0; i < Math.min(6, lines.length - 1); i++) { const n = lines[i].split(delim).filter((c) => c.trim()).length; if (n > best) { best = n; hIdx = i; } }
-          const hdr = lines[hIdx].split(delim).map((h) => h.trim().replace(/^"|"$/g, ""));
+          for (let i = 0; i < Math.min(6, rows.length - 1); i++) { const n = rows[i].filter((c) => String(c == null ? "" : c).trim()).length; if (n > best) { best = n; hIdx = i; } }
+          const hdr = rows[hIdx].map((h) => String(h == null ? "" : h).trim());
           const nameIdx = hdr.findIndex((h) => /^name$/i.test(h.trim()) || /player.?name|^player$|athlete/i.test(h));
           const numIdx = hdr.findIndex((h) => /^(#|no\.?|num(ber)?|jersey)$/i.test(h.trim()));
           // Hudl basketball: "PF" = Points For (points), with a separate "FOUL" column → map PF→Points only
           // when BOTH are present (else PF = personal fouls). Mirrors the career importer's rule.
           const hudlPF = hdr.some((h) => /^pf$/i.test(String(h).trim())) && hdr.some((h) => /^fouls?$/i.test(String(h).trim()));
-          for (const line of lines.slice(hIdx + 1)) {
-            const vals = line.split(delim).map((v) => v.trim().replace(/^"|"$/g, ""));
+          for (const vals of rows.slice(hIdx + 1)) {
             const name = String((nameIdx >= 0 ? vals[nameIdx] : vals[0]) || "").trim();
             if (isImportJunkName(name)) continue; // skip "#"/jersey/Totals junk rows
             const number = (numIdx >= 0 && String(vals[numIdx] || "").trim() !== "") ? String(vals[numIdx]).trim() : null;
@@ -3060,7 +3060,7 @@ function ImportSeasons({ school, roster = [] }) {
             hdr.forEach((h, i) => {
               if (i === nameIdx || i === numIdx || !h) return;
               const v = vals[i]; if (v === "" || v == null) return;
-              const n = Number(v); if (!isNaN(n)) raw[(hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : h] = n;
+              const n = Number(String(v).replace(/,/g, "")); if (!isNaN(n)) raw[(hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : h] = n; // strip thousand-separators ("1,198")
             });
             arr.push({ name, number, stats: remapSeasonStats(raw, seasonValid, school.sport) });
           }
