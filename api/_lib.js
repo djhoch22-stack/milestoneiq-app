@@ -89,7 +89,9 @@ export const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
-export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY };
+// Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
+const VBALL_GIRLS_DISPLAY = ["Games Played", "Wins", "Sets Played", "Kills", "Attack Attempts", "Attack Errors", "Assists", "Aces", "Serve Attempts", "Serve Errors", "Digs", "Reception Attempts", "Reception Errors", "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors"];
+export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
   if (so) {
@@ -116,16 +118,17 @@ export const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
+  volleyball_girls: VBALL_GIRLS_DISPLAY,
 };
 // URL slug from a school name — shared by the public school hub (/school/:slug) and per-program links.
 export function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 // Sport emoji for the multi-sport profile toggle (mirrors the app's SPORTS icons).
-export const SPORT_ICON = { football: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", wrestling: "🤼", track: "🏃" };
+export const SPORT_ICON = { football: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", volleyball_girls: "🏐", wrestling: "🤼", track: "🏃" };
 // Gender of a sport for cross-sport linking: "F" girls, "M" boys, "X" football (links across all genders).
 export function sportGender(sport) {
   const s = String(sport || "").toLowerCase();
   if (s.includes("football")) return "X";
-  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball" || s.includes("volleyball")) return "F";
+  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball") return "F";
   return "M";
 }
 // A kid's two sports link only when same gender — or either is football (matches the app's rule).
@@ -164,6 +167,7 @@ export const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Hitting Percentage": "avg3",
 };
 export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
@@ -226,8 +230,13 @@ const SOCCER_RATE_DEFS = [
   { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "pct", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25, noteAbbr: "SOG",
     spec: { kind: "ratio", num: [["Shots on Goal", 1]], den: [["Shots", 1]] } },
 ];
+const VBALL_RATE_DEFS = [
+  { name: "Hitting Percentage", short: "HIT%", after: "Attack Errors", fmt: "avg3", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300, noteAbbr: "att",
+    spec: { kind: "ratio", num: [["Kills", 1], ["Attack Errors", -1]], den: [["Attack Attempts", 1]] } },
+];
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
+  if (sport === "volleyball_girls") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
   return [];

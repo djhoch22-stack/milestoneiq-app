@@ -59,6 +59,24 @@ const BASEBALL_GROUPS = [
   { group: "Pitching", names: ["Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
+// Girls Volleyball — raw counting stats in canonical order (attacking, setting, serving, defense).
+// Hitting % is DERIVED (added later). Boys volleyball will be a separate sport when ready.
+const VBALL_GIRLS_DISPLAY = [
+  "Games Played", "Wins", "Sets Played",
+  "Kills", "Attack Attempts", "Attack Errors",
+  "Assists",
+  "Aces", "Serve Attempts", "Serve Errors",
+  "Digs", "Reception Attempts", "Reception Errors",
+  "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors",
+];
+const VBALL_GROUPS = [
+  { group: "General",   names: ["Games Played", "Wins", "Sets Played"] },
+  { group: "Attacking", names: ["Kills", "Attack Attempts", "Attack Errors"] },
+  { group: "Setting",   names: ["Assists"] },
+  { group: "Serving",   names: ["Aces", "Serve Attempts", "Serve Errors"] },
+  { group: "Defense",   names: ["Digs", "Reception Attempts", "Reception Errors", "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors"] },
+  { group: "Coaching",  names: ["Coach Wins"] },
+];
 
 const SPORTS = {
   football: {
@@ -173,6 +191,11 @@ const SPORTS = {
     label: "Girls Soccer", icon: "⚽",
     statCategories: SOCCER_STAT_CATEGORIES,
   },
+  volleyball_girls: {
+    label: "Girls Volleyball", icon: "🏐",
+    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
+  },
   wrestling: {
     label: "Wrestling", icon: "🤼",
     statCategories: [
@@ -233,7 +256,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -281,6 +304,7 @@ const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
+  volleyball_girls: VBALL_GIRLS_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
 // the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
@@ -378,12 +402,18 @@ const BASEBALL_THRESHOLDS = {
   "No Hitters":[1,2,3], "Perfect Games":[1,2],
   "Innings Pitched":[50,100,200,300], "Pitcher Strikeouts":[50,100,200,300],
 };
+// Girls volleyball career milestone thresholds (HS-scaled).
+const VBALL_THRESHOLDS = {
+  "Games Played":[25,50,75,100], "Wins":[25,50,75,100], "Sets Played":[100,200,300,400],
+  "Kills":[250,500,1000,1500], "Assists":[250,500,1000,2000], "Digs":[250,500,1000,1500],
+  "Aces":[50,100,200,300], "Total Blocks":[25,50,100,200],
+};
 // Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
 // those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : sport === "volleyball_girls" ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
   const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
@@ -505,6 +535,7 @@ const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Hitting Percentage": "avg3",
 };
 // Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped); era2 → "4.20". null → "—".
 function fmtRateVal(fmt, v) {
@@ -556,8 +587,15 @@ const SOCCER_RATE_DEFS = [
     calc: (g) => { const sh = g("Shots"); return sh > 0 ? g("Shots on Goal") / sh : null; },
     note: (g) => `${g("Shots on Goal").toLocaleString()}/${g("Shots").toLocaleString()}` },
 ];
+// Girls volleyball: Hitting % = (Kills - Attack Errors) / Attack Attempts (standard VB metric; can be negative).
+const VBALL_RATE_DEFS = [
+  { name: "Hitting Percentage", short: "HIT%", after: "Attack Errors", fmt: "avg3", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300,
+    calc: (g) => { const att = g("Attack Attempts"); return att > 0 ? (g("Kills") - g("Attack Errors")) / att : null; },
+    note: (g) => `${g("Attack Attempts").toLocaleString()} att` },
+];
 function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
+  if (sport === "volleyball_girls") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
   return [];
@@ -590,6 +628,7 @@ const GROUP_STYLE = {
   Coaching: { bg: "#f1f5f9", fg: "#334155" },
   Passing: { bg: "#dbeafe", fg: "#1e40af" }, Rushing: { bg: "#dcfce7", fg: "#166534" }, Receiving: { bg: "#fef3c7", fg: "#92400e" },
   Offense: { bg: "#f3e8ff", fg: "#6b21a8" }, Defense: { bg: "#fee2e2", fg: "#991b1b" }, "Special Teams": { bg: "#ffedd5", fg: "#c2410c" },
+  Attacking: { bg: "#dbeafe", fg: "#1e40af" }, Setting: { bg: "#fef3c7", fg: "#92400e" }, Serving: { bg: "#dcfce7", fg: "#166534" },
 };
 // Auto record-holders for the rate stats: single-season (from player_seasons rows) and career
 // (from the career-totals pool), gated by a minimum volume (att / AB / chances) so small samples
@@ -1785,7 +1824,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball"];
+const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
@@ -2502,6 +2541,25 @@ const STAT_ALIASES_BY_SPORT = {
     "pd": "Pass Break Ups", "pbu": "Pass Break Ups", "pass break ups": "Pass Break Ups",
     "solo": "Solo Tackles", "fgm": "Field Goals Made", "fga": "Field Goals Attempts",
   },
+  volleyball: {
+    // Hudl "Totals" export headers + MaxPreps Attacking/Serving/Blocking abbreviations.
+    "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
+    "sp": "Sets Played", "sets": "Sets Played", "sets played": "Sets Played",
+    "kill": "Kills", "kills": "Kills", "k": "Kills",
+    "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
+    "a err": "Attack Errors", "attack errors": "Attack Errors", "ae": "Attack Errors", "hit err": "Attack Errors",
+    "assist": "Assists", "assists": "Assists", "ast": "Assists",
+    "ace": "Aces", "aces": "Aces",
+    "s att": "Serve Attempts", "serve attempts": "Serve Attempts", "sa": "Serve Attempts",
+    "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
+    "dig": "Digs", "digs": "Digs",
+    "sr att": "Reception Attempts", "reception attempts": "Reception Attempts", "rec att": "Reception Attempts",
+    "sr err": "Reception Errors", "reception errors": "Reception Errors", "rec err": "Reception Errors",
+    "b solo": "Block Solo", "block solo": "Block Solo", "bs": "Block Solo", "solo blocks": "Block Solo",
+    "b assist": "Block Assist", "block assist": "Block Assist", "ba": "Block Assist", "block assists": "Block Assist",
+    "b total": "Total Blocks", "total blocks": "Total Blocks", "tot blks": "Total Blocks", "tb": "Total Blocks", "blocks": "Total Blocks",
+    "bhe": "Ball Handling Errors", "ball handling errors": "Ball Handling Errors",
+  },
 };
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.
 STAT_ALIASES_BY_SPORT.softball = STAT_ALIASES_BY_SPORT.baseball;
@@ -2521,6 +2579,7 @@ function resolveStatAlias(header, sport) {
 function isImportJunkName(n) {
   const s = String(n == null ? "" : n).trim();
   if (!s || s.toLowerCase() === "undefined" || !/[a-z]/i.test(s)) return true;
+  if (/unknown/i.test(s)) return true; // Hudl "warningUnknown Athlete" placeholder rows
   return /^(athletes?|players?|names?|totals?|team|opponent|no\.?|number|jersey)$/i.test(s);
 }
 function remapSeasonStats(stats, valid, sport) {
@@ -3881,6 +3940,8 @@ const HOF_STAT_WEIGHTS = {
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
+  // Girls volleyball ("Assists" shared above)
+  "Kills": 10, "Digs": 7, "Aces": 7, "Total Blocks": 8,
   // Generic
   "Coach Wins":                0,  // excluded from player scoring
 };
@@ -4028,7 +4089,7 @@ function crossSportNameMatch(a, b) {
 function sportGender(sport) {
   const s = String(sport || "").toLowerCase();
   if (s.includes("football")) return "X"; // football bridges every gender
-  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball" || s.includes("volleyball")) return "F";
+  if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball") return "F";
   return "M"; // _boys / soccer / baseball / basketball / wrestling / men's
 }
 // A same-name player links across two sports only when same gender — OR either side is football.
