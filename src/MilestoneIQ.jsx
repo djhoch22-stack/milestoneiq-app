@@ -62,7 +62,7 @@ const BASEBALL_GROUPS = [
 // Girls Volleyball — POSITIVE counting stats only, in canonical order (attacking, setting, serving,
 // defense). No error stats (matches every other sport). Kill % is DERIVED. Boys volleyball later.
 const VBALL_GIRLS_DISPLAY = [
-  "Games Played", "Wins", "Sets Played",
+  "Games Played", "Sets Played", "Wins",
   "Kills", "Attack Attempts",
   "Assists",
   "Aces",
@@ -70,7 +70,7 @@ const VBALL_GIRLS_DISPLAY = [
   "Block Solo", "Block Assist", "Total Blocks",
 ];
 const VBALL_GROUPS = [
-  { group: "General",   names: ["Games Played", "Wins", "Sets Played"] },
+  { group: "General",   names: ["Games Played", "Sets Played", "Wins"] },
   { group: "Attacking", names: ["Kills", "Attack Attempts"] },
   { group: "Setting",   names: ["Assists"] },
   { group: "Serving",   names: ["Aces"] },
