@@ -2570,7 +2570,7 @@ const STAT_ALIASES_BY_SPORT = {
     "kill": "Kills", "kills": "Kills", "k": "Kills",
     "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
     "assist": "Assists", "assists": "Assists", "ast": "Assists",
-    "bha": "Ball Handling Attempts", "ball handling attempts": "Ball Handling Attempts", "bh att": "Ball Handling Attempts",
+    "bha": "Ball Handling Attempts", "ball handling attempts": "Ball Handling Attempts", "bh att": "Ball Handling Attempts", "a att": "Ball Handling Attempts", // Hudl "A Att" (assist attempts) = ball-handling/set touches
     "ace": "Aces", "aces": "Aces",
     "s att": "Total Serves", "serve attempts": "Total Serves", "sa": "Total Serves", "serves": "Total Serves", "total serves": "Total Serves",
     "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
