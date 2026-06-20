@@ -2934,6 +2934,7 @@ function ImportHelpModal({ sport, onClose }) {
   };
   const sources = SPORT_SOURCES[norm] || ["maxpreps"];
   const goalieWarn = norm === "soccer"; // Hudl player exports omit keeper stats
+  const vbHudlGap = norm === "volleyball"; // Hudl's "Totals" CSV has no Service Points column (MaxPreps does)
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 24, width: "100%", maxWidth: 580, maxHeight: "88vh", overflowY: "auto" }}>
@@ -2956,6 +2957,9 @@ function ImportHelpModal({ sport, onClose }) {
               <ol style={ol}>{m.steps.map((s, i) => <li key={i} style={{ ...tBody, marginBottom: 3 }}>{s}</li>)}</ol>
               {key === "hudl" && goalieWarn && (
                 <p style={{ ...tBody, marginTop: 8, color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 10px" }}>⚠️ Hudl player exports don't include goalie stats (saves, shutouts, goals against). Enter those by hand on each keeper's profile.</p>
+              )}
+              {key === "hudl" && vbHudlGap && (
+                <p style={{ ...tBody, marginTop: 8, color: "#9a3412", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "8px 10px" }}>⚠️ Hudl's "Whole Match Totals" export doesn't include <strong>Service Points</strong>. To capture those, import a <strong>MaxPreps</strong> stats PDF for that season (it has the "PTS" column) or enter them by hand. Everything else — kills, attacks, assists, aces, serves, digs, blocks, ball‑handling — comes straight from the Hudl CSV.</p>
               )}
             </div>
           );
