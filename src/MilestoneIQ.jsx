@@ -66,7 +66,7 @@ const VBALL_GIRLS_DISPLAY = [
   "Games Played", "Sets Played", "Wins",
   "Kills", "Attack Attempts",
   "Assists", "Ball Handling Attempts",
-  "Aces", "Total Serves", "Serving Points",
+  "Aces", "Total Serves", "Service Points",
   "Receptions", "Digs",
   "Solo Blocks", "Assisted Blocks", "Total Blocks",
 ];
@@ -74,7 +74,7 @@ const VBALL_GROUPS = [
   { group: "General",   names: ["Games Played", "Sets Played", "Wins"] },
   { group: "Attacking", names: ["Kills", "Attack Attempts"] },
   { group: "Setting",   names: ["Assists", "Ball Handling Attempts"] },
-  { group: "Serving",   names: ["Aces", "Total Serves", "Serving Points"] },
+  { group: "Serving",   names: ["Aces", "Total Serves", "Service Points"] },
   { group: "Defense",   names: ["Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"] },
   { group: "Coaching",  names: ["Coach Wins"] },
 ];
@@ -2424,9 +2424,9 @@ const SEASON_STAT_MAP = {
   "Sets": "Sets Played", "Attacks": "Attack Attempts", "Serving Aces": "Aces", "Serves": "Total Serves",
 };
 // Sport-specific sheet-name overrides (win when present) — resolve cross-sport collisions like
-// volleyball "Points" (= Serving Points) vs basketball "Points".
+// volleyball "Points" (= Service Points) vs basketball "Points".
 const SEASON_STAT_MAP_BY_SPORT = {
-  volleyball_girls: { "Points": "Serving Points" },
+  volleyball_girls: { "Points": "Service Points" },
 };
 // Reverse map: stat name → the tab name to use when WRITING the season template.
 const SHEET_FOR_STAT = {
@@ -2473,7 +2473,7 @@ function parseSeasonsWorkbook(XLSX, buf, sport) {
   const sportMap = SEASON_STAT_MAP_BY_SPORT[sport] || {};
   for (const sheetName of wb.SheetNames) {
     const raw = String(sheetName).trim();
-    // Sport override first (volleyball "Points"→Serving Points), then the short-name map (Games→Games
+    // Sport override first (volleyball "Points"→Service Points), then the short-name map (Games→Games
     // Played…), else accept a full canonical category name so templates round-trip on re-upload.
     const stat = sportMap[raw] || SEASON_STAT_MAP[raw] || (ALL_DISPLAY_STATS.has(raw) ? raw : null);
     if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
@@ -2574,7 +2574,7 @@ const STAT_ALIASES_BY_SPORT = {
     "ace": "Aces", "aces": "Aces",
     "s att": "Total Serves", "serve attempts": "Total Serves", "sa": "Total Serves", "serves": "Total Serves", "total serves": "Total Serves",
     "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
-    "pts": "Serving Points", "serving points": "Serving Points",
+    "pts": "Service Points", "serving points": "Service Points", "service points": "Service Points",
     "sr att": "Receptions", "reception attempts": "Receptions", "rec att": "Receptions", "receptions": "Receptions", "rec": "Receptions",
     "dig": "Digs", "digs": "Digs",
     "b solo": "Solo Blocks", "block solo": "Solo Blocks", "bs": "Solo Blocks", "solo blocks": "Solo Blocks",
