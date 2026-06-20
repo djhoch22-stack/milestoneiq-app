@@ -24,7 +24,7 @@ const json = (b: unknown, s = 200) =>
 // MODEL: a grounded support bot is simple + latency-sensitive, so Haiku 4.5 (fast + cheap) is the right
 // fit. Switch to "claude-opus-4-8" or "claude-sonnet-4-6" here if you want more horsepower.
 const MODEL = "claude-haiku-4-5";
-const FEEDBACK_TO = Deno.env.get("FEEDBACK_TO") || "dhoch@denverchristian.org";
+const FEEDBACK_TO = Deno.env.get("FEEDBACK_TO") || "support@raftersiq.com";
 
 const SYSTEM = `You are the in-app support assistant for **RaftersIQ**, record-book software for high-school athletic programs. You help coaches and athletic directors USE the app.
 
