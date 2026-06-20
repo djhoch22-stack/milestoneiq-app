@@ -59,22 +59,22 @@ const BASEBALL_GROUPS = [
   { group: "Pitching", names: ["Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
-// Girls Volleyball — raw counting stats in canonical order (attacking, setting, serving, defense).
-// Hitting % is DERIVED (added later). Boys volleyball will be a separate sport when ready.
+// Girls Volleyball — POSITIVE counting stats only, in canonical order (attacking, setting, serving,
+// defense). No error stats (matches every other sport). Kill % is DERIVED. Boys volleyball later.
 const VBALL_GIRLS_DISPLAY = [
   "Games Played", "Wins", "Sets Played",
-  "Kills", "Attack Attempts", "Attack Errors",
+  "Kills", "Attack Attempts",
   "Assists",
-  "Aces", "Serve Attempts", "Serve Errors",
-  "Digs", "Reception Attempts", "Reception Errors",
-  "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors",
+  "Aces",
+  "Digs",
+  "Block Solo", "Block Assist", "Total Blocks",
 ];
 const VBALL_GROUPS = [
   { group: "General",   names: ["Games Played", "Wins", "Sets Played"] },
-  { group: "Attacking", names: ["Kills", "Attack Attempts", "Attack Errors"] },
+  { group: "Attacking", names: ["Kills", "Attack Attempts"] },
   { group: "Setting",   names: ["Assists"] },
-  { group: "Serving",   names: ["Aces", "Serve Attempts", "Serve Errors"] },
-  { group: "Defense",   names: ["Digs", "Reception Attempts", "Reception Errors", "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors"] },
+  { group: "Serving",   names: ["Aces"] },
+  { group: "Defense",   names: ["Digs", "Block Solo", "Block Assist", "Total Blocks"] },
   { group: "Coaching",  names: ["Coach Wins"] },
 ];
 
@@ -535,7 +535,7 @@ const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
-  "Hitting Percentage": "avg3",
+  "Kill Percentage": "pct",
 };
 // Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped); era2 → "4.20". null → "—".
 function fmtRateVal(fmt, v) {
@@ -587,10 +587,10 @@ const SOCCER_RATE_DEFS = [
     calc: (g) => { const sh = g("Shots"); return sh > 0 ? g("Shots on Goal") / sh : null; },
     note: (g) => `${g("Shots on Goal").toLocaleString()}/${g("Shots").toLocaleString()}` },
 ];
-// Girls volleyball: Hitting % = (Kills - Attack Errors) / Attack Attempts (standard VB metric; can be negative).
+// Girls volleyball: Kill % = Kills / Attack Attempts (positive efficiency; no error stats tracked).
 const VBALL_RATE_DEFS = [
-  { name: "Hitting Percentage", short: "HIT%", after: "Attack Errors", fmt: "avg3", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300,
-    calc: (g) => { const att = g("Attack Attempts"); return att > 0 ? (g("Kills") - g("Attack Errors")) / att : null; },
+  { name: "Kill Percentage", short: "KILL%", after: "Attack Attempts", fmt: "pct", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300,
+    calc: (g) => { const att = g("Attack Attempts"); return att > 0 ? Math.round((g("Kills") / att) * 1000) / 10 : null; },
     note: (g) => `${g("Attack Attempts").toLocaleString()} att` },
 ];
 function rateDefsFor(sport) {
@@ -2542,23 +2542,17 @@ const STAT_ALIASES_BY_SPORT = {
     "solo": "Solo Tackles", "fgm": "Field Goals Made", "fga": "Field Goals Attempts",
   },
   volleyball: {
-    // Hudl "Totals" export headers + MaxPreps Attacking/Serving/Blocking abbreviations.
+    // Hudl "Totals" + MaxPreps abbreviations → POSITIVE stats only (error/attempt-only columns drop on import).
     "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
     "sp": "Sets Played", "sets": "Sets Played", "sets played": "Sets Played",
     "kill": "Kills", "kills": "Kills", "k": "Kills",
     "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
-    "a err": "Attack Errors", "attack errors": "Attack Errors", "ae": "Attack Errors", "hit err": "Attack Errors",
     "assist": "Assists", "assists": "Assists", "ast": "Assists",
     "ace": "Aces", "aces": "Aces",
-    "s att": "Serve Attempts", "serve attempts": "Serve Attempts", "sa": "Serve Attempts",
-    "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
     "dig": "Digs", "digs": "Digs",
-    "sr att": "Reception Attempts", "reception attempts": "Reception Attempts", "rec att": "Reception Attempts",
-    "sr err": "Reception Errors", "reception errors": "Reception Errors", "rec err": "Reception Errors",
     "b solo": "Block Solo", "block solo": "Block Solo", "bs": "Block Solo", "solo blocks": "Block Solo",
     "b assist": "Block Assist", "block assist": "Block Assist", "ba": "Block Assist", "block assists": "Block Assist",
     "b total": "Total Blocks", "total blocks": "Total Blocks", "tot blks": "Total Blocks", "tb": "Total Blocks", "blocks": "Total Blocks",
-    "bhe": "Ball Handling Errors", "ball handling errors": "Ball Handling Errors",
   },
 };
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.

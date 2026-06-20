@@ -90,7 +90,7 @@ const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts"
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
-const VBALL_GIRLS_DISPLAY = ["Games Played", "Wins", "Sets Played", "Kills", "Attack Attempts", "Attack Errors", "Assists", "Aces", "Serve Attempts", "Serve Errors", "Digs", "Reception Attempts", "Reception Errors", "Block Solo", "Block Assist", "Total Blocks", "Ball Handling Errors"];
+const VBALL_GIRLS_DISPLAY = ["Games Played", "Wins", "Sets Played", "Kills", "Attack Attempts", "Assists", "Aces", "Digs", "Block Solo", "Block Assist", "Total Blocks"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -167,7 +167,7 @@ export const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
-  "Hitting Percentage": "avg3",
+  "Kill Percentage": "pct",
 };
 export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
@@ -231,8 +231,8 @@ const SOCCER_RATE_DEFS = [
     spec: { kind: "ratio", num: [["Shots on Goal", 1]], den: [["Shots", 1]] } },
 ];
 const VBALL_RATE_DEFS = [
-  { name: "Hitting Percentage", short: "HIT%", after: "Attack Errors", fmt: "avg3", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300, noteAbbr: "att",
-    spec: { kind: "ratio", num: [["Kills", 1], ["Attack Errors", -1]], den: [["Attack Attempts", 1]] } },
+  { name: "Kill Percentage", short: "KILL%", after: "Attack Attempts", fmt: "pct", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300, noteAbbr: "att",
+    spec: { kind: "pct", made: "Kills", att: "Attack Attempts" } },
 ];
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
