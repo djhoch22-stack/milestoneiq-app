@@ -59,22 +59,23 @@ const BASEBALL_GROUPS = [
   { group: "Pitching", names: ["Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
-// Girls Volleyball — POSITIVE counting stats only, in canonical order (attacking, setting, serving,
-// defense). No error stats (matches every other sport). Kill % is DERIVED. Boys volleyball later.
+// Girls Volleyball — matches the program's stat sheet (all positive; no error COUNTS shown). Kill %,
+// Serve % (serves-in) & Ace % are DERIVED. "Serve Errors" imports ONLY to feed Serve % — it's a hidden
+// input (see HIDDEN_INPUT_STATS), never a column or record. Boys volleyball will be its own sport later.
 const VBALL_GIRLS_DISPLAY = [
   "Games Played", "Sets Played", "Wins",
   "Kills", "Attack Attempts",
-  "Assists",
-  "Aces",
-  "Digs",
-  "Block Solo", "Block Assist", "Total Blocks",
+  "Assists", "Ball Handling Attempts",
+  "Aces", "Total Serves", "Serving Points",
+  "Receptions", "Digs",
+  "Solo Blocks", "Assisted Blocks", "Total Blocks",
 ];
 const VBALL_GROUPS = [
   { group: "General",   names: ["Games Played", "Sets Played", "Wins"] },
   { group: "Attacking", names: ["Kills", "Attack Attempts"] },
-  { group: "Setting",   names: ["Assists"] },
-  { group: "Serving",   names: ["Aces"] },
-  { group: "Defense",   names: ["Digs", "Block Solo", "Block Assist", "Total Blocks"] },
+  { group: "Setting",   names: ["Assists", "Ball Handling Attempts"] },
+  { group: "Serving",   names: ["Aces", "Total Serves", "Serving Points"] },
+  { group: "Defense",   names: ["Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"] },
   { group: "Coaching",  names: ["Coach Wins"] },
 ];
 
@@ -309,6 +310,9 @@ const DISPLAY_STATS = {
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
 // the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
 const ALL_DISPLAY_STATS = new Set(Object.values(DISPLAY_STATS).flat());
+// Stats stored + imported ONLY to feed a derived rate — never shown as a column or record. Volleyball's
+// "Serve Errors" powers Serve % but isn't a displayed stat (keeps the "no error leaderboards" rule).
+const HIDDEN_INPUT_STATS = new Set(["Serve Errors"]);
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
 // data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
 function statsToDisplay(roster, sport) {
@@ -317,7 +321,7 @@ function statsToDisplay(roster, sport) {
     .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
   // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
   // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
-  return [...new Set([...base, ...present])].filter((s) => !/^Longest /.test(s) || base.includes(s)).sort((a, b) => byStatOrder(a, b, sport));
+  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
@@ -536,6 +540,8 @@ const RATE_FMT = {
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
   "Kill Percentage": "pct",
+  "Serve Percentage": "pct",
+  "Ace Percentage": "pct",
 };
 // Format a rate value: pct → "47.3%"; avg3 → ".305" (3 decimals, leading zero dropped); era2 → "4.20". null → "—".
 function fmtRateVal(fmt, v) {
@@ -587,11 +593,18 @@ const SOCCER_RATE_DEFS = [
     calc: (g) => { const sh = g("Shots"); return sh > 0 ? g("Shots on Goal") / sh : null; },
     note: (g) => `${g("Shots on Goal").toLocaleString()}/${g("Shots").toLocaleString()}` },
 ];
-// Girls volleyball: Kill % = Kills / Attack Attempts (positive efficiency; no error stats tracked).
+// Girls volleyball derived rates: Kill % (Kills/Attacks), Serve % (serves-in = (Serves-Errors)/Serves),
+// Ace % (Aces/Serves). Serve Errors is a hidden input (HIDDEN_INPUT_STATS) — used here, never shown.
 const VBALL_RATE_DEFS = [
   { name: "Kill Percentage", short: "KILL%", after: "Attack Attempts", fmt: "pct", qualStat: "Attack Attempts", minSeason: 100, minCareer: 300,
     calc: (g) => { const att = g("Attack Attempts"); return att > 0 ? Math.round((g("Kills") / att) * 1000) / 10 : null; },
     note: (g) => `${g("Attack Attempts").toLocaleString()} att` },
+  { name: "Serve Percentage", short: "SERVE%", after: "Total Serves", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300,
+    calc: (g) => { const s = g("Total Serves"); return s > 0 ? Math.round(((s - g("Serve Errors")) / s) * 1000) / 10 : null; },
+    note: (g) => `${g("Total Serves").toLocaleString()} serves` },
+  { name: "Ace Percentage", short: "ACE%", after: "Aces", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300,
+    calc: (g) => { const s = g("Total Serves"); return s > 0 ? Math.round((g("Aces") / s) * 1000) / 10 : null; },
+    note: (g) => `${g("Total Serves").toLocaleString()} serves` },
 ];
 function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
@@ -2542,16 +2555,22 @@ const STAT_ALIASES_BY_SPORT = {
     "solo": "Solo Tackles", "fgm": "Field Goals Made", "fga": "Field Goals Attempts",
   },
   volleyball: {
-    // Hudl "Totals" + MaxPreps abbreviations → POSITIVE stats only (error/attempt-only columns drop on import).
+    // Hudl "Totals" + MaxPreps abbreviations → the program's stat sheet. "S Err" imports as Serve Errors,
+    // a HIDDEN input feeding Serve % only (never displayed). Columns we don't track drop on import.
     "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
     "sp": "Sets Played", "sets": "Sets Played", "sets played": "Sets Played",
     "kill": "Kills", "kills": "Kills", "k": "Kills",
     "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
     "assist": "Assists", "assists": "Assists", "ast": "Assists",
+    "bha": "Ball Handling Attempts", "ball handling attempts": "Ball Handling Attempts", "bh att": "Ball Handling Attempts",
     "ace": "Aces", "aces": "Aces",
+    "s att": "Total Serves", "serve attempts": "Total Serves", "sa": "Total Serves", "serves": "Total Serves", "total serves": "Total Serves",
+    "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
+    "pts": "Serving Points", "serving points": "Serving Points",
+    "sr att": "Receptions", "reception attempts": "Receptions", "rec att": "Receptions", "receptions": "Receptions", "rec": "Receptions",
     "dig": "Digs", "digs": "Digs",
-    "b solo": "Block Solo", "block solo": "Block Solo", "bs": "Block Solo", "solo blocks": "Block Solo",
-    "b assist": "Block Assist", "block assist": "Block Assist", "ba": "Block Assist", "block assists": "Block Assist",
+    "b solo": "Solo Blocks", "block solo": "Solo Blocks", "bs": "Solo Blocks", "solo blocks": "Solo Blocks",
+    "b assist": "Assisted Blocks", "block assist": "Assisted Blocks", "ba": "Assisted Blocks", "assisted blocks": "Assisted Blocks", "block assists": "Assisted Blocks",
     "b total": "Total Blocks", "total blocks": "Total Blocks", "tot blks": "Total Blocks", "tb": "Total Blocks", "blocks": "Total Blocks",
   },
 };
@@ -2984,6 +3003,7 @@ function ImportSeasons({ school, roster = [] }) {
           ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
           ...(SPORTS[school.sport]?.statCategories || []).map((s) => s.name), // sport record stats (soccer: Goals/Assists/Saves/Shutouts)
           ...(DISPLAY_STATS[school.sport] || []),                             // canonical display stats (soccer: incl Shots & Shutouts)
+          ...HIDDEN_INPUT_STATS,                                              // hidden rate inputs (Serve Errors → Serve %): import them, never display
           ...(roster || []).flatMap((p) => Object.keys(p.stats || {})),       // the program's ACTUAL stat names
         ]);
         let shared = null;
