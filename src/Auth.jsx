@@ -930,7 +930,7 @@ function LandingPage({ onStartTrial, onSignIn }) {
         <div style={{ maxWidth:820, margin:"0 auto" }}>
           <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 28px" }}>Questions, answered</h2>
           {[
-            { q:"Which sports are supported?", a:"Football, boys & girls basketball, boys & girls soccer, baseball, softball, volleyball, wrestling and more — each with sport-specific stats and records." },
+            { q:"Which sports are supported?", a:"Football, boys & girls basketball, boys & girls soccer, baseball, and softball — each with sport-specific stats and records, with more to come." },
             { q:"Can I bring in our old stats?", a:"Yes. Upload MaxPreps PDFs or Hudl / GameChanger CSV exports and our AI reads them, or type them into our Excel template. Imports merge, so re-uploading never erases anything." },
             { q:"Do we get a public record book?", a:"Yes — every program gets a clean, shareable public page and Hall of Fame. You choose which programs are public." },
             { q:"Is our athletes' data safe?", a:"Records are per-school with role-based access for your AD and coaches. Nothing is public unless you publish it." },
