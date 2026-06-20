@@ -2420,6 +2420,13 @@ const SEASON_STAT_MAP = {
   "Rebounds": "Total Rebounds", "O Rebounds": "Offensive Rebounds", "Def. Rebounds": "Defensive Rebounds",
   "Steals": "Steals", "Blocks": "Blocks", "FGM": "Field Goals Made", "FGA": "Field Goals Attempted",
   "3pFGM": "Three Pointers Made", "3pFGA": "Three Pointers Attempted", "FTM": "Free Throws Made", "FTA": "Free Throws Attempted",
+  // Volleyball (sheet short-names → canonical; "Points" is sport-specific, handled below)
+  "Sets": "Sets Played", "Attacks": "Attack Attempts", "Serving Aces": "Aces", "Serves": "Total Serves",
+};
+// Sport-specific sheet-name overrides (win when present) — resolve cross-sport collisions like
+// volleyball "Points" (= Serving Points) vs basketball "Points".
+const SEASON_STAT_MAP_BY_SPORT = {
+  volleyball_girls: { "Points": "Serving Points" },
 };
 // Reverse map: stat name → the tab name to use when WRITING the season template.
 const SHEET_FOR_STAT = {
@@ -2460,14 +2467,15 @@ function normSeason(h) {
   const m = String(h || "").match(/\d{4}-\d{4}/);
   return m ? m[0] : String(h || "").trim();
 }
-function parseSeasonsWorkbook(XLSX, buf) {
+function parseSeasonsWorkbook(XLSX, buf, sport) {
   const wb = XLSX.read(buf, { type: "array" });
   const byPS = {};
+  const sportMap = SEASON_STAT_MAP_BY_SPORT[sport] || {};
   for (const sheetName of wb.SheetNames) {
     const raw = String(sheetName).trim();
-    // Short-name map first (Games→Games Played…); else accept a full canonical category name so the
-    // football template (tabs named "Rushing Yards", "Tackles", …) round-trips on re-upload.
-    const stat = SEASON_STAT_MAP[raw] || (ALL_DISPLAY_STATS.has(raw) ? raw : null);
+    // Sport override first (volleyball "Points"→Serving Points), then the short-name map (Games→Games
+    // Played…), else accept a full canonical category name so templates round-trip on re-upload.
+    const stat = sportMap[raw] || SEASON_STAT_MAP[raw] || (ALL_DISPLAY_STATS.has(raw) ? raw : null);
     if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false });
     if (!grid.length) continue;
@@ -3147,7 +3155,7 @@ function ImportSeasons({ school, roster = [] }) {
       let all = [];
       for (const f of xlsxFiles) {
         const buf = await f.arrayBuffer();
-        all = all.concat(parseSeasonsWorkbook(XLSX, new Uint8Array(buf)));
+        all = all.concat(parseSeasonsWorkbook(XLSX, new Uint8Array(buf), school.sport));
       }
       const rows = mergeSeasonRows(all);
       if (!rows.length) { setBusy(false); setMsg("No season rows found in those files."); return; }
