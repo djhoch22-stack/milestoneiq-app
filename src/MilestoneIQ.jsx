@@ -2656,9 +2656,11 @@ function splitCSVRows(text) {
 function parseSeasonsPaste(text) {
   const rows = splitCSVRows(String(text || "").trim()).map((r) => r.map((c) => String(c == null ? "" : c).trim()));
   if (!rows.length) return [];
-  const num = (v) => { if (v == null || v === "" || v === "-") return null; const n = Number(String(v).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? null : n; };
+  const num = (v) => { const s = String(v == null ? "" : v).trim(); if (!s || s === "-" || !/\d/.test(s)) return null; const n = Number(s.replace(/[^0-9.\-]/g, "")); return isNaN(n) ? null : n; };
   const h0 = rows[0].map((c) => c.toLowerCase());
-  const isHeader = h0.some((c) => /season|coach|overall|league|record|accomplish|note/.test(c)) && num(rows[0][1]) == null;
+  // Header row = names season/coach/etc. fields AND its first cell isn't an actual season value (a
+  // 4-digit year or Fall/Spring/…). Don't gate on num() being null — num("Overall W") is 0, not null.
+  const isHeader = h0.some((c) => /season|coach|overall|league|record|accomplish|note|\bwins?\b|\bloss/.test(c)) && !/^\s*(\d{4}|fall|spring|winter|summer)\b/i.test(rows[0][0] || "");
   let col = { season: 0, wins: 1, losses: 2, leagueWins: 3, leagueLosses: 4, coach: 5, notes: 6 };
   let data = rows;
   if (isHeader) {
