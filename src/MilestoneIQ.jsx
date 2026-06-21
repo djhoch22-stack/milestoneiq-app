@@ -5153,6 +5153,11 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
 
 function HofDetailModal({ player, programScore, crossSport, allScores, finalScore, confirmed, xState, school, allSchools, awards = [], allSeasonRows = [], onClose, onToggle }) {
   const tier = hofTier(finalScore);
+  // HOF toggle buttons reflect cross-sport induction (same as the list), so a player inducted via
+  // another of her sports shows the lit button here too.
+  const { schoolNames: mSchoolHof, stateNames: mStateHof } = (school && school.sport) ? hofInductedNames(school, allSchools) : { schoolNames: new Set(), stateNames: new Set() };
+  const mInSchool = player.schoolHallOfFame || mSchoolHof.has(normName(player.name));
+  const mInState  = player.stateHallOfFame  || mStateHof.has(normName(player.name));
   // Per-sport breakdown: multi-sport mode shows every sport the athlete played; otherwise just
   // this program. Each context carries that sport's program (school) + its roster entry (player).
   const sportContexts = (crossSport && allScores && allScores.length > 1)
@@ -5417,15 +5422,15 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
           <div style={{ borderTop:"1px solid #f0eeea", paddingTop:16, display:"flex", gap:8 }}>
             <button onClick={() => { onToggle(player, 'school'); onClose(); }}
               style={{ flex:1, padding:"10px 0", borderRadius:9, border:"none", cursor:"pointer", fontWeight:700, fontSize:13,
-                background: player.schoolHallOfFame ? "#7c3aed" : "#f5f3ff",
-                color: player.schoolHallOfFame ? "#fff" : "#7c3aed" }}>
-              {player.schoolHallOfFame ? "🏛️ Remove School HOF" : "🏛️ Add to School HOF"}
+                background: mInSchool ? "#7c3aed" : "#f5f3ff",
+                color: mInSchool ? "#fff" : "#7c3aed" }}>
+              {mInSchool ? "🏛️ Remove School HOF" : "🏛️ Add to School HOF"}
             </button>
             <button onClick={() => { onToggle(player, 'state'); onClose(); }}
               style={{ flex:1, padding:"10px 0", borderRadius:9, border:"none", cursor:"pointer", fontWeight:700, fontSize:13,
-                background: player.stateHallOfFame ? "#b45309" : "#fffbeb",
-                color: player.stateHallOfFame ? "#fff" : "#b45309" }}>
-              {player.stateHallOfFame ? "⭐ Remove State HOF" : "⭐ Add to State HOF"}
+                background: mInState ? "#b45309" : "#fffbeb",
+                color: mInState ? "#fff" : "#b45309" }}>
+              {mInState ? "⭐ Remove State HOF" : "⭐ Add to State HOF"}
             </button>
             <button onClick={onClose}
               style={{ padding:"10px 20px", borderRadius:9, border:"1px solid #e5e7eb", cursor:"pointer", fontWeight:600, fontSize:13, background:"#fff", color:"#374151" }}>
