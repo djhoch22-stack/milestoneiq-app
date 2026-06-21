@@ -5029,6 +5029,10 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
       {view === "athletes" && <><div style={{ display:"flex", flexDirection:"column", gap:8 }}>
         {filtered.slice(0, hofPage * 25).map(({ player, programScore, crossSport, allScores, finalScore, confirmed, xState }, i) => {
           const tier = hofTier(finalScore);
+          // School/State buttons light from cross-sport induction (same as the border/🏛️/year box),
+          // so a player inducted via another of her sports shows the lit button here too.
+          const inSchoolHof = player.schoolHallOfFame || hofSchoolNames.has(normName(player.name));
+          const inStateHof  = player.stateHallOfFame  || hofStateNames.has(normName(player.name));
           return (
             <div key={player.id}
               style={{ background:"#fff", borderRadius:12, border:`1px solid ${confirmed ? "#c4b5fd" : "#e8e4dd"}`,
@@ -5088,17 +5092,17 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
                 <div style={{ display:"flex", gap:6, flexShrink:0 }} onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => toggleConfirmed(player, 'school')}
-                    title={player.schoolHallOfFame ? "Remove from School HOF" : "Add to School HOF"}
-                    style={{ background: player.schoolHallOfFame ? "#7c3aed" : "#f3f4f6",
-                      color: player.schoolHallOfFame ? "#fff" : "#6b7280",
+                    title={inSchoolHof ? "Remove from School HOF" : "Add to School HOF"}
+                    style={{ background: inSchoolHof ? "#7c3aed" : "#f3f4f6",
+                      color: inSchoolHof ? "#fff" : "#6b7280",
                       border:"none", borderRadius:6, padding:"5px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>
                     🏛️ School
                   </button>
                   <button
                     onClick={() => toggleConfirmed(player, 'state')}
-                    title={player.stateHallOfFame ? "Remove from State HOF" : "Add to State HOF"}
-                    style={{ background: player.stateHallOfFame ? "#b45309" : "#f3f4f6",
-                      color: player.stateHallOfFame ? "#fff" : "#6b7280",
+                    title={inStateHof ? "Remove from State HOF" : "Add to State HOF"}
+                    style={{ background: inStateHof ? "#b45309" : "#f3f4f6",
+                      color: inStateHof ? "#fff" : "#6b7280",
                       border:"none", borderRadius:6, padding:"5px 9px", fontSize:11, fontWeight:700, cursor:"pointer" }}>
                     ⭐ State
                   </button>
