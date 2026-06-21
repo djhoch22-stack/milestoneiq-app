@@ -296,7 +296,23 @@ export default async function handler(req, res) {
   }
 
   // ── HALL OF FAME — INDUCTED ONLY (athletes ⇄ coaches) ───────────────────────
-  const inductedAth = careerPool.filter((p) => p.schoolHOF || p.stateHOF)
+  // Cross-sport recognition: a player inducted in a gender-compatible sibling program (e.g. girls
+  // basketball) is a Hall of Famer here too — mirrors the in-app HOF tab, which the public page lacked.
+  const hofSibIds = (await sb(`public_teams?org_id=eq.${team.org_id}&select=id,sport`))
+    .filter((p) => p.id !== pid && sportsLinkable(team.sport, p.sport)).map((p) => p.id);
+  const xHofRaw = hofSibIds.length
+    ? await sb(`all_time_players?program_id=in.(${hofSibIds.join(",")})&select=name,school_hall_of_fame,state_hall_of_fame,hof_year`)
+    : [];
+  const xHof = new Map();
+  xHofRaw.forEach((p) => {
+    if (!p.school_hall_of_fame && !p.state_hall_of_fame) return;
+    const k = normName(p.name), c = xHof.get(k) || { schoolHOF: false, stateHOF: false, hofYear: null };
+    xHof.set(k, { schoolHOF: c.schoolHOF || !!p.school_hall_of_fame, stateHOF: c.stateHOF || !!p.state_hall_of_fame, hofYear: c.hofYear || p.hof_year || null });
+  });
+  const inductedAth = careerPool.map((p) => {
+    const x = xHof.get(normName(p.name)); if (!x) return p;
+    return { ...p, schoolHOF: p.schoolHOF || x.schoolHOF, stateHOF: p.stateHOF || x.stateHOF, hofYear: p.hofYear || x.hofYear };
+  }).filter((p) => p.schoolHOF || p.stateHOF)
     .sort((a, b) => (b.stateHOF ? 1 : 0) - (a.stateHOF ? 1 : 0) || a.name.localeCompare(b.name));
   const athItems = inductedAth.map((p) => {
     const badges = (p.stateHOF ? `<span class="badge state">State HOF</span>` : "") + (p.schoolHOF ? `<span class="badge school">School HOF</span>` : "");
