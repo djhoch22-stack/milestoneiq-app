@@ -3628,29 +3628,43 @@ function BulkSeasonsImport({ seasons = [], onSave }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const parsedCount = open && text.trim() ? parseSeasonsPaste(text).length : 0;
-  const doImport = () => {
-    const parsed = parseSeasonsPaste(text);
-    if (!parsed.length) { setErr("Couldn't read any seasons. Use columns: Season, Wins, Losses, League W, League L, Coach, Notes (a header row is fine)."); return; }
+  // Parse + merge by year (same year replaces, new years add), then save. Returns whether anything imported.
+  const importRaw = (raw) => {
+    const parsed = parseSeasonsPaste(raw);
+    if (!parsed.length) { setErr("Couldn't read any seasons. Expected columns: Season, Wins, Losses, League W, League L, Coach, Notes — keep the header row."); return false; }
     const labels = new Set(parsed.map((s) => String(s.season)));
     const kept = (seasons || []).filter((s) => !labels.has(String(s.season)));
     const yr = (s) => parseInt(String(s.season).match(/\d{4}/)?.[0] || "0", 10);
-    const merged = [...parsed, ...kept].sort((a, b) => yr(b) - yr(a));
-    onSave(merged);
-    setText(""); setErr(""); setOpen(false);
+    onSave([...parsed, ...kept].sort((a, b) => yr(b) - yr(a)));
+    return true;
+  };
+  const doImport = () => { if (importRaw(text)) { setText(""); setErr(""); setOpen(false); } };
+  const handleFile = (e) => {
+    const f = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { if (importRaw(String(reader.result || ""))) { setText(""); setErr(""); setOpen(false); } };
+    reader.onerror = () => setErr("Couldn't read that file.");
+    reader.readAsText(f);
   };
   if (!open) return (
     <button onClick={() => { setOpen(true); setErr(""); }}
       style={{ background:"#fff", color:"#1a56db", border:"1px solid #1a56db", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
-      📋 Paste seasons
+      📋 Import seasons
     </button>
   );
   return (
     <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e8e4dd", padding:16, marginBottom:16 }}>
-      <div style={{ fontSize:14, fontWeight:700, color:"#111", marginBottom:6 }}>📋 Paste season history</div>
+      <div style={{ fontSize:14, fontWeight:700, color:"#111", marginBottom:6 }}>📋 Import season history</div>
       <div style={{ fontSize:12, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>
-        Copy rows straight from a spreadsheet (or CSV). Columns: <strong>Season, Wins, Losses, League W, League L, Coach, Notes</strong> — keep the header row, extra columns are ignored. A season whose year matches an existing one replaces it.
+        Upload a <strong>CSV</strong> (or paste rows from a spreadsheet). Columns: <strong>Season, Wins, Losses, League W, League L, Coach, Notes</strong> — keep the header row; blank/extra columns are ignored. A season whose year matches an existing one replaces it.
       </div>
-      <textarea value={text} onChange={(e) => { setText(e.target.value); setErr(""); }} rows={8}
+      <label style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#1a56db", color:"#fff", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", marginBottom:12 }}>
+        <input type="file" accept=".csv,.tsv,.txt" onChange={handleFile} style={{ display:"none" }} />
+        📁 Choose CSV file…
+      </label>
+      <div style={{ fontSize:12, color:"#9ca3af", margin:"0 0 6px" }}>— or paste rows below —</div>
+      <textarea value={text} onChange={(e) => { setText(e.target.value); setErr(""); }} rows={7}
         placeholder={"Season\tWins\tLosses\tLeague W\tLeague L\tCoach\tNotes\n2025\t22\t6\t7\t3\tRuss Haman\tRegion Champs\n2024\t16\t9\t7\t3\tVictoria Kassebaum\tRegion Host"}
         style={{ width:"100%", boxSizing:"border-box", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 10px", fontSize:12, fontFamily:"monospace", resize:"vertical" }} />
       {err && <div style={{ color:"#b91c1c", fontSize:12, marginTop:6 }}>{err}</div>}
@@ -3666,12 +3680,15 @@ function BulkSeasonsImport({ seasons = [], onSave }) {
   );
 }
 
-function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior }) {
+function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, programId = null }) {
   const isMobile = useIsMobile();
   const [sortDir, setSortDir] = useState("desc");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingCoach, setEditingCoach] = useState(null);
+  // Coach-of-the-Year awards (shown on each coach tile), loaded per program.
+  const [coachAwards, setCoachAwards] = useState([]);
+  useEffect(() => { let live = true; if (programId) getAwards(programId).then(({ data }) => { if (live) setCoachAwards(data || []); }); return () => { live = false; }; }, [programId]);
 
   const blankForm = { season:"", wins:"", losses:"", ties:"", leagueWins:"", leagueLosses:"", leagueTies:"", coach:"", notes:"" };
   const [form, setForm] = useState(blankForm);
@@ -3780,7 +3797,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
       coachMap[s.coach] = {
         wins: 0, losses: 0, ties: 0,
         leagueWins: 0, leagueLosses: 0, leagueTies: 0,
-        seasons: 0, titles: 0,
+        seasons: 0, titles: 0, leagueTitles: 0, stateTitles: 0,
         firstYear: s.season, lastYear: s.season
       };
     }
@@ -3793,6 +3810,8 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
     if (s.leagueLosses != null) rec.leagueLosses += s.leagueLosses;
     if (s.leagueTies != null) rec.leagueTies += s.leagueTies;
     if (s.notes && /champion/i.test(s.notes)) rec.titles++;
+    if (s.leagueChampion || (s.notes && /league champ/i.test(s.notes))) rec.leagueTitles++;
+    if (s.stateChampion  || (s.notes && /state champ/i.test(s.notes)))  rec.stateTitles++;
     if (s.season < rec.firstYear) rec.firstYear = s.season;
     if (s.season > rec.lastYear) rec.lastYear = s.season;
   });
@@ -3804,6 +3823,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
     rec.wins += Number(pr.wins || 0); rec.losses += Number(pr.losses || 0); rec.ties += Number(pr.ties || 0);
     rec.leagueWins += Number(pr.leagueWins || 0); rec.leagueLosses += Number(pr.leagueLosses || 0); rec.leagueTies += Number(pr.leagueTies || 0);
     rec.titles += Number(pr.leagueChamps || 0) + Number(pr.stateChamps || 0);
+    rec.leagueTitles += Number(pr.leagueChamps || 0); rec.stateTitles += Number(pr.stateChamps || 0);
   });
 
   const seasonsWithRecord = seasons.filter(s => s.wins != null && s.losses != null);
@@ -3912,6 +3932,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
               const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? ((rec.wins/(rec.wins+rec.losses+(rec.ties||0)))*100).toFixed(1) : "—";
               const lPct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins/(rec.leagueWins+rec.leagueLosses+(rec.leagueTies||0)))*100).toFixed(1) : "—";
               const yearRange = rec.firstYear === rec.lastYear ? rec.firstYear : `${rec.firstYear} – ${rec.lastYear}`;
+              const coyCount = awardsForHolder(coach, "coach", coachAwards).length;
               return (
                 <div key={coach} style={{
                   padding:"16px 20px",
@@ -3945,10 +3966,11 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior })
                       <div style={{fontSize:11,color:"#6b7280"}}>{lPct}%</div>
                     </div>
                   </div>
-                  {rec.titles > 0 && (
-                    <div style={{fontSize:11,color:"#92400e",marginTop:8,display:"flex",alignItems:"center",gap:4}}>
-                      <span>🏆</span>
-                      <span>{rec.titles} league title{rec.titles!==1?"s":""}</span>
+                  {(rec.leagueTitles > 0 || rec.stateTitles > 0 || coyCount > 0) && (
+                    <div style={{fontSize:11,marginTop:8,display:"flex",flexWrap:"wrap",gap:"4px 12px",alignItems:"center"}}>
+                      {rec.leagueTitles > 0 && <span style={{color:"#92400e"}}>🏆 {rec.leagueTitles} league title{rec.leagueTitles!==1?"s":""}</span>}
+                      {rec.stateTitles > 0 && <span style={{color:"#b45309"}}>🥇 {rec.stateTitles} state title{rec.stateTitles!==1?"s":""}</span>}
+                      {coyCount > 0 && <span style={{color:"#6b21a8"}}>🏅 {coyCount} Coach of the Year</span>}
                     </div>
                   )}
                 </div>
@@ -6249,7 +6271,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 </p>
               </div>
             </div>
-            <SeasonsTab seasons={school.seasons} onSave={async (updatedSeasons) => {
+            <SeasonsTab seasons={school.seasons} programId={school.id} onSave={async (updatedSeasons) => {
               // Credit each season's team WINS to every player who has a row for that season, so adding/editing
               // a season's record auto-updates the roster's win totals (no re-import needed). Only seasons whose
               // wins actually changed are touched; then recompute career + reload to show the new totals.
