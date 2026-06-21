@@ -3645,7 +3645,7 @@ function BulkSeasonsImport({ seasons = [], onSave }) {
     const f = e.target.files && e.target.files[0]; e.target.value = "";
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => { if (importRaw(String(reader.result || ""))) { setText(""); setErr(""); setOpen(false); } };
+    reader.onload = () => { setText(String(reader.result || "")); setErr(""); }; // fill the box; user sees the count, then clicks Import
     reader.onerror = () => setErr("Couldn't read that file.");
     reader.readAsText(f);
   };
@@ -3661,14 +3661,14 @@ function BulkSeasonsImport({ seasons = [], onSave }) {
       <div style={{ fontSize:12, color:"#6b7280", marginBottom:10, lineHeight:1.5 }}>
         Upload a <strong>CSV</strong> (or paste rows from a spreadsheet). Columns: <strong>Season, Wins, Losses, League W, League L, Coach, Notes</strong> — keep the header row; blank/extra columns are ignored. A season whose year matches an existing one replaces it.
       </div>
-      <label style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#1a56db", color:"#fff", borderRadius:8, padding:"8px 16px", fontSize:13, fontWeight:600, cursor:"pointer", marginBottom:12 }}>
-        <input type="file" accept=".csv,.tsv,.txt" onChange={handleFile} style={{ display:"none" }} />
-        📁 Choose CSV file…
-      </label>
+      <div style={{ marginBottom:12 }}>
+        <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={handleFile} style={{ display:"block", fontSize:13, color:"#374151" }} />
+      </div>
       <div style={{ fontSize:12, color:"#9ca3af", margin:"0 0 6px" }}>— or paste rows below —</div>
       <textarea value={text} onChange={(e) => { setText(e.target.value); setErr(""); }} rows={7}
         placeholder={"Season\tWins\tLosses\tLeague W\tLeague L\tCoach\tNotes\n2025\t22\t6\t7\t3\tRuss Haman\tRegion Champs\n2024\t16\t9\t7\t3\tVictoria Kassebaum\tRegion Host"}
         style={{ width:"100%", boxSizing:"border-box", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 10px", fontSize:12, fontFamily:"monospace", resize:"vertical" }} />
+      {text.trim() && <div style={{ fontSize:12, marginTop:6, fontWeight:600, color: parsedCount ? "#166534" : "#b91c1c" }}>{parsedCount ? `✓ Found ${parsedCount} season${parsedCount===1?"":"s"} — click Import below.` : "No seasons detected — make sure the header row (Season, Overall W, …) is included."}</div>}
       {err && <div style={{ color:"#b91c1c", fontSize:12, marginTop:6 }}>{err}</div>}
       <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:10 }}>
         <button onClick={doImport} disabled={!text.trim()}
