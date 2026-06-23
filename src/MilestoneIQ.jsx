@@ -3795,7 +3795,7 @@ function BulkSeasonsImport({ seasons = [], onSave }) {
   );
 }
 
-function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, programId = null }) {
+function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, programId = null, school = null, onUpdate }) {
   const isMobile = useIsMobile();
   const [sortDir, setSortDir] = useState("desc");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -3804,6 +3804,19 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
   // Coach-of-the-Year awards (shown on each coach tile), loaded per program.
   const [coachAwards, setCoachAwards] = useState([]);
   useEffect(() => { let live = true; if (programId) getAwards(programId).then(({ data }) => { if (live) setCoachAwards(data || []); }); return () => { live = false; }; }, [programId]);
+  const [cardCoach, setCardCoach] = useState(null); // click a coach tile → open their full profile card
+  const coachScored = useMemo(() => {
+    const list = buildCoachStats(seasons || []);
+    const names = list.map(c => c.name);
+    return list.map(c => ({ ...c, score: Math.min(calcCoachHofScore(c, list) + coachAwardBonus(c.name, coachAwards, names), 100), coyCount: awardsForHolder(c.name, "coach", coachAwards, names).length }));
+  }, [seasons, coachAwards]);
+  const scoredByName = useMemo(() => { const m = {}; coachScored.forEach(c => { m[c.name] = c; }); return m; }, [coachScored]);
+  const toggleCoachHof = (coachName) => {
+    if (!school || !onUpdate) return;
+    const updated = { ...(school.coachHof || {}) };
+    if (updated[coachName]) delete updated[coachName]; else updated[coachName] = new Date().getFullYear();
+    onUpdate({ ...school, coachHof: updated });
+  };
 
   const blankForm = { season:"", wins:"", losses:"", ties:"", leagueWins:"", leagueLosses:"", leagueTies:"", coach:"", notes:"" };
   const [form, setForm] = useState(blankForm);
@@ -3986,6 +3999,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
   return (
     <div>
       {editingCoach && <CoachPriorModal coach={editingCoach} prior={coachPrior[editingCoach] || {}} onClose={()=>setEditingCoach(null)} onSave={(pr)=>{ if (onSaveCoachPrior) onSaveCoachPrior({ ...coachPrior, [editingCoach]: pr }); setEditingCoach(null); }} />}
+      {cardCoach && school && <CoachHofModal coach={cardCoach} school={school} allCoaches={coachScored} awards={coachAwards} awardsBySport={{}} confirmed={!!((school.coachHof||{})[cardCoach.name])} onClose={()=>setCardCoach(null)} onToggle={()=>{ toggleCoachHof(cardCoach.name); setCardCoach(null); }} />}
       {/* Add season button + form */}
       <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
         {!showAddForm && !editingId && (
@@ -4049,9 +4063,10 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
               const yearRange = rec.firstYear === rec.lastYear ? rec.firstYear : `${rec.firstYear} – ${rec.lastYear}`;
               const coyCount = awardsForHolder(coach, "coach", coachAwards).length;
               return (
-                <div key={coach} style={{
+                <div key={coach} onClick={()=> scoredByName[coach] && setCardCoach(scoredByName[coach])} style={{
                   padding:"16px 20px",
                   borderBottom:"1px solid #f3f0ea",
+                  cursor:"pointer",
                   background: isCurrent ? "#eff6ff" : "transparent",
                   borderLeft: isCurrent ? "4px solid #1a56db" : "4px solid transparent",
                 }}>
@@ -4062,7 +4077,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
                         Current
                       </span>
                     )}
-                    <button onClick={()=>setEditingCoach(coach)} title="Add wins & accomplishments from prior schools"
+                    <button onClick={(e)=>{e.stopPropagation();setEditingCoach(coach);}} title="Add wins & accomplishments from prior schools"
                       style={{marginLeft:"auto",background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:6,padding:"2px 8px",fontSize:11,cursor:"pointer",color:"#374151",fontWeight:600,whiteSpace:"nowrap"}}>✏️ Prior</button>
                   </div>
                   <div style={{fontSize:12,color:"#6b7280",marginBottom:8}}>{yearRange} · {rec.seasons} season{rec.seasons!==1?"s":""}</div>
@@ -6392,7 +6407,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 </p>
               </div>
             </div>
-            <SeasonsTab seasons={school.seasons} programId={school.id} onSave={async (updatedSeasons) => {
+            <SeasonsTab seasons={school.seasons} programId={school.id} school={school} onUpdate={onUpdate} onSave={async (updatedSeasons) => {
               // Credit each season's team WINS to every player who has a row for that season, so adding/editing
               // a season's record auto-updates the roster's win totals (no re-import needed). Only seasons whose
               // wins actually changed are touched; then recompute career + reload to show the new totals.
