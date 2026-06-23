@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
-  RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor,
+  RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
@@ -76,32 +76,60 @@ export default async function handler(req, res) {
   ];
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
-  const recordsSection = !allRecords.length
-    ? `<div class="empty">No school records published yet.</div>`
-    : Object.keys(byStat).sort((a, b) => byStatOrder(a, b, team.sport)).map((sn) => {
-        const recs = byStat[sn].slice().sort((a, b) => ((PCT_PARENT[a.statName] ? 100 : 0) + vIdx(a.variant)) - ((PCT_PARENT[b.statName] ? 100 : 0) + vIdx(b.variant)));
-        const groups = []; const seen = {};
-        for (const r of recs) { const k = r.statName + "|" + r.variant + "|" + r.value; if (seen[k] != null) groups[seen[k]].push(r); else { seen[k] = groups.length; groups.push([r]); } }
-        const tiles = groups.map((g) => {
-          const rec = g[0]; const isPct = !!RATE_FMT[rec.statName]; // any derived rate (FG%/3P%/FT% · AVG/OBP/SLG/OPS/FLD%)
-          // Show ALL players tied at this record's value (team stats like Wins are shared), not just one.
-          const seen = new Set(g.filter((r) => r.holderName).map((r) => r.holderName.toLowerCase().trim()));
-          let tied = [];
-          if (!isPct && rec.variant === "Career total") {
-            tied = careerPool.filter((p) => (p.stats?.[rec.statName] ?? null) === rec.value && !seen.has((p.name || "").toLowerCase().trim()))
-              .map((p) => ({ name: p.name, year: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? p.firstYear : p.firstYear + "-" + p.lastYear) : (p.gradYear ? "Class of " + p.gradYear : "") }));
-          } else if (!isPct && rec.variant === "Single season") {
-            const ns = new Set();
-            tied = (seasonRows || []).filter((r) => (r.stats?.[rec.statName] ?? null) === rec.value && r.player_name && !seen.has(r.player_name.toLowerCase().trim()) && !ns.has(r.player_name.toLowerCase().trim()) && (ns.add(r.player_name.toLowerCase().trim()) || true))
-              .map((r) => ({ name: r.player_name, year: r.season }));
-          }
-          const holderList = [...g.filter((r) => r.holderName).map((r) => ({ name: r.holderName, year: r.holderYear })), ...tied];
-          const holders = holderList.map((h) => `<div class="holder">🏅 ${esc(h.name)}${h.year ? ` · ${esc(String(h.year))}` : ""}</div>`).join("");
-          const pctLabel = rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : "Best (" + esc(rec.variant) + ")";
-          return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? pctLabel : esc(rec.variant)}</span><span class="val">${isPct ? esc(fmtRateVal(RATE_FMT[rec.statName], rec.value)) : fmtNum(rec.value)}</span></div>${holders}</div>`;
-        }).join("");
-        return `<div class="statcard"><div class="hd">${esc(sn)}</div><div class="tiles">${tiles}</div></div>`;
-      }).join("");
+  // One stat's tile (variants collapsed, ties expanded) — rendered inside its category group.
+  const statCardHtml = (sn) => {
+    const recs = byStat[sn].slice().sort((a, b) => ((PCT_PARENT[a.statName] ? 100 : 0) + vIdx(a.variant)) - ((PCT_PARENT[b.statName] ? 100 : 0) + vIdx(b.variant)));
+    const groups = []; const seen = {};
+    for (const r of recs) { const k = r.statName + "|" + r.variant + "|" + r.value; if (seen[k] != null) groups[seen[k]].push(r); else { seen[k] = groups.length; groups.push([r]); } }
+    const tiles = groups.map((g) => {
+      const rec = g[0]; const isPct = !!RATE_FMT[rec.statName]; // any derived rate (FG%/3P%/FT% · AVG/OBP/SLG/OPS/FLD% · Completion %)
+      // Show ALL players tied at this record's value (team stats like Wins are shared), not just one.
+      const seen = new Set(g.filter((r) => r.holderName).map((r) => r.holderName.toLowerCase().trim()));
+      let tied = [];
+      if (!isPct && rec.variant === "Career total") {
+        tied = careerPool.filter((p) => (p.stats?.[rec.statName] ?? null) === rec.value && !seen.has((p.name || "").toLowerCase().trim()))
+          .map((p) => ({ name: p.name, year: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? p.firstYear : p.firstYear + "-" + p.lastYear) : (p.gradYear ? "Class of " + p.gradYear : "") }));
+      } else if (!isPct && rec.variant === "Single season") {
+        const ns = new Set();
+        tied = (seasonRows || []).filter((r) => (r.stats?.[rec.statName] ?? null) === rec.value && r.player_name && !seen.has(r.player_name.toLowerCase().trim()) && !ns.has(r.player_name.toLowerCase().trim()) && (ns.add(r.player_name.toLowerCase().trim()) || true))
+          .map((r) => ({ name: r.player_name, year: r.season }));
+      }
+      const holderList = [...g.filter((r) => r.holderName).map((r) => ({ name: r.holderName, year: r.holderYear })), ...tied];
+      const holders = holderList.map((h) => `<div class="holder">🏅 ${esc(h.name)}${h.year ? ` · ${esc(String(h.year))}` : ""}</div>`).join("");
+      const pctLabel = rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : "Best (" + esc(rec.variant) + ")";
+      return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? pctLabel : esc(rec.variant)}</span><span class="val">${isPct ? esc(fmtRateVal(RATE_FMT[rec.statName], rec.value)) : fmtNum(rec.value)}</span></div>${holders}</div>`;
+    }).join("");
+    return `<div class="statcard"><div class="hd">${esc(sn)}</div><div class="tiles">${tiles}</div></div>`;
+  };
+  // Group records into categories (Passing/Rushing/…) like the in-app Records tab. A rate (e.g. Completion %)
+  // sits in its anchor stat's group; anything not in a group falls under "Other" (matches the app).
+  const rgroups = groupsFor(team.sport);
+  const groupOf = (statName) => {
+    if (!rgroups) return "Other";
+    const g = rgroups.find((gr) => gr.s.includes(statName));
+    if (g) return g.g;
+    const rd = rateDefsFor(team.sport).find((d) => d.name === statName);
+    if (rd) { const a = rgroups.find((gr) => gr.s.includes(rd.after)); if (a) return a.g; }
+    return "Other";
+  };
+  const rgOrder = (rgroups || []).map((g) => g.g);
+  const rgIdx = (name) => { if (name === "Coaching") return 99999; const i = rgOrder.indexOf(name); return i === -1 ? 9999 : i; };
+  const RGROUP_BG = { "Passing":"#dbeafe","Rushing":"#dcfce7","Receiving":"#fef3c7","Offense":"#f3e8ff","Other Offense":"#f3e8ff","Scoring":"#ffedd5","Special Teams":"#ffedd5","Defense":"#fee2e2","General":"#f1f5f9","Batting":"#dbeafe","Fielding":"#dcfce7","Pitching":"#f3e8ff","Attacking":"#fee2e2","Setting":"#dbeafe","Serving":"#fef3c7","Punting":"#ffedd5","Punt Returns":"#dcfce7","Kicking":"#f3e8ff","Kickoffs":"#fef3c7","Kickoff Returns":"#dcfce7","Coaching":"#f1f5f9","Other":"#f1f5f9" };
+  const RGROUP_FG = { "Passing":"#1e40af","Rushing":"#166534","Receiving":"#92400e","Offense":"#6b21a8","Other Offense":"#6b21a8","Scoring":"#c2410c","Special Teams":"#c2410c","Defense":"#991b1b","General":"#334155","Batting":"#1e40af","Fielding":"#166534","Pitching":"#6b21a8","Attacking":"#991b1b","Setting":"#1e40af","Serving":"#92400e","Punting":"#c2410c","Punt Returns":"#166534","Kicking":"#6b21a8","Kickoffs":"#92400e","Kickoff Returns":"#166534","Coaching":"#334155","Other":"#334155" };
+  let recordsSection;
+  if (!allRecords.length) {
+    recordsSection = `<div class="empty">No school records published yet.</div>`;
+  } else {
+    const byRGroup = {};
+    for (const sn of Object.keys(byStat)) { const grp = groupOf(sn); (byRGroup[grp] = byRGroup[grp] || []).push(sn); }
+    recordsSection = Object.keys(byRGroup).sort((a, b) => rgIdx(a) - rgIdx(b)).map((grpName) => {
+      const names = byRGroup[grpName].sort((a, b) => byStatOrder(a, b, team.sport));
+      const count = names.reduce((n, sn) => n + byStat[sn].length, 0);
+      const bg = RGROUP_BG[grpName] || "#f1f5f9", fg = RGROUP_FG[grpName] || "#334155";
+      const header = `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px"><span style="background:${bg};color:${fg};border-radius:20px;padding:3px 14px;font-size:12px;font-weight:700">${esc(grpName)}</span><span style="flex:1;height:1px;background:#e8e4dd"></span><span style="font-size:12px;color:#9ca3af">${count} record${count !== 1 ? "s" : ""}</span></div>`;
+      return header + names.map(statCardHtml).join("");
+    }).join("");
+  }
 
   // ── Player profiles (powers click-to-open modal across tabs) ─────────────────
   const bySeasonName = {};
