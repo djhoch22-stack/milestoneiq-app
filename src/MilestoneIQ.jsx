@@ -82,7 +82,7 @@ const VBALL_GROUPS = [
 // Girls flag football — tailored to the MaxPreps girls-flag export: football's passing/rushing/receiving
 // + flag pulls + sacks + punts/returns + kicking, but NO kickoffs/kick-returns and NO contact-only
 // defense (interceptions, fumbles, blocked kicks, pass break-ups). "Tackles" → "Flag Pulls".
-const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Sacks","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 const FLAG_FOOTBALL_GROUPS = [
   { group: "General", stats: [
     { name: "Games Played", variants: ["Career total","Single season"] },
@@ -108,7 +108,6 @@ const FLAG_FOOTBALL_GROUPS = [
     { name: "Longest Reception", variants: ["Longest"] },
   ]},
   { group: "Offense", stats: [
-    { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
     { name: "Total TDs", variants: STAT_VARIANTS_STANDARD },
   ]},
   { group: "Defense", stats: [
@@ -117,12 +116,8 @@ const FLAG_FOOTBALL_GROUPS = [
     { name: "Assist Flag Pulls", variants: STAT_VARIANTS_STANDARD },
     { name: "Sacks", variants: STAT_VARIANTS_STANDARD },
   ]},
-  { group: "Kicking", stats: [
-    { name: "Field Goals Made", variants: STAT_VARIANTS_STANDARD },
-    { name: "Field Goals Attempts", variants: STAT_VARIANTS_STANDARD },
-    { name: "Longest Field Goal", variants: ["Longest"] },
-    { name: "PAT Mades", variants: STAT_VARIANTS_STANDARD },
-    { name: "PAT Attempts", variants: STAT_VARIANTS_STANDARD },
+  { group: "Scoring", stats: [
+    { name: "Try Points", variants: STAT_VARIANTS_STANDARD },
   ]},
   { group: "Punting", stats: [
     { name: "Punts", variants: STAT_VARIANTS_STANDARD },
@@ -2664,11 +2659,14 @@ const STAT_ALIASES_BY_SPORT = {
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.
 STAT_ALIASES_BY_SPORT.softball = STAT_ALIASES_BY_SPORT.baseball;
 // Girls flag football imports like football; MaxPreps' defense section is "Flag Pulls" → our Tackles stats.
-STAT_ALIASES_BY_SPORT.flag_football_girls = {
+// NOTE: keyed "flag_football" (NOT _girls) — resolveStatAlias strips the _boys/_girls suffix before lookup.
+STAT_ALIASES_BY_SPORT.flag_football = {
   ...STAT_ALIASES_BY_SPORT.football,
-  "solo": "Solo Flag Pulls", "asst": "Assist Flag Pulls", "ast": "Assist Flag Pulls",
-  "tot fps": "Flag Pulls", "fp": "Flag Pulls", "fps": "Flag Pulls", "flag pull": "Flag Pulls", "flag pulls": "Flag Pulls", "total flag pulls": "Flag Pulls", "tackles": "Flag Pulls", "tot": "Flag Pulls",
+  "solo": "Solo Flag Pulls", "solo tackles": "Solo Flag Pulls", "solo fps": "Solo Flag Pulls",
+  "asst": "Assist Flag Pulls", "ast": "Assist Flag Pulls", "assist tackles": "Assist Flag Pulls", "asst tackles": "Assist Flag Pulls",
+  "tot fps": "Flag Pulls", "fp": "Flag Pulls", "fps": "Flag Pulls", "flag pull": "Flag Pulls", "flag pulls": "Flag Pulls", "total flag pulls": "Flag Pulls", "tackles": "Flag Pulls", "total tackles": "Flag Pulls", "tot": "Flag Pulls",
   "car": "Rushes", "carries": "Rushes",
+  "try pts": "Try Points", "try points": "Try Points", "try": "Try Points", "2 pt": "Try Points", "2pt": "Try Points", "2 pt conversions made": "Try Points", "two point conversions": "Try Points",
 };
 const _ciAlias = (m) => { const o = {}; for (const k in m) o[k.toLowerCase()] = m[k]; return o; };
 const _ALIAS_COMMON_CI = _ciAlias(STAT_ALIAS_COMMON);
