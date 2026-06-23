@@ -147,6 +147,9 @@ export default async function handler(req, res) {
     (recByHolder[k] = recByHolder[k] || []).push({ n: r.statName, v: r.variant, val });
   }
   const activeSet = new Set(athletes.filter((a) => a.isActive).map((a) => normName(a.name)));
+  // A roster athlete explicitly marked inactive wins over a stale all-time is_current flag, so deactivating
+  // on the user side immediately drops the "Active" badge everywhere on the public side too.
+  const inactiveSet = new Set(athletes.filter((a) => a.isActive === false).map((a) => normName(a.name)));
   const athByName = {}; athletes.forEach((a) => { athByName[normName(a.name)] = a; });
   // A player's honors/awards (this program) → label strings with year, shown on their profile card.
   const honorsArr = (name) => awardsForHolder(name, "player", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
@@ -156,7 +159,7 @@ export default async function handler(req, res) {
   careerPool.forEach((p) => {
     const k = normName(p.name); const ath = athByName[k];
     profiles[k] = { n: p.name, y: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? String(p.firstYear) : String(p.firstYear) + "–" + String(p.lastYear)) : (p.gradYear ? "Class of " + p.gradYear : ""),
-      pos: (ath && ath.position) ? ath.position : "", a: !!(p.isCurrent || activeSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(p.name), ts: tsFor(p.firstYear, p.lastYear, p.gradYear) };
+      pos: (ath && ath.position) ? ath.position : "", a: activeSet.has(k) || (!!p.isCurrent && !inactiveSet.has(k)), sh: !!p.schoolHOF, st: !!p.stateHOF, at: 1, s: p.stats, ss: bySeasonName[k] || [], rec: recByHolder[k] || [], hon: honorsArr(p.name), ts: tsFor(p.firstYear, p.lastYear, p.gradYear) };
   });
   athletes.forEach((a) => {
     const k = normName(a.name); if (profiles[k]) return;
@@ -292,10 +295,11 @@ export default async function handler(req, res) {
     });
     const coachCards = Object.entries(cmap).sort((a, b) => b[1].wins - a[1].wins).map(([coach, rec]) => {
       const cur = coach === mostRecent;
+      const coyC = awardsForHolder(coach, "coach", awards).length;
       const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? ((rec.wins / (rec.wins + rec.losses + (rec.ties||0))) * 100).toFixed(1) : "—";
       const lpct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins / (rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0))) * 100).toFixed(1) : "—";
       const yr = String(rec.firstYear) === String(rec.lastYear) ? esc(String(rec.firstYear)) : esc(String(rec.firstYear)) + " – " + esc(String(rec.lastYear));
-      return `<div style="padding:16px 20px;border-bottom:1px solid #f3f0ea;${cur ? "background:#eff6ff;border-left:4px solid #1a56db" : "border-left:4px solid transparent"}">
+      return `<div class="ccard" data-c="${esc(normName(coach))}" style="cursor:pointer;padding:16px 20px;border-bottom:1px solid #f3f0ea;${cur ? "background:#eff6ff;border-left:4px solid #1a56db" : "border-left:4px solid transparent"}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:700;font-size:15px;color:#111">${esc(coach)}</div>${cur ? '<span style="background:#1a56db;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">Current</span>' : ""}</div>
         <div style="font-size:12px;color:#6b7280;margin-bottom:8px">${yr} · ${rec.seasons} season${rec.seasons !== 1 ? "s" : ""}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -304,6 +308,8 @@ export default async function handler(req, res) {
         </div>
         ${rec.leagueTitles > 0 ? `<div style="font-size:11px;color:#92400e;margin-top:8px">🏆 ${rec.leagueTitles} league title${rec.leagueTitles !== 1 ? "s" : ""}</div>` : ""}
         ${rec.stateTitles > 0 ? `<div style="font-size:11px;color:#b45309;margin-top:4px">🏅 ${rec.stateTitles} state title${rec.stateTitles !== 1 ? "s" : ""}</div>` : ""}
+        ${coyC > 0 ? `<div style="font-size:11px;color:#7c3aed;margin-top:4px">🏅 ${coyC} Coach of the Year award${coyC !== 1 ? "s" : ""}</div>` : ""}
+        <div style="font-size:12px;color:#1a56db;font-weight:600;margin-top:8px">View full record →</div>
       </div>`;
     }).join("");
 
@@ -382,6 +388,15 @@ export default async function handler(req, res) {
   const coachHofYear = {};
   Object.entries(team.coach_hof || {}).forEach(([k, v]) => { if (v) coachHofYear[normName(k)] = (typeof v === "number" ? v : null); });
   const coachProfiles = {}; // powers the click-to-open coach record modal
+  // Modal data for EVERY coach (not just inducted), so the Seasons-tab coach cards open the profile too.
+  coaches.forEach((c) => {
+    const tot = c.wins + c.losses + (c.ties || 0); const pct = tot > 0 ? Math.round((c.wins / tot) * 1000) / 10 : null;
+    const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
+    const coy = awardsForHolder(c.name, "coach", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
+    const iy = coachHofYear[normName(c.name)] || null;
+    const byTeam = c.byTeam || {};
+    coachProfiles[normName(c.name)] = { n: c.name, iy, yrs, ss: c.seasons, w: c.wins, l: c.losses, t: c.ties || 0, pct, lw: c.leagueWins || 0, ll: c.leagueLosses || 0, lt: c.leagueTies || 0, titles: c.titles || 0, teams: Object.keys(byTeam).sort().map((tm) => { const b = byTeam[tm]; const aw = (awBySport[normName(c.name) + "|" + tm] || []).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : "")); return { tm, ic: labelEmoji[tm] || "🏅", w: b.wins, l: b.losses, t: b.ties || 0, aw }; }), coy, ps: coachPostseason(c.name, orgSeasons), titleSeasons: coachTitleSeasons(c.name, orgSeasons).map((x) => ({ ssn: x.season, team: x.team, ic: labelEmoji[x.team] || "🏅", lg: x.league, st: x.state })) };
+  });
   const coachItems = inductedCoaches.map((c) => {
     const tot = c.wins + c.losses + (c.ties || 0); const pct = tot > 0 ? Math.round((c.wins / tot) * 1000) / 10 : null;
     const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
