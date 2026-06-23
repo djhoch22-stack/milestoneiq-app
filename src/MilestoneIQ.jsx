@@ -667,7 +667,7 @@ const VBALL_RATE_DEFS = [
     note: (g) => `${g("Total Serves").toLocaleString()} serves` },
 ];
 const FOOTBALL_RATE_DEFS = [
-  { name: "Completion Percentage", short: "COMP%", after: "Completions", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200,
+  { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200,
     calc: (g) => { const a = g("Passing Attempts"); return a > 0 ? Math.round((g("Completions") / a) * 1000) / 10 : null; },
     note: (g) => `${g("Passing Attempts").toLocaleString()} att` },
 ];
@@ -6025,8 +6025,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   const RECORD_STAT_ORDER = [...STAT_ORDER, "Coach Wins", "Field Goal Percentage", "Three Point Percentage", "Free Throw Percentage", "Batting Average", "On Base Percentage", "Slugging Percentage", "OPS", "Fielding Percentage", "ERA"];
                   const recStatIdx = (n) => {
                     const so = SPORT_ORDER[school.sport];
-                    if (so) { const fi = so.indexOf(n); if (fi !== -1) return fi; }
-                    const i = RECORD_STAT_ORDER.indexOf(n); return i===-1 ? 999 : i;
+                    const baseIdx = (name) => { if (so) { const fi = so.indexOf(name); if (fi !== -1) return fi; } const i = RECORD_STAT_ORDER.indexOf(name); return i===-1 ? 999 : i; };
+                    const rd = rateDefsFor(school.sport).find(d => d.name === n); // a rate sorts right after its anchor stat (e.g. Completion % after Passing Attempts)
+                    return rd ? baseIdx(rd.after) + 0.5 : baseIdx(n);
                   };
                   const VARIANT_ORDER = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)","Longest"];
                   const recVariantIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i===-1 ? 999 : i; };
