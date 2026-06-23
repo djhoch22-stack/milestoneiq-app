@@ -45,6 +45,11 @@ FOOTBALL — use these EXACT stat names (the coach's set), mapping the column wi
 - "Kickoff and Punt Returns" section: "KO Rets"→"Kick Off Returns", the Yds right after KO Rets→"Kick Off Return Yards", any TD there→"Kick Off Return TDs"; "P Rets"→"Punt Returns", the Yds right after P Rets→"Punt Return Yards", any TD there→"Punt Return TDs", the KO Ret Lng→"Longest Kick Off Return", the P Ret Lng→"Longest Punt Return" (ignore Avg/FC and the combined "KR Yds" total)
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
+FLAG FOOTBALL (girls flag football) — read Passing/Rushing/Receiving exactly like FOOTBALL above, PLUS:
+- The "Flag Pulls" table IS the tackles table: Solo→"Solo Tackles", Asst→"Assist Tackles", "Tot FPs"→"Tackles" (the app renames tackles→flag pulls). Keep the Sacks table's Sacks→"Sacks".
+- The "Scoring" table: "Try Pts"→"Try Points" (flag football's extra-point conversion). IGNORE that table's other columns (Tot Pts, PAT, XP Att, FG, FG Att, S, and any TD/P-G).
+- There are NO kickoffs, kickoff returns, or field goals to keep — skip them.
+
 BASEBALL — a MaxPreps printout has SEVERAL sections in this order: Batting (two tables), Baserunning, Fielding, Pitching (three tables). The SAME player (match by jersey # + last name) appears in many tables — COMBINE every table into that one player object. Map ONLY the columns below to these EXACT stat names; IGNORE all rate/derived columns (Avg, OBP, SLG, OPS, FP, ERA, W%, OBA, CS%) and any counting column not listed here (GS in batting, K in batting, FC, LOB, SBA, E, PB, CS, L, WP, BK):
 - Games Played (GP). Wins: read the team's OVERALL win total from the "Overall W-L" line near the top of the sheet (e.g. "Overall 20-10" → 20) and set "Wins" to that number for EVERY athlete — there is no per-player team-wins column, so never leave it blank or guess.
 - BATTING tables: PA→"Plate Appearances", AB→"At Bats", R→"Runs", H→"Hits", RBI→"RBIs", 2B→"Doubles", 3B→"Triples", HR→"Home Runs", SF→"Sacrifice Fly", "SH/B"→"Sacrifice Bunt", BB→"Walk (BB)", HBP→"Hit By Pitch", ROE→"Reached on Error"
