@@ -176,6 +176,13 @@ const SPORTS = {
     groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
+  flag_football_girls: {
+    label: "Girls Flag Football", icon: "🏈",
+    // Duplicate of football — identical stats, order, groups, and import. (Flag football's defense is
+    // "flag pulls"; those import into the Tackles stats. It's a girls sport, so it siloes with girls HOF.)
+    get groups() { return SPORTS.football.groups; },
+    get statCategories() { return SPORTS.football.statCategories; },
+  },
   basketball_boys: {
     label: "Boys Basketball", icon: "🏀",
     statCategories: BASKETBALL_STAT_CATEGORIES,
@@ -257,7 +264,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -304,7 +311,7 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
-  football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
   volleyball_girls: VBALL_GIRLS_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
@@ -417,7 +424,7 @@ const VBALL_THRESHOLDS = {
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const TH = sport === "football" ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : sport === "volleyball_girls" ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const TH = (sport === "football" || sport === "flag_football_girls") ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : sport === "volleyball_girls" ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
   const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
@@ -1840,7 +1847,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["football", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls"];
+const AVAILABLE_SPORTS = ["football", "flag_football_girls", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
@@ -2599,6 +2606,13 @@ const STAT_ALIASES_BY_SPORT = {
 };
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.
 STAT_ALIASES_BY_SPORT.softball = STAT_ALIASES_BY_SPORT.baseball;
+// Girls flag football imports like football; MaxPreps' defense section is "Flag Pulls" → our Tackles stats.
+STAT_ALIASES_BY_SPORT.flag_football_girls = {
+  ...STAT_ALIASES_BY_SPORT.football,
+  "asst": "Assist Tackles", "ast": "Assist Tackles",
+  "tot fps": "Tackles", "fp": "Tackles", "fps": "Tackles", "flag pull": "Tackles", "flag pulls": "Tackles", "total flag pulls": "Tackles",
+  "car": "Rushes", "carries": "Rushes",
+};
 const _ciAlias = (m) => { const o = {}; for (const k in m) o[k.toLowerCase()] = m[k]; return o; };
 const _ALIAS_COMMON_CI = _ciAlias(STAT_ALIAS_COMMON);
 const _ALIAS_SPORT_CI = (() => { const o = {}; for (const s in STAT_ALIASES_BY_SPORT) o[s] = _ciAlias(STAT_ALIASES_BY_SPORT[s]); return o; })();
@@ -2993,7 +3007,7 @@ function ImportHelpModal({ sport, onClose }) {
   };
   const norm = String(sport || "").replace(/_(boys|girls)$/, "");
   const SPORT_SOURCES = {
-    football: ["maxpreps"], baseball: ["maxpreps", "gamechanger"], softball: ["maxpreps", "gamechanger"],
+    football: ["maxpreps"], flag_football_girls: ["maxpreps"], baseball: ["maxpreps", "gamechanger"], softball: ["maxpreps", "gamechanger"],
     soccer: ["maxpreps", "hudl"], basketball: ["maxpreps", "hudl"], volleyball: ["maxpreps", "hudl"],
   };
   const sources = SPORT_SOURCES[norm] || ["maxpreps"];
@@ -4249,9 +4263,11 @@ function crossSportNameMatch(a, b) {
 // the same name are never merged into one multi-sport athlete.
 function sportGender(sport) {
   const s = String(sport || "").toLowerCase();
-  if (s.includes("football")) return "X"; // football bridges every gender
+  // Gender suffix wins FIRST so girls flag football siloes with girls sports (not the football bridge).
   if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball") return "F";
-  return "M"; // _boys / soccer / baseball / basketball / wrestling / men's
+  if (s.endsWith("_boys") || s.includes("boys")) return "M";
+  if (s.includes("football")) return "X"; // tackle football (no gender suffix) bridges every gender
+  return "M"; // soccer / baseball / basketball / wrestling / men's
 }
 // A same-name player links across two sports only when same gender — OR either side is football.
 function sportsLinkable(a, b) {
