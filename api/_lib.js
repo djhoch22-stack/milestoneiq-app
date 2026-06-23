@@ -92,7 +92,7 @@ const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Atte
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
-const VBALL_GIRLS_DISPLAY = ["Games Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
+const VBALL_GIRLS_DISPLAY = ["Matches Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -175,6 +175,7 @@ export const RATE_FMT = {
   "ERA": "era2",
   "Completion Percentage": "pct",
   "Kill Percentage": "pct",
+  "Kills Per Set": "perSet", "Assists Per Set": "perSet", "Aces Per Set": "perSet", "Digs Per Set": "perSet", "Blocks Per Set": "perSet", "Receptions Per Set": "perSet",
   "Serve Percentage": "pct",
   "Ace Percentage": "pct",
 };
@@ -182,6 +183,7 @@ export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
   if (fmt === "pct") return v + "%";
   if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
+  if (fmt === "perSet") return Number(v).toFixed(2); // 3.52 kills/set
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305 (1.000+ keeps its leading digit)
 }
@@ -247,6 +249,18 @@ const VBALL_RATE_DEFS = [
     spec: { kind: "pctIn", att: "Total Serves", errs: "Serve Errors" } },
   { name: "Ace Percentage", short: "ACE%", after: "Aces", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300, noteAbbr: "serves",
     spec: { kind: "pct", made: "Aces", att: "Total Serves" } },
+  { name: "Kills Per Set", short: "K/S", after: "Kills", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Kills", 1]], den: [["Sets Played", 1]] } },
+  { name: "Assists Per Set", short: "A/S", after: "Assists", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Assists", 1]], den: [["Sets Played", 1]] } },
+  { name: "Aces Per Set", short: "AC/S", after: "Aces", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Aces", 1]], den: [["Sets Played", 1]] } },
+  { name: "Digs Per Set", short: "D/S", after: "Digs", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Digs", 1]], den: [["Sets Played", 1]] } },
+  { name: "Blocks Per Set", short: "B/S", after: "Total Blocks", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Total Blocks", 1]], den: [["Sets Played", 1]] } },
+  { name: "Receptions Per Set", short: "R/S", after: "Receptions", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100, noteAbbr: "sets",
+    spec: { kind: "ratio", num: [["Receptions", 1]], den: [["Sets Played", 1]] } },
 ];
 const FOOTBALL_RATE_DEFS = [
   { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
@@ -288,7 +302,7 @@ const G_BASEBALL = [
   { g: "Coaching", s: ["Coach Wins"] },
 ];
 const G_VBALL = [
-  { g: "General", s: ["Games Played","Sets Played","Wins"] },
+  { g: "General", s: ["Matches Played","Sets Played","Wins"] },
   { g: "Attacking", s: ["Kills","Attack Attempts"] },
   { g: "Setting", s: ["Assists","Ball Handling Attempts"] },
   { g: "Serving", s: ["Aces","Total Serves","Service Points"] },
@@ -373,12 +387,13 @@ const PERGAME_RECORD_DEFS = [
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
 export function perGame(stats, statKey) {
-  const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"]);
+  const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"] ?? stats?.["Matches Played"]);
   if (!g || g <= 0 || isNaN(v) || isNaN(g)) return null;
   return Math.round((v / g) * 10) / 10;
 }
 export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
+  if (sport === "volleyball_girls" || sport === "volleyball") return out; // volleyball uses per-SET rates, not per-match averages
   const minSeasonGP = (sport === "football" || sport === "flag_football_girls") ? 4 : PERGAME_MIN_SEASON_GP;
   const minCareerGP = (sport === "football" || sport === "flag_football_girls") ? 10 : PERGAME_MIN_CAREER_GP;
   for (const d of PERGAME_RECORD_DEFS) {
@@ -470,7 +485,7 @@ export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
 
 // ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
 const HOF_STAT_WEIGHTS = {
-  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 0, "Games Played": 3,
+  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 0, "Games Played": 3, "Matches Played": 3,
   "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
