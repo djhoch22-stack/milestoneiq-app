@@ -274,15 +274,11 @@ const SPORTS = {
     ]
   },
   volleyball: {
-    label: "Volleyball", icon: "🏐",
-    statCategories: [
-      { name: "Kills", variants: ["Career total","Single season","Single game","Per game avg (season)"] },
-      { name: "Aces", variants: ["Career total","Single season","Single game"] },
-      { name: "Digs", variants: ["Career total","Single season","Single game"] },
-      { name: "Assists", variants: ["Career total","Single season","Single game"] },
-      { name: "Blocks", variants: ["Career total","Single season","Single game"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    label: "Boys Volleyball", icon: "🏐",
+    // Boys volleyball — identical to girls volleyball (same stats/order/groups/rates/import). Bare
+    // "volleyball" is the boys side, mirroring how bare soccer/basketball are the boys versions.
+    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   track: {
     label: "Track & Field", icon: "🏃",
@@ -324,7 +320,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -372,7 +368,7 @@ const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
-  volleyball_girls: VBALL_GIRLS_DISPLAY,
+  volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
 // the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
@@ -484,7 +480,7 @@ const VBALL_THRESHOLDS = {
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const TH = (sport === "football" || sport === "flag_football_girls") ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : sport === "volleyball_girls" ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const TH = (sport === "football" || sport === "flag_football_girls") ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : (sport === "volleyball_girls" || sport === "volleyball") ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
   const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
@@ -675,7 +671,7 @@ const VBALL_RATE_DEFS = [
 ];
 function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
-  if (sport === "volleyball_girls") return VBALL_RATE_DEFS;
+  if (sport === "volleyball_girls" || sport === "volleyball") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
   return [];
@@ -1907,7 +1903,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["football", "flag_football_girls", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls"];
+const AVAILABLE_SPORTS = ["football", "flag_football_girls", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls", "volleyball"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
@@ -2509,6 +2505,7 @@ const SEASON_STAT_MAP = {
 // volleyball "Points" (= Service Points) vs basketball "Points".
 const SEASON_STAT_MAP_BY_SPORT = {
   volleyball_girls: { "Points": "Service Points" },
+  volleyball: { "Points": "Service Points" },
 };
 // Reverse map: stat name → the tab name to use when WRITING the season template.
 const SHEET_FOR_STAT = {
