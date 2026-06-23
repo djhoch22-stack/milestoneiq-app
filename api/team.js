@@ -123,7 +123,11 @@ export default async function handler(req, res) {
     const byRGroup = {};
     for (const sn of Object.keys(byStat)) { const grp = groupOf(sn); (byRGroup[grp] = byRGroup[grp] || []).push(sn); }
     recordsSection = Object.keys(byRGroup).sort((a, b) => rgIdx(a) - rgIdx(b)).map((grpName) => {
-      const names = byRGroup[grpName].sort((a, b) => byStatOrder(a, b, team.sport));
+      const rdAfter = (n) => { const rd = rateDefsFor(team.sport).find((d) => d.name === n); return rd ? rd.after : null; }; // a rate sorts right after its anchor stat
+      const names = byRGroup[grpName].sort((a, b) => {
+        const d = byStatOrder(rdAfter(a) || a, rdAfter(b) || b, team.sport);
+        return d !== 0 ? d : (rdAfter(a) ? 1 : 0) - (rdAfter(b) ? 1 : 0);
+      });
       const count = names.reduce((n, sn) => n + byStat[sn].length, 0);
       const bg = RGROUP_BG[grpName] || "#f1f5f9", fg = RGROUP_FG[grpName] || "#334155";
       const header = `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px"><span style="background:${bg};color:${fg};border-radius:20px;padding:3px 14px;font-size:12px;font-weight:700">${esc(grpName)}</span><span style="flex:1;height:1px;background:#e8e4dd"></span><span style="font-size:12px;color:#9ca3af">${count} record${count !== 1 ? "s" : ""}</span></div>`;
