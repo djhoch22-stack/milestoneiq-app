@@ -252,6 +252,56 @@ const FOOTBALL_RATE_DEFS = [
   { name: "Completion Percentage", short: "COMP%", after: "Completions", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
     spec: { kind: "pct", made: "Completions", att: "Passing Attempts" } },
 ];
+// ── Record categorization (mirrors the in-app sport.groups; names only) ──────
+// Lets the public Records section group by category (Passing/Rushing/…) like the app.
+const G_FOOTBALL = [
+  { g: "General", s: ["Games Played","Wins"] },
+  { g: "Passing", s: ["Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion"] },
+  { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
+  { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
+  { g: "Offense", s: ["Total Yards","Total TDs"] },
+  { g: "Defense", s: ["Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties"] },
+  { g: "Kicking", s: ["Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Longest Field Goal"] },
+  { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
+  { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
+  { g: "Kickoffs", s: ["Kick Offs","Kick Off Yards","Longest Kick Off"] },
+  { g: "Kickoff Returns", s: ["Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return"] },
+  { g: "Coaching", s: ["Coach Wins"] },
+];
+const G_FLAG_FOOTBALL = [
+  { g: "General", s: ["Games Played","Wins"] },
+  { g: "Passing", s: ["Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion"] },
+  { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
+  { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
+  { g: "Offense", s: ["Total TDs"] },
+  { g: "Defense", s: ["Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks"] },
+  { g: "Scoring", s: ["Try Points"] },
+  { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
+  { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
+  { g: "Coaching", s: ["Coach Wins"] },
+];
+const G_BASEBALL = [
+  { g: "General", s: ["Games Played","Wins"] },
+  { g: "Batting", s: ["Plate Appearances","At Bats","Hits","Doubles","Triples","Home Runs","Runs","RBIs","Stolen Base","Sacrifice Fly","Sacrifice Bunt","Walk (BB)","Hit By Pitch","Reached on Error"] },
+  { g: "Fielding", s: ["Total Chances","Put Outs","Assists","Double Plays","Triple Plays"] },
+  { g: "Pitching", s: ["Pitcher Wins","Pitcher Appearances","Pitcher Games Started","Pitcher Complete Games","Pitcher Shut Outs","Pitcher Saves","No Hitters","Perfect Games","Innings Pitched","Earned Runs","Pitcher Strikeouts","Batters Faced","At Bats Pitcher","# of Pitches"] },
+  { g: "Coaching", s: ["Coach Wins"] },
+];
+const G_VBALL = [
+  { g: "General", s: ["Games Played","Sets Played","Wins"] },
+  { g: "Attacking", s: ["Kills","Attack Attempts"] },
+  { g: "Setting", s: ["Assists","Ball Handling Attempts"] },
+  { g: "Serving", s: ["Aces","Total Serves","Service Points"] },
+  { g: "Defense", s: ["Receptions","Digs","Solo Blocks","Assisted Blocks","Total Blocks"] },
+  { g: "Coaching", s: ["Coach Wins"] },
+];
+export function groupsFor(sport) {
+  if (sport === "football") return G_FOOTBALL;
+  if (sport === "flag_football_girls") return G_FLAG_FOOTBALL;
+  if (sport === "baseball" || sport === "softball") return G_BASEBALL;
+  if (sport === "volleyball_girls" || sport === "volleyball") return G_VBALL;
+  return null; // no groups → everything falls under "Other" (matches the in-app)
+}
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
   if (sport === "football" || sport === "flag_football_girls") return FOOTBALL_RATE_DEFS;
