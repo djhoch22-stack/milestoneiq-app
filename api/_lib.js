@@ -75,7 +75,7 @@ export const STAT_ORDER = [
   "Rushes","Rushing Yards","Rushing TDs",
   "Receptions","Receiving Yards","Receiving TDs",
   "Total Yards","Total TDs",
-  "Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
+  "Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
   "Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts",
   "Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return",
   "Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return",
@@ -86,9 +86,9 @@ export const STAT_ORDER = [
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Girls flag football — football minus kickoffs/kick-returns + contact-only defense; tackles → flag pulls.
-const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
@@ -260,7 +260,7 @@ const G_FOOTBALL = [
   { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
   { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
   { g: "Offense", s: ["Total Yards","Total TDs"] },
-  { g: "Defense", s: ["Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties"] },
+  { g: "Defense", s: ["Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties"] },
   { g: "Kicking", s: ["Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Longest Field Goal"] },
   { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
   { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
@@ -274,7 +274,7 @@ const G_FLAG_FOOTBALL = [
   { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
   { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
   { g: "Offense", s: ["Total TDs"] },
-  { g: "Defense", s: ["Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks"] },
+  { g: "Defense", s: ["Total Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks"] },
   { g: "Scoring", s: ["Try Points"] },
   { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
   { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
@@ -355,12 +355,12 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Rushes" }, { stat: "Rushing Yards" }, { stat: "Rushing TDs" },
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
-  { stat: "Tackles" }, { stat: "Sacks" }, { stat: "Interceptions" }, { stat: "Pass Break Ups" },
+  { stat: "Total Tackles" }, { stat: "Sacks" }, { stat: "Interceptions" }, { stat: "Pass Break Ups" },
   { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Punt Return Yards" }, { stat: "Punt Return TDs" }, { stat: "Kick Returns" },
   // Volleyball (per-match)
   { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" }, { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
   // Flag football
-  { stat: "Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assist Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
+  { stat: "Total Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assist Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
@@ -466,7 +466,7 @@ const HOF_STAT_WEIGHTS = {
   "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
-  "Total Tackles": 8, "Tackles": 8, "Solo Tackles": 4, "Assist Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
+  "Total Tackles": 8, "Solo Tackles": 4, "Assist Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
   "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
   "Goals": 10, "Saves": 8, "Shutouts": 7, "Shots": 4, "Coach Wins": 0,
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
