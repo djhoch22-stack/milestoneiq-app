@@ -2688,12 +2688,12 @@ const STAT_ALIASES_BY_SPORT = {
     "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
     "assist": "Assists", "assists": "Assists", "ast": "Assists",
     "bha": "Ball Handling Attempts", "ball handling attempts": "Ball Handling Attempts", "bh att": "Ball Handling Attempts", "a att": "Ball Handling Attempts", // Hudl "A Att" (assist attempts) = ball-handling/set touches
-    "ace": "Aces", "aces": "Aces",
+    "a": "Aces", "ace": "Aces", "aces": "Aces", // MaxPreps Serving table uses bare "A" for Aces (assists are "Ast")
     "s att": "Total Serves", "serve attempts": "Total Serves", "sa": "Total Serves", "serves": "Total Serves", "total serves": "Total Serves",
     "s err": "Serve Errors", "serve errors": "Serve Errors", "se": "Serve Errors",
     "pts": "Service Points", "serving points": "Service Points", "service points": "Service Points",
-    "sr att": "Receptions", "reception attempts": "Receptions", "rec att": "Receptions", "receptions": "Receptions", "rec": "Receptions",
-    "dig": "Digs", "digs": "Digs",
+    "r": "Receptions", "sr att": "Receptions", "reception attempts": "Receptions", "rec att": "Receptions", "receptions": "Receptions", "rec": "Receptions", // MaxPreps Serve Receiving uses bare "R"
+    "d": "Digs", "dig": "Digs", "digs": "Digs", // MaxPreps Digging table uses bare "D"
     "b solo": "Solo Blocks", "block solo": "Solo Blocks", "bs": "Solo Blocks", "solo blocks": "Solo Blocks",
     "b assist": "Assisted Blocks", "block assist": "Assisted Blocks", "ba": "Assisted Blocks", "assisted blocks": "Assisted Blocks", "block assists": "Assisted Blocks",
     "b total": "Total Blocks", "total blocks": "Total Blocks", "tot blks": "Total Blocks", "tb": "Total Blocks", "blocks": "Total Blocks",
