@@ -82,7 +82,7 @@ const VBALL_GROUPS = [
 // Girls flag football — tailored to the MaxPreps girls-flag export: football's passing/rushing/receiving
 // + flag pulls + sacks + punts/returns + kicking, but NO kickoffs/kick-returns and NO contact-only
 // defense (interceptions, fumbles, blocked kicks, pass break-ups). "Tackles" → "Flag Pulls".
-const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pulls for Loss","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 const FLAG_FOOTBALL_GROUPS = [
   { group: "General", stats: [
     { name: "Games Played", variants: ["Career total","Single season"] },
@@ -114,6 +114,7 @@ const FLAG_FOOTBALL_GROUPS = [
     { name: "Flag Pulls", variants: STAT_VARIANTS_STANDARD },
     { name: "Solo Flag Pulls", variants: STAT_VARIANTS_STANDARD },
     { name: "Assist Flag Pulls", variants: STAT_VARIANTS_STANDARD },
+    { name: "Flag Pulls for Loss", variants: STAT_VARIANTS_STANDARD },
     { name: "Sacks", variants: STAT_VARIANTS_STANDARD },
   ]},
   { group: "Scoring", stats: [
@@ -2664,6 +2665,7 @@ STAT_ALIASES_BY_SPORT.flag_football = {
   ...STAT_ALIASES_BY_SPORT.football,
   "solo": "Solo Flag Pulls", "solo tackles": "Solo Flag Pulls", "solo fps": "Solo Flag Pulls",
   "asst": "Assist Flag Pulls", "ast": "Assist Flag Pulls", "assist tackles": "Assist Flag Pulls", "asst tackles": "Assist Flag Pulls",
+  "fp loss": "Flag Pulls for Loss", "fpl": "Flag Pulls for Loss", "flag pulls for loss": "Flag Pulls for Loss", "tackles for loss": "Flag Pulls for Loss", "tfl": "Flag Pulls for Loss",
   "tot fps": "Flag Pulls", "fp": "Flag Pulls", "fps": "Flag Pulls", "flag pull": "Flag Pulls", "flag pulls": "Flag Pulls", "total flag pulls": "Flag Pulls", "tackles": "Flag Pulls", "total tackles": "Flag Pulls", "tot": "Flag Pulls",
   "car": "Rushes", "carries": "Rushes",
   "try pts": "Try Points", "try points": "Try Points", "try": "Try Points", "2 pt": "Try Points", "2pt": "Try Points", "2 pt conversions made": "Try Points", "two point conversions": "Try Points",
