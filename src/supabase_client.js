@@ -163,6 +163,16 @@ export const deleteAthlete = async (athleteId) => {
   return { error };
 };
 
+// Baseball/softball: Singles + Total Bases are COMPUTED from the batting line (never stored, so they
+// always reflect the current Hits/2B/3B/HR). Applied to every stats object as it loads — works on a
+// season line or a career total since the formula is linear. Other sports pass through unchanged.
+export function withDerivedStats(stats, sport) {
+  if (!stats || (sport !== "baseball" && sport !== "softball")) return stats || {};
+  if (stats["Hits"] == null) return stats; // no batting line (e.g. a pitcher-only row) → nothing to derive
+  const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
+  return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
+}
+
 // ── All-time roster helpers ───────────────────────────────────────────────────
 export const getAllTimePlayers = async (programId) => {
   const { data, error } = await supabase
