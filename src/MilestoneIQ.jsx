@@ -7116,7 +7116,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
   };
 
   return (
-    <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4" }}>
+    <div style={{ fontFamily:"Georgia, serif", minHeight:"100vh", background:"#f8f7f4", overflowX:"hidden" }}>
       <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&display=swap" rel="stylesheet" />
       {showAddSchool && <AddSchoolModal onClose={()=>setShowAddSchool(false)} existingSports={schools.map(sc=>sc.sport)} onAdd={async (s)=>{
         if (orgId) {
@@ -7133,7 +7133,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
       }} />}
 
       <div style={{ background:"#111",padding:"0 24px" }}>
-        <div style={{ display:"flex",alignItems:"center",gap:16,height:56 }}>
+        <div style={{ display:"flex",flexWrap:"wrap",alignItems:"center",gap:"8px 16px",minHeight:56,padding:"8px 0" }}>
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <img src={raftersLogo} alt="RaftersIQ" style={{ width:36,height:36,objectFit:"contain" }} />
             <span style={{ color:"#fff",fontWeight:700,fontSize:18,fontFamily:"Crimson Pro,serif" }}>RaftersIQ</span>
@@ -7163,7 +7163,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
         : homeTab === "hof" ? (hofEnabled(tier) ? <AllSportsHof schools={schools} onUpdate={updateSchool} /> : <div style={{ padding:24 }}><HofLocked /></div>)
         : (
         <div style={{ padding:24 }}>
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:20 }}>
+          <div style={{ display:"flex",flexWrap:"wrap",gap:12,justifyContent:"space-between",alignItems:"flex-end",marginBottom:20 }}>
             <div>
               <h1 style={{ margin:0,fontSize:28,fontWeight:700,color:"#111" }}>Your programs</h1>
               <p style={{ margin:"4px 0 0",fontSize:14,color:"#6b7280" }}>
