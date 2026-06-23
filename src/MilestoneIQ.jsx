@@ -598,6 +598,7 @@ const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Completion Percentage": "pct",
   "Kill Percentage": "pct",
   "Serve Percentage": "pct",
   "Ace Percentage": "pct",
@@ -665,8 +666,14 @@ const VBALL_RATE_DEFS = [
     calc: (g) => { const s = g("Total Serves"); return s > 0 ? Math.round((g("Aces") / s) * 1000) / 10 : null; },
     note: (g) => `${g("Total Serves").toLocaleString()} serves` },
 ];
+const FOOTBALL_RATE_DEFS = [
+  { name: "Completion Percentage", short: "COMP%", after: "Completions", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200,
+    calc: (g) => { const a = g("Passing Attempts"); return a > 0 ? Math.round((g("Completions") / a) * 1000) / 10 : null; },
+    note: (g) => `${g("Passing Attempts").toLocaleString()} att` },
+];
 function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
+  if (sport === "football" || sport === "flag_football_girls") return FOOTBALL_RATE_DEFS;
   if (sport === "volleyball_girls" || sport === "volleyball") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
@@ -757,6 +764,8 @@ const PERGAME_RECORD_DEFS = [
   // Volleyball — per-game (per-match) over a season AND a career ("Assists" & "Receptions" already above)
   { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" },
   { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
+  // Flag football (shared football stats above already covered)
+  { stat: "Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assist Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
@@ -770,8 +779,8 @@ function perGame(stats, statKey) {
 function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
   // football seasons are short (~9 games), so qualify per-game records at lower game counts
-  const minSeasonGP = sport === "football" ? 4 : PERGAME_MIN_SEASON_GP;
-  const minCareerGP = sport === "football" ? 10 : PERGAME_MIN_CAREER_GP;
+  const minSeasonGP = (sport === "football" || sport === "flag_football_girls") ? 4 : PERGAME_MIN_SEASON_GP;
+  const minCareerGP = (sport === "football" || sport === "flag_football_girls") ? 10 : PERGAME_MIN_CAREER_GP;
   for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
