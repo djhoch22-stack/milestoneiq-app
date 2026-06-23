@@ -249,7 +249,7 @@ const VBALL_RATE_DEFS = [
     spec: { kind: "pct", made: "Aces", att: "Total Serves" } },
 ];
 const FOOTBALL_RATE_DEFS = [
-  { name: "Completion Percentage", short: "COMP%", after: "Completions", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
+  { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
     spec: { kind: "pct", made: "Completions", att: "Passing Attempts" } },
 ];
 // ── Record categorization (mirrors the in-app sport.groups; names only) ──────
