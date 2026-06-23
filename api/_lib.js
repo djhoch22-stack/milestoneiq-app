@@ -91,7 +91,7 @@ const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts"
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
 const VBALL_GIRLS_DISPLAY = ["Games Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
-export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
+export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
   if (so) {
@@ -117,18 +117,20 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 export const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
-  football: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
   volleyball_girls: VBALL_GIRLS_DISPLAY,
 };
 // URL slug from a school name — shared by the public school hub (/school/:slug) and per-program links.
 export function slugify(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
 // Sport emoji for the multi-sport profile toggle (mirrors the app's SPORTS icons).
-export const SPORT_ICON = { football: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", volleyball_girls: "🏐", wrestling: "🤼", track: "🏃" };
+export const SPORT_ICON = { football: "🏈", flag_football_girls: "🏈", basketball: "🏀", basketball_boys: "🏀", basketball_girls: "🏀", soccer: "⚽", soccer_girls: "⚽", baseball: "⚾", softball: "🥎", volleyball: "🏐", volleyball_girls: "🏐", wrestling: "🤼", track: "🏃" };
 // Gender of a sport for cross-sport linking: "F" girls, "M" boys, "X" football (links across all genders).
 export function sportGender(sport) {
   const s = String(sport || "").toLowerCase();
-  if (s.includes("football")) return "X";
+  // Gender suffix wins FIRST so girls flag football siloes with girls sports (not the football bridge).
   if (s.endsWith("_girls") || s.includes("girls") || s.includes("women") || s === "softball") return "F";
+  if (s.endsWith("_boys") || s.includes("boys")) return "M";
+  if (s.includes("football")) return "X";
   return "M";
 }
 // A kid's two sports link only when same gender — or either is football (matches the app's rule).
