@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
-  RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor,
+  RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor, withDerivedStats,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   if (!team) { res.statusCode = 404; return res.end(notFound()); }
 
   const pid = team.id;
-  const [recordsRaw, atpRaw, seasonsRaw, awards, seasonRows, athletesRaw] = await Promise.all([
+  const [recordsRaw, atpRaw, seasonsRaw, awards, seasonRowsRaw, athletesRaw] = await Promise.all([
     sb(`records?program_id=eq.${pid}`),
     sb(`all_time_players?program_id=eq.${pid}`),
     sb(`seasons?program_id=eq.${pid}`),
@@ -31,13 +31,14 @@ export default async function handler(req, res) {
 
   // ── Normalize ───────────────────────────────────────────────────────────────
   const careerPool = (atpRaw || []).map((p) => ({
-    id: p.id, name: p.name, stats: p.stats || {},
+    id: p.id, name: p.name, stats: withDerivedStats(p.stats || {}, team.sport),
     firstYear: p.first_year, lastYear: p.last_year, gradYear: p.grad_year,
     isCurrent: p.is_current, schoolHOF: p.school_hall_of_fame, stateHOF: p.state_hall_of_fame, hofYear: p.hof_year,
   }));
   const athletes = (athletesRaw || []).map((a) => ({
-    name: a.name, position: a.position, gradYear: a.grad_year, isActive: a.is_active !== false, stats: a.stats || {},
+    name: a.name, position: a.position, gradYear: a.grad_year, isActive: a.is_active !== false, stats: withDerivedStats(a.stats || {}, team.sport),
   }));
+  const seasonRows = (seasonRowsRaw || []).map((r) => ({ ...r, stats: withDerivedStats(r.stats || {}, team.sport) }));
   const storedRecords = (recordsRaw || []).map((r) => ({
     statName: r.stat_name, variant: r.variant, holderName: r.holder_name, holderYear: r.holder_year, value: r.value,
   }));
