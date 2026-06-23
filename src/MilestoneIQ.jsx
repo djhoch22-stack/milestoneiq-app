@@ -6416,10 +6416,13 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               const changed = updatedSeasons.filter(s => (Number(s.wins) || 0) > 0 && (Number(s.wins) || 0) !== (oldWins[s.season] || 0));
               if (school.id && changed.length) {
                 try {
+                  const gpKey = (school.sport === "volleyball" || school.sport === "volleyball_girls") ? "Matches Played" : "Games Played";
                   for (const s of changed) {
                     const w = Number(s.wins) || 0;
+                    const g = w + (Number(s.losses) || 0) + (Number(s.ties) || 0); // team games (W+L+T) this season → credited as Matches/Games Played, like Wins
                     const { data } = await getPlayerSeasonsForSeason(school.id, s.season);
-                    const rows = (data || []).map(r => ({ player_name: r.player_name, stats: { ...(r.stats || {}), Wins: w } }));
+                    // Credit team games too, but NEVER overwrite a real per-player value already imported (e.g. football's G, girls VB's Matches Played from a spreadsheet).
+                    const rows = (data || []).map(r => ({ player_name: r.player_name, stats: { ...(r.stats || {}), Wins: w, [gpKey]: (r.stats && r.stats[gpKey] != null ? r.stats[gpKey] : g) } }));
                     if (rows.length) await replacePlayerSeasonRowsForSeason(school.id, s.season, rows);
                   }
                   await recomputeCareerFromSeasons(school.id);
