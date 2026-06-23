@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   const PCT_PARENT = { "Field Goal Percentage": "Field Goals Made", "Three Point Percentage": "Three Pointers Made", "Free Throw Percentage": "Free Throws Made" };
   // "Longest …" records render INSIDE their parent stat's tile (Longest Completion under Completions, etc.).
   const LONGEST_PARENT = { "Longest Completion": "Completions", "Longest Rush": "Rushes", "Longest Reception": "Receptions", "Longest Field Goal": "Field Goals Made", "Longest Punt": "Punts", "Longest Punt Return": "Punt Returns", "Longest Kick Off Return": "Kick Off Returns", "Longest Kick Off": "Kick Offs" };
-  const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)", "Longest"];
+  const VARIANT_ORDER = ["Career total", "Single season", "Single game", "Per match avg (season)", "Per match avg (career)", "Per game avg (season)", "Per game avg (career)", "Longest"];
   const vIdx = (v) => { const i = VARIANT_ORDER.indexOf(v); return i === -1 ? 999 : i; };
   const autoRecs = [
     ...pctRecordsFrom(seasonRows, careerPool, team.sport, team.record_minimums),
@@ -320,8 +320,8 @@ export default async function handler(req, res) {
     }).join("");
 
     seasonsSection =
-      `<div class="ovcards" style="grid-template-columns:repeat(6,1fr)">${row1}</div>
-       <div class="ovcards" style="grid-template-columns:repeat(6,1fr)">${row2}</div>
+      `<div class="ovcards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${row1}</div>
+       <div class="ovcards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${row2}</div>
        <h3>Head coaches</h3>
        <div style="background:#fff;border:1px solid #e8e4dd;border-radius:12px;overflow:hidden"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${coachCards}</div></div>
        <h3>Season by season</h3>
