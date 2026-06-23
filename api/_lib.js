@@ -90,7 +90,7 @@ const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts"
 // Girls flag football — football minus kickoffs/kick-returns + contact-only defense; tackles → flag pulls.
 const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
-const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
+const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
 const VBALL_GIRLS_DISPLAY = ["Games Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
@@ -282,7 +282,7 @@ const G_FLAG_FOOTBALL = [
 ];
 const G_BASEBALL = [
   { g: "General", s: ["Games Played","Wins"] },
-  { g: "Batting", s: ["Plate Appearances","At Bats","Hits","Doubles","Triples","Home Runs","Runs","RBIs","Stolen Base","Sacrifice Fly","Sacrifice Bunt","Walk (BB)","Hit By Pitch","Reached on Error"] },
+  { g: "Batting", s: ["Plate Appearances","At Bats","Hits","Singles","Doubles","Triples","Home Runs","Total Bases","Runs","RBIs","Stolen Base","Sacrifice Fly","Sacrifice Bunt","Walk (BB)","Hit By Pitch","Reached on Error"] },
   { g: "Fielding", s: ["Total Chances","Put Outs","Assists","Double Plays","Triple Plays"] },
   { g: "Pitching", s: ["Pitcher Wins","Pitcher Appearances","Pitcher Games Started","Pitcher Complete Games","Pitcher Shut Outs","Pitcher Saves","No Hitters","Perfect Games","Innings Pitched","Earned Runs","Pitcher Strikeouts","Batters Faced","At Bats Pitcher","# of Pitches"] },
   { g: "Coaching", s: ["Coach Wins"] },
@@ -301,6 +301,14 @@ export function groupsFor(sport) {
   if (sport === "baseball" || sport === "softball") return G_BASEBALL;
   if (sport === "volleyball_girls" || sport === "volleyball") return G_VBALL;
   return null; // no groups → everything falls under "Other" (matches the in-app)
+}
+// Baseball/softball: Singles + Total Bases are COMPUTED from the batting line (never stored, so they
+// always reflect current Hits/2B/3B/HR). Applied to every stats object as it loads. Mirrors the app.
+export function withDerivedStats(stats, sport) {
+  if (!stats || (sport !== "baseball" && sport !== "softball")) return stats || {};
+  if (stats["Hits"] == null) return stats;
+  const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
+  return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
 }
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
