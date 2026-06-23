@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, withDerivedStats, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -42,7 +42,7 @@ const SOCCER_STAT_CATEGORIES = [
 // columns, player cards, records, and sort order. Defined before SPORTS so it can build the categories.
 const BASEBALL_DISPLAY = [
   "Games Played", "Wins",
-  "Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs",
+  "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs",
   "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error",
   "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays",
   "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games",
@@ -54,7 +54,7 @@ const BASEBALL_DISPLAY = [
 // Derived rates (AVG/ERA/…) aren't listed here — they inherit their anchor stat's group at render.
 const BASEBALL_GROUPS = [
   { group: "General",  names: ["Games Played", "Wins"] },
-  { group: "Batting",  names: ["Plate Appearances", "At Bats", "Hits", "Doubles", "Triples", "Home Runs", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error"] },
+  { group: "Batting",  names: ["Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error"] },
   { group: "Fielding", names: ["Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays"] },
   { group: "Pitching", names: ["Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"] },
   { group: "Coaching", names: ["Coach Wins"] },
@@ -456,8 +456,8 @@ const FOOTBALL_THRESHOLDS = {
 // intentionally omitted — it's lower-is-better, so accumulating it isn't an achievement.
 const BASEBALL_THRESHOLDS = {
   "Games Played":[25,50,75,100], "Wins":[25,50,75,100],
-  "At Bats":[100,250,500], "Hits":[25,50,100,150], "Doubles":[10,25,50], "Triples":[5,10,15],
-  "Home Runs":[5,10,20,30], "Runs":[25,50,100,150], "RBIs":[25,50,100,150],
+  "At Bats":[100,250,500], "Hits":[25,50,100,150], "Singles":[15,35,70,100], "Doubles":[10,25,50], "Triples":[5,10,15],
+  "Home Runs":[5,10,20,30], "Total Bases":[50,100,200,300], "Runs":[25,50,100,150], "RBIs":[25,50,100,150],
   "Stolen Base":[10,25,50,75], "Walk (BB)":[25,50,100],
   "Put Outs":[50,100,250,500], "Assists":[25,50,100,200], "Double Plays":[10,25,50],
   "Pitcher Wins":[5,10,20,30], "Pitcher Appearances":[10,25,50,75], "Pitcher Games Started":[5,10,25,50],
@@ -5581,7 +5581,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
   useEffect(() => {
     let alive = true;
     if (!school?.id) { setAllSeasonRows([]); return; }
-    getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows(data || []); });
+    getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows((data || []).map(r => ({ ...r, stats: withDerivedStats(r.stats, school.sport) }))); });
     return () => { alive = false; };
   }, [school.id]);
   // Full record total (auto + stored) for the header & Overview tile — memoized so it isn't recomputed
