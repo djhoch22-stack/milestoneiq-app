@@ -46,7 +46,7 @@ FOOTBALL — use these EXACT stat names (the coach's set), mapping the column wi
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
 FLAG FOOTBALL (girls flag football) — read Passing/Rushing/Receiving exactly like FOOTBALL above, PLUS:
-- The "Flag Pulls" table IS the tackles table: Solo→"Solo Tackles", Asst→"Assist Tackles", "Tot FPs"→"Tackles" (the app renames tackles→flag pulls). Keep the Sacks table's Sacks→"Sacks".
+- The "Flag Pulls" table IS the tackles table: Solo→"Solo Tackles", Asst→"Assist Tackles", "Tot FPs"→"Tackles", "FP Loss"→"Flag Pulls for Loss" (the app renames tackles→flag pulls). Keep the Sacks table's Sacks→"Sacks".
 - The "Scoring" table: "Try Pts"→"Try Points" (flag football's extra-point conversion). IGNORE that table's other columns (Tot Pts, PAT, XP Att, FG, FG Att, S, and any TD/P-G).
 - There are NO kickoffs, kickoff returns, or field goals to keep — skip them.
 
