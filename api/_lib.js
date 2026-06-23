@@ -306,7 +306,11 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
   { stat: "Tackles" }, { stat: "Sacks" }, { stat: "Interceptions" }, { stat: "Pass Break Ups" },
-  { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Kick Returns" },
+  { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Punt Return Yards" }, { stat: "Punt Return TDs" }, { stat: "Kick Returns" },
+  // Volleyball (per-match)
+  { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" }, { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
+  // Flag football
+  { stat: "Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assist Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
@@ -317,8 +321,8 @@ export function perGame(stats, statKey) {
 }
 export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  const minSeasonGP = sport === "football" ? 4 : PERGAME_MIN_SEASON_GP;
-  const minCareerGP = sport === "football" ? 10 : PERGAME_MIN_CAREER_GP;
+  const minSeasonGP = (sport === "football" || sport === "flag_football_girls") ? 4 : PERGAME_MIN_SEASON_GP;
+  const minCareerGP = (sport === "football" || sport === "flag_football_girls") ? 10 : PERGAME_MIN_CAREER_GP;
   for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
