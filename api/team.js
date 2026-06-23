@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   const sport = prettySport(team.sport);
   const school = team.school_name || team.name || "Team";
   const place = [team.city, team.state].filter(Boolean).join(", ");
-  const isFootball = String(team.sport || "").toLowerCase().includes("football");
+  const isFootball = team.sport === "football"; // EXACT — flag football has its own stats (flag pulls, try points), so it must NOT use football's OFFENSE/DEFENSE/SPECIAL buckets (those sets don't include flag-football stats → inconsistent cards). Falls back to the flat canonical list, like the app.
   const yearsStr = (p) => p.firstYear && p.lastYear
     ? (String(p.firstYear) === String(p.lastYear) ? esc(String(p.firstYear)) : esc(String(p.firstYear)) + "–" + esc(String(p.lastYear)))
     : (p.gradYear ? "Class of " + esc(String(p.gradYear)) : "");
