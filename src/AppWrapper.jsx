@@ -16,6 +16,7 @@ import {
   getPrograms,
   getAthletes,
   getAllTimePlayers,
+  withDerivedStats,
   getRecords,
   getMilestones,
   getSeasons,
@@ -61,7 +62,7 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awar
       gradYear: a.grad_year,
       jersey: a.jersey,
       isActive: a.is_active,
-      stats: a.stats || {},
+      stats: withDerivedStats(a.stats || {}, prog.sport),
     })),
     allTimeRoster: (allTime || []).map((p) => ({
       id: p.id,
@@ -74,7 +75,7 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awar
       schoolHallOfFame: p.school_hall_of_fame,
       stateHallOfFame: p.state_hall_of_fame,
       hofYear: p.hof_year,
-      stats: p.stats || {},
+      stats: withDerivedStats(p.stats || {}, prog.sport),
     })),
     records: (records || []).map((r) => ({
       id: r.id,
