@@ -760,7 +760,7 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Receptions" }, { stat: "Receiving Yards" }, { stat: "Receiving TDs" },
   { stat: "Total Yards" }, { stat: "Total TDs" },
   { stat: "Tackles" }, { stat: "Sacks" }, { stat: "Interceptions" }, { stat: "Pass Break Ups" },
-  { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Kick Returns" },
+  { stat: "Punts" }, { stat: "Punt Yards" }, { stat: "Punt Returns" }, { stat: "Punt Return Yards" }, { stat: "Punt Return TDs" }, { stat: "Kick Returns" },
   // Volleyball — per-game (per-match) over a season AND a career ("Assists" & "Receptions" already above)
   { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" },
   { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
@@ -1289,11 +1289,23 @@ function RecordsModal({ school, onClose, onSave }) {
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 3 }}>Stat category</label>
               <select value={newForm.statName} onChange={e => setNewForm(f => ({ ...f, statName: e.target.value, variant: variantsForStat(e.target.value)[0] }))}
                 style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 10px", fontSize: 13 }}>
-                {sportDef.groups ? sportDef.groups.map(g => (
-                  <optgroup key={g.group} label={g.group}>
-                    {g.stats.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                  </optgroup>
-                )) : statOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                {sportDef.groups ? [
+                  ...sportDef.groups.map(g => (
+                    <optgroup key={g.group} label={g.group}>
+                      {g.stats.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                    </optgroup>
+                  )),
+                  // derived rate stats (e.g. Completion %) aren't in the groups — add them so they're editable (e.g. a single-game record)
+                  ...(() => {
+                    const inGroups = new Set(sportDef.groups.flatMap(g => g.stats.map(s => s.name)));
+                    const rateNames = rateDefsFor(school.sport).map(d => d.name).filter(n => !inGroups.has(n));
+                    return rateNames.length ? [(
+                      <optgroup key="__rates" label="Rates & percentages">
+                        {rateNames.map(n => <option key={n} value={n}>{n}</option>)}
+                      </optgroup>
+                    )] : [];
+                  })(),
+                ] : statOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
