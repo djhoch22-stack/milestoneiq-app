@@ -63,7 +63,7 @@ const BASEBALL_GROUPS = [
 // Serve % (serves-in) & Ace % are DERIVED. "Serve Errors" imports ONLY to feed Serve % — it's a hidden
 // input (see HIDDEN_INPUT_STATS), never a column or record. Boys volleyball will be its own sport later.
 const VBALL_GIRLS_DISPLAY = [
-  "Games Played", "Sets Played", "Wins",
+  "Matches Played", "Sets Played", "Wins",
   "Kills", "Attack Attempts",
   "Assists", "Ball Handling Attempts",
   "Aces", "Total Serves", "Service Points",
@@ -71,7 +71,7 @@ const VBALL_GIRLS_DISPLAY = [
   "Solo Blocks", "Assisted Blocks", "Total Blocks",
 ];
 const VBALL_GROUPS = [
-  { group: "General",   names: ["Games Played", "Sets Played", "Wins"] },
+  { group: "General",   names: ["Matches Played", "Sets Played", "Wins"] },
   { group: "Attacking", names: ["Kills", "Attack Attempts"] },
   { group: "Setting",   names: ["Assists", "Ball Handling Attempts"] },
   { group: "Serving",   names: ["Aces", "Total Serves", "Service Points"] },
@@ -467,7 +467,7 @@ const BASEBALL_THRESHOLDS = {
 };
 // Girls volleyball career milestone thresholds (HS-scaled).
 const VBALL_THRESHOLDS = {
-  "Games Played":[25,50,75,100], "Wins":[25,50,75,100], "Sets Played":[100,200,300,400],
+  "Matches Played":[25,50,75,100], "Wins":[25,50,75,100], "Sets Played":[100,200,300,400],
   "Kills":[250,500,1000,1500], "Assists":[250,500,1000,2000], "Digs":[250,500,1000,1500],
   "Aces":[50,100,200,300], "Total Blocks":[25,50,100,200],
 };
@@ -600,6 +600,7 @@ const RATE_FMT = {
   "ERA": "era2",
   "Completion Percentage": "pct",
   "Kill Percentage": "pct",
+  "Kills Per Set": "perSet", "Assists Per Set": "perSet", "Aces Per Set": "perSet", "Digs Per Set": "perSet", "Blocks Per Set": "perSet", "Receptions Per Set": "perSet",
   "Serve Percentage": "pct",
   "Ace Percentage": "pct",
 };
@@ -608,6 +609,7 @@ function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
   if (fmt === "pct") return v + "%";
   if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
+  if (fmt === "perSet") return Number(v).toFixed(2); // 3.52 kills/set
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305  (1.000+ keeps its leading digit)
 }
@@ -665,6 +667,24 @@ const VBALL_RATE_DEFS = [
   { name: "Ace Percentage", short: "ACE%", after: "Aces", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300,
     calc: (g) => { const s = g("Total Serves"); return s > 0 ? Math.round((g("Aces") / s) * 1000) / 10 : null; },
     note: (g) => `${g("Total Serves").toLocaleString()} serves` },
+  { name: "Kills Per Set", short: "K/S", after: "Kills", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Kills") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
+  { name: "Assists Per Set", short: "A/S", after: "Assists", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Assists") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
+  { name: "Aces Per Set", short: "AC/S", after: "Aces", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Aces") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
+  { name: "Digs Per Set", short: "D/S", after: "Digs", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Digs") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
+  { name: "Blocks Per Set", short: "B/S", after: "Total Blocks", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Total Blocks") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
+  { name: "Receptions Per Set", short: "R/S", after: "Receptions", fmt: "perSet", qualStat: "Sets Played", minSeason: 30, minCareer: 100,
+    calc: (g) => { const s = g("Sets Played"); return s > 0 ? g("Receptions") / s : null; },
+    note: (g) => `${g("Sets Played").toLocaleString()} sets` },
 ];
 const FOOTBALL_RATE_DEFS = [
   { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200,
@@ -770,7 +790,7 @@ const PERGAME_RECORD_DEFS = [
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
 function perGame(stats, statKey) {
-  const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"]);
+  const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"] ?? stats?.["Matches Played"]);
   if (!g || g <= 0 || isNaN(v) || isNaN(g)) return null;
   return Math.round((v / g) * 10) / 10; // one decimal, e.g. 18.3
 }
@@ -778,6 +798,7 @@ function perGame(stats, statKey) {
 // (career stat ÷ career games). Returned as variants of the parent stat.
 function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
+  if (sport === "volleyball_girls" || sport === "volleyball") return out; // volleyball uses per-SET rates (rate defs), not per-match averages
   // football seasons are short (~9 games), so qualify per-game records at lower game counts
   const minSeasonGP = (sport === "football" || sport === "flag_football_girls") ? 4 : PERGAME_MIN_SEASON_GP;
   const minCareerGP = (sport === "football" || sport === "flag_football_girls") ? 10 : PERGAME_MIN_CAREER_GP;
@@ -2426,7 +2447,7 @@ function PlayerProfileModal({ player: player0, school: school0, allSchools = [],
 
           {(() => {
             // Per-game averages need Games Played — nudge coaches who entered stats but no games.
-            const hasGames = Number(player.stats?.["Games Played"]) > 0;
+            const hasGames = Number(player.stats?.["Games Played"] ?? player.stats?.["Matches Played"]) > 0;
             const hasPerGameStat = PERGAME_DEFS.some(d => Number(player.stats?.[d.stat]) > 0);
             return (!hasGames && hasPerGameStat) ? (
               <div style={{ fontSize:12, color:"#92400e", background:"#fffbeb", border:"1px solid #fde68a", borderRadius:8, padding:"8px 12px", marginBottom:20 }}>
@@ -2632,7 +2653,7 @@ const STAT_ALIASES_BY_SPORT = {
   soccer: {
     // Hudl/GameChanger soccer "Totals" export columns: MP, G, A, S (shots), SOT (shots on goal).
     // S/G and SOT% are DERIVED (the app computes per-game + accuracy) and drop out automatically.
-    "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
+    "mp": "Matches Played", "matches": "Matches Played", "matches played": "Matches Played", "games": "Matches Played", "gp": "Matches Played", "games played": "Matches Played",
     "g": "Goals", "gls": "Goals", "goals": "Goals",
     "a": "Assists", "ast": "Assists", "assists": "Assists",
     "s": "Shots", "sh": "Shots", "sht": "Shots", "shts": "Shots", "shots": "Shots",
@@ -2661,7 +2682,7 @@ const STAT_ALIASES_BY_SPORT = {
   volleyball: {
     // Hudl "Totals" + MaxPreps abbreviations → the program's stat sheet. "S Err" imports as Serve Errors,
     // a HIDDEN input feeding Serve % only (never displayed). Columns we don't track drop on import.
-    "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played",
+    "mp": "Matches Played", "matches": "Matches Played", "matches played": "Matches Played", "games": "Matches Played", "gp": "Matches Played", "games played": "Matches Played",
     "sp": "Sets Played", "sets": "Sets Played", "sets played": "Sets Played",
     "kill": "Kills", "kills": "Kills", "k": "Kills",
     "att": "Attack Attempts", "attack attempts": "Attack Attempts", "ta": "Attack Attempts", "total attacks": "Attack Attempts",
@@ -4155,7 +4176,7 @@ const HOF_STAT_WEIGHTS = {
   "Steals":                    6,
   "Blocks":                    5,
   "Wins":                      0,  // TEAM stat — given to every roster player; never an individual rank/record
-  "Games Played":              3,
+  "Games Played":              3, "Matches Played": 3,
   "Field Goals Made":          4,
   "Field Goals Attempted":     2,
   "Three Pointers Made":       4,
