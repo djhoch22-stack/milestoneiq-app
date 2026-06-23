@@ -718,7 +718,8 @@ ${noindex ? '<meta name="robots" content="noindex, follow"/>' : '<meta name="rob
 ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script>` : ""}
 <style>
   *{box-sizing:border-box}
-  body{margin:0;font-family:Georgia,"Times New Roman",serif;color:#1f2937;background:#f8f7f4;line-height:1.5}
+  body{margin:0;font-family:Georgia,"Times New Roman",serif;color:#1f2937;background:#f8f7f4;line-height:1.5;overflow-x:hidden}
+  .tabbar::-webkit-scrollbar{display:none} .tabbar{scrollbar-width:none}
   a{color:#1a56db;text-decoration:none}
   a:hover{text-decoration:underline}
   .nav{display:flex;align-items:center;gap:10px;max-width:1040px;margin:0 auto;padding:16px 20px}
