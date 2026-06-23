@@ -79,6 +79,66 @@ const VBALL_GROUPS = [
   { group: "Coaching",  names: ["Coach Wins"] },
 ];
 
+// Girls flag football — tailored to the MaxPreps girls-flag export: football's passing/rushing/receiving
+// + flag pulls + sacks + punts/returns + kicking, but NO kickoffs/kick-returns and NO contact-only
+// defense (interceptions, fumbles, blocked kicks, pass break-ups). "Tackles" → "Flag Pulls".
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Sacks","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_GROUPS = [
+  { group: "General", stats: [
+    { name: "Games Played", variants: ["Career total","Single season"] },
+    { name: "Wins", variants: ["Career total","Single season"] },
+  ]},
+  { group: "Passing", stats: [
+    { name: "Completions", variants: STAT_VARIANTS_STANDARD },
+    { name: "Passing Attempts", variants: STAT_VARIANTS_STANDARD },
+    { name: "Passing Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Passing TDs", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Completion", variants: ["Longest"] },
+  ]},
+  { group: "Rushing", stats: [
+    { name: "Rushes", variants: STAT_VARIANTS_STANDARD },
+    { name: "Rushing Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Rushing TDs", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Rush", variants: ["Longest"] },
+  ]},
+  { group: "Receiving", stats: [
+    { name: "Receptions", variants: STAT_VARIANTS_STANDARD },
+    { name: "Receiving Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Receiving TDs", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Reception", variants: ["Longest"] },
+  ]},
+  { group: "Offense", stats: [
+    { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Total TDs", variants: STAT_VARIANTS_STANDARD },
+  ]},
+  { group: "Defense", stats: [
+    { name: "Flag Pulls", variants: STAT_VARIANTS_STANDARD },
+    { name: "Solo Flag Pulls", variants: STAT_VARIANTS_STANDARD },
+    { name: "Assist Flag Pulls", variants: STAT_VARIANTS_STANDARD },
+    { name: "Sacks", variants: STAT_VARIANTS_STANDARD },
+  ]},
+  { group: "Kicking", stats: [
+    { name: "Field Goals Made", variants: STAT_VARIANTS_STANDARD },
+    { name: "Field Goals Attempts", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Field Goal", variants: ["Longest"] },
+    { name: "PAT Mades", variants: STAT_VARIANTS_STANDARD },
+    { name: "PAT Attempts", variants: STAT_VARIANTS_STANDARD },
+  ]},
+  { group: "Punting", stats: [
+    { name: "Punts", variants: STAT_VARIANTS_STANDARD },
+    { name: "Punt Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Punt", variants: ["Longest"] },
+  ]},
+  { group: "Punt Returns", stats: [
+    { name: "Punt Returns", variants: STAT_VARIANTS_STANDARD },
+    { name: "Punt Return Yards", variants: STAT_VARIANTS_STANDARD },
+    { name: "Punt Return TDs", variants: STAT_VARIANTS_STANDARD },
+    { name: "Longest Punt Return", variants: ["Longest"] },
+  ]},
+  { group: "Coaching", stats: [
+    { name: "Coach Wins", variants: ["Career total","Single season"] },
+  ]},
+];
 const SPORTS = {
   football: {
     label: "Football", icon: "🏈",
@@ -178,10 +238,10 @@ const SPORTS = {
   },
   flag_football_girls: {
     label: "Girls Flag Football", icon: "🏈",
-    // Duplicate of football — identical stats, order, groups, and import. (Flag football's defense is
-    // "flag pulls"; those import into the Tackles stats. It's a girls sport, so it siloes with girls HOF.)
-    get groups() { return SPORTS.football.groups; },
-    get statCategories() { return SPORTS.football.statCategories; },
+    // Tailored set (FLAG_FOOTBALL_GROUPS): football minus kickoffs/kick-returns + contact-only defense,
+    // with tackles → flag pulls. A girls sport, so it siloes with the girls HOF.
+    groups: FLAG_FOOTBALL_GROUPS,
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   basketball_boys: {
     label: "Boys Basketball", icon: "🏀",
@@ -264,7 +324,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -311,7 +371,7 @@ const SOCCER_DISPLAY = ["Games Played", "Wins", "Points", "Goals", "Assists", "S
 const DISPLAY_STATS = {
   soccer: SOCCER_DISPLAY, soccer_girls: SOCCER_DISPLAY,
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
-  football: FOOTBALL_DISPLAY, flag_football_girls: FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
+  football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
   volleyball_girls: VBALL_GIRLS_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
@@ -2609,8 +2669,8 @@ STAT_ALIASES_BY_SPORT.softball = STAT_ALIASES_BY_SPORT.baseball;
 // Girls flag football imports like football; MaxPreps' defense section is "Flag Pulls" → our Tackles stats.
 STAT_ALIASES_BY_SPORT.flag_football_girls = {
   ...STAT_ALIASES_BY_SPORT.football,
-  "asst": "Assist Tackles", "ast": "Assist Tackles",
-  "tot fps": "Tackles", "fp": "Tackles", "fps": "Tackles", "flag pull": "Tackles", "flag pulls": "Tackles", "total flag pulls": "Tackles",
+  "solo": "Solo Flag Pulls", "asst": "Assist Flag Pulls", "ast": "Assist Flag Pulls",
+  "tot fps": "Flag Pulls", "fp": "Flag Pulls", "fps": "Flag Pulls", "flag pull": "Flag Pulls", "flag pulls": "Flag Pulls", "total flag pulls": "Flag Pulls", "tackles": "Flag Pulls", "tot": "Flag Pulls",
   "car": "Rushes", "carries": "Rushes",
 };
 const _ciAlias = (m) => { const o = {}; for (const k in m) o[k.toLowerCase()] = m[k]; return o; };
@@ -4097,6 +4157,9 @@ const HOF_STAT_WEIGHTS = {
   "Tackles":                   8,
   "Solo Tackles":              4,
   "Assist Tackles":            2,
+  "Flag Pulls":                8,
+  "Solo Flag Pulls":           4,
+  "Assist Flag Pulls":         2,
   "Sacks":                     8,
   "Sack Yards Lost":           2,
   "Hurries":                   3,
