@@ -173,6 +173,7 @@ export const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Completion Percentage": "pct",
   "Kill Percentage": "pct",
   "Serve Percentage": "pct",
   "Ace Percentage": "pct",
@@ -247,8 +248,13 @@ const VBALL_RATE_DEFS = [
   { name: "Ace Percentage", short: "ACE%", after: "Aces", fmt: "pct", qualStat: "Total Serves", minSeason: 100, minCareer: 300, noteAbbr: "serves",
     spec: { kind: "pct", made: "Aces", att: "Total Serves" } },
 ];
+const FOOTBALL_RATE_DEFS = [
+  { name: "Completion Percentage", short: "COMP%", after: "Completions", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
+    spec: { kind: "pct", made: "Completions", att: "Passing Attempts" } },
+];
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
+  if (sport === "football" || sport === "flag_football_girls") return FOOTBALL_RATE_DEFS;
   if (sport === "volleyball_girls" || sport === "volleyball") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
