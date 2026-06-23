@@ -83,15 +83,15 @@ Kill all friction — **do the work for them:**
 ## Tracker (fill in)
 | # | School | Contact (name/role) | Tier | Channel | Sent | Replied | Built? | Status / next step |
 |---|--------|---------------------|------|---------|------|---------|--------|--------------------|
-| 1 | Norman North, OK | Cameron Bennett — HC Football | 1 | text |  |  |  | demo: raftersiq.com/teams/denver-christian-football |
-| 2 | Cole Valley Christian, ID | Leif Karlberg — HC Boys Basketball | 1 | text |  |  |  | DC hoops demo |
-| 3 | Resurrection Christian, CO | Bart Mayes — Athletic Director | 1 | call |  |  |  | ⭐ AD — whole-school pitch |
-| 4 | Highland HS, CO | Wesley Burke — HC Boys Basketball | 1 | text |  |  |  | DC hoops demo |
-| 5 | Arapahoe HS, CO | Kevin Boley — HC Boys Basketball | 1 | text |  |  |  | DC hoops demo |
-| 6 | Grace Christian, AK | Jason Boerger — HC Boys Basketball | 1 | text |  |  |  | DC hoops demo |
-| 7 | Kent Denver School, CO | Richard Judd — Asst. AD | 1 | email |  |  |  | ⭐ AD — whole-school pitch |
-| 8 | Front Range Christian, CO | Eric Osberg — AD + Girls Soccer Coach | 1 | call |  |  |  | ⭐ AD — whole-school pitch (+ girls-soccer demo) |
-| 9 |  |  | 1 |  |  |  |  | (open) |
+| 1 | Norman North, OK | Cameron Bennett — HC Football | 1 | text | ✓ | — | | texted, no reply yet → follow up in 3–4 days |
+| 2 | Cole Valley Christian, ID | Leif Karlberg — HC Boys Basketball | 1 | text | ✓ | ✓ | | ran through it with him — keep warm / ask "who else?" |
+| 3 | Resurrection Christian, CO | Bart Mayes — Athletic Director | 1 | call | ✓ | — | | ⭐ AD — texted, no reply yet → follow up |
+| 4 | Highland HS, CO | Wesley Burke — HC Boys Basketball | 1 | text | ✓ | | | texted today — awaiting reply |
+| 5 | Arapahoe HS, CO | Kevin Boley — HC Boys Basketball | 1 | text | | | | not contacted yet |
+| 6 | Grace Christian, AK | Jason Boerger — HC Boys Basketball | 1 | text | ✓ | | | texted today — awaiting reply |
+| 7 | Front Range Christian, CO | Eric Osberg — AD + Girls Soccer Coach | 1 | call | ✓ | | | ⭐ AD — texted today — awaiting reply (+ girls-soccer demo) |
+| 8 | Mt. Paran Christian School, GA | Mike Walker — Athletic Director | 1 | email | ✓ | | | ⭐ AD — texted today — awaiting reply |
+| 9 | Rock Canyon HS, CO | Tom Brieske — Athletic Director | 1 | call | | | | ⭐ AD — whole-school pitch (new) |
 | 10|  |  | 1 |  |  |  |  | (open) |
 
 ## Remember
