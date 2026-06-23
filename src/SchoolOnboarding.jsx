@@ -16,7 +16,7 @@ import {
 } from './supabase_client';
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
-const SPORTS_AVAILABLE = [["football","🏈 Football"],["flag_football_girls","🏈 Girls Flag Football"],["basketball_boys","🏀 Boys Basketball"],["basketball_girls","🏀 Girls Basketball"],["soccer","⚽ Boys Soccer"],["soccer_girls","⚽ Girls Soccer"],["baseball","⚾ Baseball"],["softball","🥎 Softball"],["volleyball_girls","🏐 Girls Volleyball"]];
+const SPORTS_AVAILABLE = [["football","🏈 Football"],["flag_football_girls","🏈 Girls Flag Football"],["basketball_boys","🏀 Boys Basketball"],["basketball_girls","🏀 Girls Basketball"],["soccer","⚽ Boys Soccer"],["soccer_girls","⚽ Girls Soccer"],["baseball","⚾ Baseball"],["softball","🥎 Softball"],["volleyball_girls","🏐 Girls Volleyball"],["volleyball","🏐 Boys Volleyball"]];
 
 const s = {
   wrap: { minHeight:'100vh', background:'#f8f7f4', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Georgia, serif', padding:20 },
