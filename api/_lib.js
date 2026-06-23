@@ -75,7 +75,7 @@ export const STAT_ORDER = [
   "Rushes","Rushing Yards","Rushing TDs",
   "Receptions","Receiving Yards","Receiving TDs",
   "Total Yards","Total TDs",
-  "Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
+  "Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
   "Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts",
   "Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return",
   "Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return",
@@ -86,9 +86,9 @@ export const STAT_ORDER = [
 ];
 
 // Football: exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Girls flag football — football minus kickoffs/kick-returns + contact-only defense; tackles → flag pulls.
-const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assisted Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 // Baseball: raw counting stats in canonical order (ported from MilestoneIQ.jsx BASEBALL_DISPLAY).
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
@@ -274,7 +274,7 @@ const G_FOOTBALL = [
   { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
   { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
   { g: "Offense", s: ["Total Yards","Total TDs"] },
-  { g: "Defense", s: ["Total Tackles","Solo Tackles","Assist Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties"] },
+  { g: "Defense", s: ["Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties"] },
   { g: "Kicking", s: ["Field Goals Made","Field Goals Attempts","PAT Mades","PAT Attempts","Longest Field Goal"] },
   { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
   { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
@@ -288,7 +288,7 @@ const G_FLAG_FOOTBALL = [
   { g: "Rushing", s: ["Rushes","Rushing Yards","Rushing TDs","Longest Rush"] },
   { g: "Receiving", s: ["Receptions","Receiving Yards","Receiving TDs","Longest Reception"] },
   { g: "Offense", s: ["Total TDs"] },
-  { g: "Defense", s: ["Total Flag Pulls","Solo Flag Pulls","Assist Flag Pulls","Flag Pull Yards Lost","Sacks"] },
+  { g: "Defense", s: ["Total Flag Pulls","Solo Flag Pulls","Assisted Flag Pulls","Flag Pull Yards Lost","Sacks"] },
   { g: "Scoring", s: ["Try Points"] },
   { g: "Punting", s: ["Punts","Punt Yards","Longest Punt"] },
   { g: "Punt Returns", s: ["Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"] },
@@ -382,7 +382,7 @@ const PERGAME_RECORD_DEFS = [
   // Volleyball (per-match)
   { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" }, { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
   // Flag football
-  { stat: "Total Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assist Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
+  { stat: "Total Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assisted Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
@@ -393,24 +393,24 @@ export function perGame(stats, statKey) {
 }
 export function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
   const out = [];
-  if (sport === "volleyball_girls" || sport === "volleyball") return out; // volleyball uses per-SET rates, not per-match averages
+  const perLbl = (sport === "volleyball_girls" || sport === "volleyball") ? "Per match avg" : "Per game avg";
   const minSeasonGP = (sport === "football" || sport === "flag_football_girls") ? 4 : PERGAME_MIN_SEASON_GP;
   const minCareerGP = (sport === "football" || sport === "flag_football_girls") ? 10 : PERGAME_MIN_CAREER_GP;
   for (const d of PERGAME_RECORD_DEFS) {
     let ss = null;
     for (const r of (seasonRows || [])) {
-      if (Number(r.stats?.["Games Played"]) < minSeasonGP) continue;
+      if (Number(r.stats?.["Games Played"] ?? r.stats?.["Matches Played"]) < minSeasonGP) continue;
       const v = perGame(r.stats, d.stat);
       if (v != null && (!ss || v > ss.value)) ss = { value: v, holderName: r.player_name, holderYear: r.season || "" };
     }
-    if (ss) out.push({ id: `auto-pg-ss-${d.stat}`, statName: d.stat, variant: "Per game avg (season)", sport, ...ss });
+    if (ss) out.push({ id: `auto-pg-ss-${d.stat}`, statName: d.stat, variant: `${perLbl} (season)`, sport, ...ss });
     let car = null;
     for (const pl of (careerPlayers || [])) {
-      if (Number(pl.stats?.["Games Played"]) < minCareerGP) continue;
+      if (Number(pl.stats?.["Games Played"] ?? pl.stats?.["Matches Played"]) < minCareerGP) continue;
       const v = perGame(pl.stats, d.stat);
       if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
     }
-    if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: "Per game avg (career)", sport, ...car });
+    if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: `${perLbl} (career)`, sport, ...car });
   }
   return out;
 }
@@ -489,7 +489,7 @@ const HOF_STAT_WEIGHTS = {
   "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
-  "Total Tackles": 8, "Solo Tackles": 4, "Assist Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
+  "Total Tackles": 8, "Solo Tackles": 4, "Assisted Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
   "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
   "Goals": 10, "Saves": 8, "Shutouts": 7, "Shots": 4, "Coach Wins": 0,
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
