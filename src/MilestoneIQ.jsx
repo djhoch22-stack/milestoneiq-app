@@ -6007,8 +6007,8 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   <button onClick={()=>setShowRecords(true)} style={{ marginTop:12,background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontWeight:600,fontSize:13,cursor:"pointer" }}>Add records</button>
                 </div>
               : (()=>{
-                  const groupColors = { "Passing":"#dbeafe","Rushing":"#dcfce7","Receiving":"#fef3c7","Other Offense":"#f3e8ff","Special Teams":"#ffedd5","Defense":"#fee2e2","General":"#f1f5f9","Batting":"#dbeafe","Fielding":"#dcfce7","Pitching":"#f3e8ff","Coaching":"#f1f5f9" };
-                  const groupTextColors = { "Passing":"#1e40af","Rushing":"#166534","Receiving":"#92400e","Other Offense":"#6b21a8","Special Teams":"#c2410c","Defense":"#991b1b","General":"#334155","Batting":"#1e40af","Fielding":"#166534","Pitching":"#6b21a8","Coaching":"#334155" };
+                  const groupColors = { "Passing":"#dbeafe","Rushing":"#dcfce7","Receiving":"#fef3c7","Offense":"#f3e8ff","Other Offense":"#f3e8ff","Scoring":"#ffedd5","Special Teams":"#ffedd5","Defense":"#fee2e2","General":"#f1f5f9","Batting":"#dbeafe","Fielding":"#dcfce7","Pitching":"#f3e8ff","Attacking":"#fee2e2","Setting":"#dbeafe","Serving":"#fef3c7","Punting":"#ffedd5","Punt Returns":"#dcfce7","Kicking":"#f3e8ff","Kickoffs":"#fef3c7","Kickoff Returns":"#dcfce7","Coaching":"#f1f5f9" };
+                  const groupTextColors = { "Passing":"#1e40af","Rushing":"#166534","Receiving":"#92400e","Offense":"#6b21a8","Other Offense":"#6b21a8","Scoring":"#c2410c","Special Teams":"#c2410c","Defense":"#991b1b","General":"#334155","Batting":"#1e40af","Fielding":"#166534","Pitching":"#6b21a8","Attacking":"#991b1b","Setting":"#1e40af","Serving":"#92400e","Punting":"#c2410c","Punt Returns":"#166534","Kicking":"#6b21a8","Kickoffs":"#92400e","Kickoff Returns":"#166534","Coaching":"#334155" };
 
                   const getGroup = (statName) => {
                     if (!sport.groups) return "Other";
