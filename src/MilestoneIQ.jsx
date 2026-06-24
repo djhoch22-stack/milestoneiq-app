@@ -6036,12 +6036,29 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               </div>
             </div>
 
-            {(() => { const h = (school.records||[]).filter(r => r.value == null && /^Per (game|match) avg/.test(r.variant)); return h.length ? (
-              <div style={{ display:"flex",alignItems:"center",gap:8,background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:13,color:"#9a3412" }}>
-                <span>🚫 {h.length} per-game average record{h.length!==1?"s":""} hidden</span>
-                <button onClick={() => onUpdate({ ...school, records: (school.records||[]).filter(r => !(r.value == null && /^Per (game|match) avg/.test(r.variant))) })}
-                  style={{ marginLeft:"auto",background:"#fff",border:"1px solid #fdba74",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,color:"#9a3412",cursor:"pointer" }}>Restore all</button>
-              </div>) : null; })()}
+            {(() => {
+              const h = (school.records||[]).filter(r => r.value == null && /^Per (game|match) avg/.test(r.variant));
+              if (!h.length) return null;
+              const restore = (keys) => onUpdate({ ...school, records: (school.records||[]).filter(r => !(r.value == null && keys.includes(r.statName + "|" + r.variant))) });
+              return (
+                <div style={{ background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:13,color:"#9a3412" }}>
+                  <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:6 }}>
+                    <span style={{ fontWeight:600 }}>🚫 {h.length} per-game average record{h.length!==1?"s":""} hidden</span>
+                    <button onClick={() => restore(h.map(r => r.statName + "|" + r.variant))}
+                      style={{ marginLeft:"auto",background:"#fff",border:"1px solid #fdba74",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,color:"#9a3412",cursor:"pointer",whiteSpace:"nowrap" }}>Restore all</button>
+                  </div>
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:6 }}>
+                    {h.map(r => (
+                      <button key={r.statName + "|" + r.variant} onClick={() => restore([r.statName + "|" + r.variant])}
+                        title={`Restore ${r.statName} — ${r.variant}`}
+                        style={{ background:"#fff",border:"1px solid #fed7aa",borderRadius:6,padding:"3px 8px",fontSize:11,color:"#9a3412",cursor:"pointer" }}>
+                        ↩ {r.statName} {r.variant.replace(/^Per (game|match) avg /, "")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {((school.records||[]).length===0 && allStatsFor([...(school.athletes||[]), ...(school.allTimeRoster||[])]).length===0 && (allSeasonRows||[]).length===0)
               ? <div style={{ background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb",padding:40,textAlign:"center",color:"#9ca3af" }}>
                   <div style={{ fontSize:32,marginBottom:8 }}>📋</div>
