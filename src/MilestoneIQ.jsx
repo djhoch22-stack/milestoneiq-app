@@ -267,6 +267,72 @@ const SPORTS = {
     groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
+  // ── Coming soon: not in AVAILABLE_SPORTS, so the add-program picker shows them disabled as "Coming soon".
+  // Stat sets are starter placeholders; they get fleshed out (display/groups/rates) when a sport goes live.
+  lacrosse: {
+    label: "Boys Lacrosse", icon: "🥍",
+    statCategories: [
+      { name: "Goals", variants: ["Career total","Single season"] },
+      { name: "Assists", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season"] },
+      { name: "Ground Balls", variants: ["Career total","Single season"] },
+      { name: "Saves", variants: ["Career total","Single season"] },
+      { name: "Caused Turnovers", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  lacrosse_girls: {
+    label: "Girls Lacrosse", icon: "🥍",
+    statCategories: [
+      { name: "Goals", variants: ["Career total","Single season"] },
+      { name: "Assists", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season"] },
+      { name: "Ground Balls", variants: ["Career total","Single season"] },
+      { name: "Saves", variants: ["Career total","Single season"] },
+      { name: "Caused Turnovers", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  hockey: {
+    label: "Boys Ice Hockey", icon: "🏒",
+    statCategories: [
+      { name: "Goals", variants: ["Career total","Single season"] },
+      { name: "Assists", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season"] },
+      { name: "Saves", variants: ["Career total","Single season"] },
+      { name: "Shutouts", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  hockey_girls: {
+    label: "Girls Ice Hockey", icon: "🏒",
+    statCategories: [
+      { name: "Goals", variants: ["Career total","Single season"] },
+      { name: "Assists", variants: ["Career total","Single season"] },
+      { name: "Points", variants: ["Career total","Single season"] },
+      { name: "Saves", variants: ["Career total","Single season"] },
+      { name: "Shutouts", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  cross_country: {
+    label: "Cross Country", icon: "🏃",
+    statCategories: [
+      { name: "1st Place Finishes", variants: ["Career total","Single season"] },
+      { name: "State Qualifications", variants: ["Career total"] },
+      { name: "Conference Titles", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
+  track: {
+    label: "Track & Field", icon: "🏃",
+    statCategories: [
+      { name: "Events Won", variants: ["Career total","Single season"] },
+      { name: "State Qualifications", variants: ["Career total"] },
+      { name: "Conference Titles", variants: ["Career total","Single season"] },
+      { name: "Coach Wins", variants: ["Career total","Single season"] },
+    ]
+  },
 };
 
 // school.records is now an array of:
