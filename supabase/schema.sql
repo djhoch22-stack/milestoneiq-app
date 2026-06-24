@@ -547,6 +547,26 @@ alter table public.profiles add column if not exists phone text;
 create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public, auth as $$
 begin
+  -- Guard: don't let the SOLE admin of a school that still has data delete their account.
+  -- It would orphan the org (RLS keys on org_members, which would be empty) and strand its
+  -- programs + coaches. Allowed when: there is another admin, OR the org is an empty solo account.
+  if exists (
+    select 1
+    from public.org_members me
+    where me.user_id = auth.uid()
+      and me.role = 'admin'
+      and not exists (   -- no OTHER admin in this org
+        select 1 from public.org_members a
+        where a.org_id = me.org_id and a.role = 'admin' and a.user_id <> auth.uid()
+      )
+      and (              -- ...and there is something to strand
+        exists (select 1 from public.org_members o where o.org_id = me.org_id and o.user_id <> auth.uid())
+        or exists (select 1 from public.programs p where p.org_id = me.org_id)
+      )
+  ) then
+    raise exception 'You are the only admin of a school that still has records. Promote another admin in Team settings, or delete the school''s programs first, before deleting your account.';
+  end if;
+
   -- Detach references that would otherwise block deletion (created_by points at the user).
   update public.organizations set created_by = null where created_by = auth.uid();
   -- Wipe the caller's app data (always permitted on these tables).
