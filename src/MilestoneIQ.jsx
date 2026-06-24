@@ -7271,9 +7271,9 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",border:"1px solid #fca5a5",borderRadius:10,background:"#fff5f5" }}>
               <div>
                 <div style={{ fontSize:14,fontWeight:600,color:"#991b1b" }}>Delete account</div>
-                <div style={{ fontSize:12,color:"#6b7280" }}>Permanently delete your account and all data. This cannot be undone.</div>
+                <div style={{ fontSize:12,color:"#6b7280" }}>Removes your personal login and access. Your school's records and programs stay intact.</div>
               </div>
-              <button onClick={async ()=>{ if(!window.confirm("Permanently delete your account and sign out? This cannot be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+(error.message || error.hint || error.code || JSON.stringify(error))); return; } try { sessionStorage.removeItem("mq_tab"); } catch(e){} await signOut(); window.location.href = "/"; }}
+              <button onClick={async ()=>{ if(!window.confirm("Delete your account?\n\nYour school's records and programs stay intact — only your personal login is removed. This can't be undone.")) return; const { error } = await deleteMyAccount(); if(error){ alert("Could not delete account: "+(error.message || error.hint || error.code || JSON.stringify(error))); return; } try { sessionStorage.removeItem("mq_tab"); } catch(e){} await signOut(); window.location.href = "/"; }}
                 style={{ background:"#991b1b",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>Delete account</button>
             </div>
           </div>
