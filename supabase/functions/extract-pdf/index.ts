@@ -83,8 +83,12 @@ Deno.serve(async (req) => {
     const { data: { user } } = await admin.auth.getUser(token);
     if (!user) return json({ error: "not authenticated" }, 401);
 
-    const { pdf } = await req.json();
-    if (!pdf) return json({ error: "no pdf provided" }, 400);
+    const { pdf, image, mediaType } = await req.json();
+    if (!pdf && !image) return json({ error: "no file provided" }, 400);
+    // A photo of a (often old / handwritten) stat sheet arrives as an image; a digital export as a PDF.
+    const fileBlock = image
+      ? { type: "image", source: { type: "base64", media_type: mediaType || "image/jpeg", data: image } }
+      : { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf } };
 
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -107,7 +111,7 @@ Deno.serve(async (req) => {
         messages: [{
           role: "user",
           content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf } },
+            fileBlock,
             { type: "text", text: PROMPT },
           ],
         }],
