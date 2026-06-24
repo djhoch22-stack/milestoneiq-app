@@ -260,15 +260,6 @@ const SPORTS = {
     groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
-  wrestling: {
-    label: "Wrestling", icon: "🤼",
-    statCategories: [
-      { name: "Career Wins", variants: ["Career total","Single season"] },
-      { name: "Pins", variants: ["Career total","Single season"] },
-      { name: "Tech Falls", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
-  },
   volleyball: {
     label: "Boys Volleyball", icon: "🏐",
     // Boys volleyball — identical to girls volleyball (same stats/order/groups/rates/import). Bare
@@ -276,15 +267,6 @@ const SPORTS = {
     groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
-  track: {
-    label: "Track & Field", icon: "🏃",
-    statCategories: [
-      { name: "Events Won", variants: ["Career total","Single season"] },
-      { name: "State Qualifications", variants: ["Career total"] },
-      { name: "Conference Titles", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
-  }
 };
 
 // school.records is now an array of:
