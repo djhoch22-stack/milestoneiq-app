@@ -1285,7 +1285,8 @@ function RecordsModal({ school, onClose, onSave }) {
 
   const deleteRecord = (id) => setRecords(r => r.filter(rec => rec.id !== id));
 
-  const filtered = records.filter(r => !filter || r.statName.toLowerCase().includes(filter.toLowerCase()) || (r.holderName || "").toLowerCase().includes(filter.toLowerCase()));
+  const realRecords = records.filter(r => r.value != null); // hide per-game "delete" markers (null value) from the modal list + count
+  const filtered = realRecords.filter(r => !filter || r.statName.toLowerCase().includes(filter.toLowerCase()) || (r.holderName || "").toLowerCase().includes(filter.toLowerCase()));
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -1361,10 +1362,10 @@ function RecordsModal({ school, onClose, onSave }) {
         </div>
 
         {/* Existing records */}
-        {records.length > 0 && (
+        {realRecords.length > 0 && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{records.length} records on file</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{realRecords.length} records on file</div>
               <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter records..."
                 style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 12px", fontSize: 13, width: 180 }} />
             </div>
@@ -6035,6 +6036,12 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               </div>
             </div>
 
+            {(() => { const h = (school.records||[]).filter(r => r.value == null && /^Per (game|match) avg/.test(r.variant)); return h.length ? (
+              <div style={{ display:"flex",alignItems:"center",gap:8,background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"8px 12px",marginBottom:12,fontSize:13,color:"#9a3412" }}>
+                <span>🚫 {h.length} per-game average record{h.length!==1?"s":""} hidden</span>
+                <button onClick={() => onUpdate({ ...school, records: (school.records||[]).filter(r => !(r.value == null && /^Per (game|match) avg/.test(r.variant))) })}
+                  style={{ marginLeft:"auto",background:"#fff",border:"1px solid #fdba74",borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,color:"#9a3412",cursor:"pointer" }}>Restore all</button>
+              </div>) : null; })()}
             {((school.records||[]).length===0 && allStatsFor([...(school.athletes||[]), ...(school.allTimeRoster||[])]).length===0 && (allSeasonRows||[]).length===0)
               ? <div style={{ background:"#fff",borderRadius:12,border:"2px dashed #e5e7eb",padding:40,textAlign:"center",color:"#9ca3af" }}>
                   <div style={{ fontSize:32,marginBottom:8 }}>📋</div>
@@ -6089,7 +6096,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   const allRecords = [
                     ...(school.records||[]),
                     ...autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)),
-                  ];
+                  ].filter(r => r.value != null); // null-value rows are "hidden" markers (a deleted per-game/per-match avg): they still suppress the auto record via manualKeys above, but don't render
                   const byGroup = {};
                   allRecords.forEach(r => {
                     const tileStat = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName;
@@ -6133,7 +6140,12 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                                   // % + fewest records aren't a "chase the leader" progress bar — only normal counting records show one.
                                   const p = (!isPct && !isLow && leaderVal && rec.variant==="Career total") ? pct(leaderVal, rec.value) : null;
                                   return (
-                                    <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
+                                    <div key={rec.id} style={{ background:"#f9fafb",borderRadius:8,padding:12,position:"relative" }}>
+                                      {/^Per (game|match) avg/.test(rec.variant) && (
+                                        <button onClick={() => onUpdate({ ...school, records: [...(school.records||[]), { id:`r${Date.now()}`, statName: rec.statName, variant: rec.variant, value: null, sport: school.sport }] })}
+                                          title="Delete this per-game average record" aria-label="Delete this per-game average record"
+                                          style={{ position:"absolute",top:2,right:4,background:"none",border:"none",color:"#9ca3af",fontSize:13,lineHeight:1,cursor:"pointer",padding:"2px 4px" }}>✕</button>
+                                      )}
                                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6 }}>
                                         <span style={{ background:groupColors[grpName]||"#eff6ff",color:groupTextColors[grpName]||"#1e3a5f",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:600 }}>{isPct ? (rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : `Best (${rec.variant})`) : isLow ? (rec.variant === "Career total" ? "Career fewest" : "Season fewest") : rec.variant}</span>
                                         <span style={{ fontSize:17,fontWeight:700,color:"#111" }}>{isPct ? fmtRateVal(RATE_FMT[rec.statName], rec.value) : rec.value.toLocaleString()}</span>
