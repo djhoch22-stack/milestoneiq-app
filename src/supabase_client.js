@@ -364,14 +364,17 @@ export const deleteAward = async (id) => {
 
 // AI PDF extraction (one PDF per call) — goes through the extract-pdf edge function
 // which holds the Anthropic key server-side. `pdf` is base64 (no data: prefix).
-export const extractPdfStats = async (pdf) => {
+export const extractPdfStats = async (fileData, mediaType) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return { error: 'no session' };
+    // A photo (image/*) goes up as { image, mediaType }; a PDF (no mediaType) stays { pdf } — the edge
+    // function reads either. Keeps existing PDF callers working unchanged.
+    const isImage = !!mediaType && mediaType.startsWith('image/');
     const res = await fetch(`${SUPABASE_URL}/functions/v1/extract-pdf`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ pdf }),
+      body: JSON.stringify(isImage ? { image: fileData, mediaType } : { pdf: fileData }),
     });
     const out = await res.json().catch(() => ({}));
     return { data: out, error: res.ok ? null : (out.error || 'extract failed') };
