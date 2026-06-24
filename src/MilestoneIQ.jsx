@@ -2582,6 +2582,17 @@ function loadExcelJS() {
     document.head.appendChild(s);
   });
 }
+// heic2any — loaded on demand to convert iPhone HEIC/HEIF photos to JPEG (Claude vision can't read HEIC).
+function loadHeic2Any() {
+  return new Promise((resolve, reject) => {
+    if (window.heic2any) return resolve(window.heic2any);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+    s.onload = () => (window.heic2any ? resolve(window.heic2any) : reject(new Error("heic2any unavailable")));
+    s.onerror = () => reject(new Error("Couldn't load the photo converter (network?)"));
+    document.head.appendChild(s);
+  });
+}
 function normSeason(h) {
   const m = String(h || "").match(/\d{4}-\d{4}/);
   return m ? m[0] : String(h || "").trim();
@@ -3182,6 +3193,8 @@ function ImportSeasons({ school, roster = [] }) {
     if (!school || !school.id) { setMsg("Open a saved program first."); return; }
     const xlsxFiles = files.filter((f) => /\.(xlsx|xls)$/i.test(f.name));
     const pdfFiles = files.filter((f) => /\.pdf$/i.test(f.name));
+    const imageFiles = files.filter((f) => /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)); // photos of paper / old stat sheets → AI vision
+    const aiFiles = [...pdfFiles, ...imageFiles]; // both PDFs and photos run through the AI extractor (same per-season path)
     const flatFiles = files.filter((f) => /\.(csv|tsv|txt)$/i.test(f.name)); // flat one-season exports (Hudl/GameChanger)
     setBusy(true);
     try {
@@ -3189,7 +3202,7 @@ function ImportSeasons({ school, roster = [] }) {
       // (other seasons untouched). Season comes from the filename, else we ask.
       // Flat CSV/TXT exports (Hudl / GameChanger) take the SAME per-season path below — they skip the
       // AI step and parse the table directly, then feed the shared reconcile + merge that PDFs use.
-      if (pdfFiles.length || flatFiles.length) {
+      if (aiFiles.length || flatFiles.length) {
         const seasonValid = new Set([
           ...(SPORTS[school.sport]?.groups || []).filter((g) => g.group !== "Coaching").flatMap((g) => (g.stats || []).map((s) => s.name)),
           ...(SPORTS[school.sport]?.statCategories || []).map((s) => s.name), // sport record stats (soccer: Goals/Assists/Saves/Shutouts)
@@ -3200,22 +3213,33 @@ function ImportSeasons({ school, roster = [] }) {
         let shared = null;
         const rawBySeason = {}; // season -> [{ name, number, stats }]
         const errs = [];
-        for (let i = 0; i < pdfFiles.length; i++) {
-          const f = pdfFiles[i];
+        for (let i = 0; i < aiFiles.length; i++) {
+          const f = aiFiles[i];
           let season = seasonFromFilename(f.name);
           if (!season) {
-            if (!shared) shared = (window.prompt("What season are these PDF stats for? (e.g. 2011-2012)") || "").trim();
+            if (!shared) shared = (window.prompt("What season are these stats for? (e.g. 2011-2012)") || "").trim();
             season = shared;
           }
           if (!season) { errs.push(`${f.name}: no season given`); continue; }
-          setMsg(`Reading ${i + 1} of ${pdfFiles.length}: ${f.name}…`);
+          setMsg(`Reading ${i + 1} of ${aiFiles.length}: ${f.name}…`);
+          // PDF → sent as a document; a photo → sent as an image. HEIC/HEIF (iPhone) is converted to JPEG
+          // first because Claude vision can't read it; jpg/png/webp pass straight through.
+          let blob = f, mediaType = null;
+          if (/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) {
+            if (/\.(heic|heif)$/i.test(f.name)) {
+              try { const h2a = await loadHeic2Any(); const out = await h2a({ blob: f, toType: "image/jpeg", quality: 0.92 }); blob = Array.isArray(out) ? out[0] : out; mediaType = "image/jpeg"; }
+              catch (e3) { errs.push(`${f.name}: couldn't read that HEIC photo — upload a JPG/PNG or a screenshot of it`); continue; }
+            } else {
+              mediaType = /\.png$/i.test(f.name) ? "image/png" : /\.webp$/i.test(f.name) ? "image/webp" : "image/jpeg";
+            }
+          }
           const base64 = await new Promise((res, rej) => {
             const r = new FileReader();
             r.onload = () => res(r.result.split(",")[1]);
             r.onerror = () => rej(new Error("read failed"));
-            r.readAsDataURL(f);
+            r.readAsDataURL(blob);
           });
-          const { data, error } = await extractPdfStats(base64);
+          const { data, error } = await extractPdfStats(base64, mediaType);
           if (error) { errs.push(`${f.name}: ${error}`); continue; }
           const arr = (rawBySeason[season] = rawBySeason[season] || []);
           for (const a of (data.athletes || [])) {
@@ -3399,8 +3423,8 @@ function ImportSeasons({ school, roster = [] }) {
     <>
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <label style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>
-        {busy ? "Working…" : "📥 Import season stats (MaxPreps · Hudl · GameChanger)"}
-        <input type="file" accept=".xlsx,.xls,.pdf,.csv,.tsv,.txt" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
+        {busy ? "Working…" : "📥 Import season stats (photo · PDF · Excel · CSV)"}
+        <input type="file" accept=".xlsx,.xls,.pdf,.csv,.tsv,.txt,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*" multiple onChange={onFiles} disabled={busy} style={{ display: "none" }} />
       </label>
       <button onClick={downloadTemplate} disabled={busy} style={{ background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}>⬇︎ Download template</button>
       <button onClick={() => setShowHelp(true)} style={{ background: "none", border: "none", color: "#1a56db", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", textDecoration: "underline", padding: "8px 2px" }}>❓ How to import</button>
