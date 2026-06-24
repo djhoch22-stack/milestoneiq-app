@@ -1285,7 +1285,8 @@ function RecordsModal({ school, onClose, onSave }) {
 
   const deleteRecord = (id) => setRecords(r => r.filter(rec => rec.id !== id));
 
-  const realRecords = records.filter(r => r.value != null); // hide per-game "delete" markers (null value) from the modal list + count
+  const hiddenKeys = new Set(records.filter(r => r.value == null).map(r => r.statName + "|" + r.variant)); // null-value record = a "hidden" marker
+  const realRecords = records.filter(r => r.value != null && !hiddenKeys.has(r.statName + "|" + r.variant)); // hide markers + the records they hide from the modal list + count
   const filtered = realRecords.filter(r => !filter || r.statName.toLowerCase().includes(filter.toLowerCase()) || (r.holderName || "").toLowerCase().includes(filter.toLowerCase()));
 
   return (
@@ -6110,10 +6111,11 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   // auto-computed one for the same stat+variant (e.g. an edited best FG%/3P%/FT%).
                   // Auto-computed records fill in only where there's no manual entry.
                   const manualKeys = new Set((school.records||[]).map(r => r.statName + "|" + r.variant));
+                  const hiddenKeys = new Set((school.records||[]).filter(r => r.value == null).map(r => r.statName + "|" + r.variant)); // a null-value record = a "hidden" marker for that statName|variant (a deleted per-game/per-match avg)
                   const allRecords = [
                     ...(school.records||[]),
                     ...autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)),
-                  ].filter(r => r.value != null); // null-value rows are "hidden" markers (a deleted per-game/per-match avg): they still suppress the auto record via manualKeys above, but don't render
+                  ].filter(r => !hiddenKeys.has(r.statName + "|" + r.variant)); // drop any record (manual OR auto) whose statName|variant has a hidden marker; the manual record stays in school.records so a restore brings back its exact value
                   const byGroup = {};
                   allRecords.forEach(r => {
                     const tileStat = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName;
