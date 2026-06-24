@@ -771,6 +771,8 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script
   .tabbar{display:flex;gap:0;border-bottom:1px solid #e8e4dd;overflow-x:auto;margin:14px 0 18px;-webkit-overflow-scrolling:touch}
   .tabbar label{padding:10px 16px;font-size:14px;font-weight:400;color:#6b7280;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;flex-shrink:0}
   .tabbar label:hover{color:#374151}
+  /* Mobile: fit all tabs in one clean line — no horizontal scroll/clipping */
+  @media(max-width:560px){.tabbar{overflow-x:visible}.tabbar label{flex:1 1 0;min-width:0;padding:9px 2px;font-size:11px;text-align:center;letter-spacing:-.2px}}
   .panel{display:none}
   #t-overview:checked~.p-overview,#t-athletes:checked~.p-athletes,#t-records:checked~.p-records,#t-alltime:checked~.p-alltime,#t-seasons:checked~.p-seasons,#t-hof:checked~.p-hof{display:block}
   #t-overview:checked~.tabbar label[for="t-overview"],#t-athletes:checked~.tabbar label[for="t-athletes"],#t-records:checked~.tabbar label[for="t-records"],#t-alltime:checked~.tabbar label[for="t-alltime"],#t-seasons:checked~.tabbar label[for="t-seasons"],#t-hof:checked~.tabbar label[for="t-hof"]{color:#1a56db;font-weight:700;border-bottom-color:#1a56db}
