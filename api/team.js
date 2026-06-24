@@ -74,7 +74,7 @@ export default async function handler(req, res) {
   const allRecords = [
     ...storedRecords,
     ...autoRecs.filter((r) => !manualKeys.has(r.statName + "|" + r.variant)),
-  ];
+  ].filter((r) => r.value != null); // null-value rows are "hidden" markers (deleted per-game/per-match avg): suppress the auto record via manualKeys, don't render
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
   // One stat's tile (variants collapsed, ties expanded) — rendered inside its category group.
