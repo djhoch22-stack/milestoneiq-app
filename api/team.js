@@ -71,10 +71,11 @@ export default async function handler(req, res) {
   ];
   // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
   const manualKeys = new Set(storedRecords.map((r) => r.statName + "|" + r.variant));
+  const hiddenKeys = new Set(storedRecords.filter((r) => r.value == null).map((r) => r.statName + "|" + r.variant)); // null-value record = a "hidden" marker for that statName|variant
   const allRecords = [
     ...storedRecords,
     ...autoRecs.filter((r) => !manualKeys.has(r.statName + "|" + r.variant)),
-  ].filter((r) => r.value != null); // null-value rows are "hidden" markers (deleted per-game/per-match avg): suppress the auto record via manualKeys, don't render
+  ].filter((r) => !hiddenKeys.has(r.statName + "|" + r.variant)); // drop any record (manual OR auto) whose statName|variant has a hidden marker
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
   // One stat's tile (variants collapsed, ties expanded) — rendered inside its category group.
