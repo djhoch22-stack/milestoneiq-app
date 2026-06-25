@@ -5396,6 +5396,9 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
   const sportContexts = (crossSport && allScores && allScores.length > 1)
     ? allScores.map(a => ({ school: a.school, player: a.player }))
     : [{ school, player }];
+  // Multi-sport athletes: a toggle to switch which sport's stats show (defaults to the top-scoring sport).
+  const [viewSportId, setViewSportId] = useState(null);
+  const effSportId = viewSportId || sportContexts[0]?.school.id;
   const buildStatBreakdown = (pl, rost) => Object.entries(pl.stats || {})
     .filter(([stat]) => HOF_STAT_WEIGHTS[stat] > 0)
     .map(([stat, val]) => {
@@ -5510,10 +5513,20 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
             </div>
           )}
 
-          {/* Stat rankings — per sport when multi-sport */}
+          {/* Stat rankings — per sport when multi-sport; toggle switches which sport's stats show */}
           <div style={{ marginBottom:20 }}>
             <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>Statistical rank</div>
-            {sportContexts.map(({ school: s, player: pl }) => {
+            {crossSport && sportContexts.length > 1 && (
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+                {sportContexts.map(({ school: s }) => (
+                  <button key={s.id} onClick={() => setViewSportId(s.id)}
+                    style={{ border:"1px solid", borderColor: effSportId===s.id?"#7c3aed":"#e5e7eb", background: effSportId===s.id?"#f5f3ff":"#fff", color: effSportId===s.id?"#6b21a8":"#374151", borderRadius:8, padding:"5px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                    {SPORTS[s.sport]?.icon} {SPORTS[s.sport]?.label || s.sport}
+                  </button>
+                ))}
+              </div>
+            )}
+            {sportContexts.filter(c => !(crossSport && sportContexts.length > 1) || c.school.id === effSportId).map(({ school: s, player: pl }) => {
               const rows = buildStatBreakdown(pl, s.allTimeRoster || []);
               if (!rows.length) return null;
               return (
@@ -5574,7 +5587,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                   {honors.map(a => (
                     <span key={a.id} style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", color:"#6b21a8", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:600 }}>
-                      {SPORTS[school.sport]?.icon || "🏅"} {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
+                      {SPORTS[a._sport || school.sport]?.icon || "🏅"} {awardLabel(a)}{a.season ? ` · ${a.season}` : ""}
                     </span>
                   ))}
                 </div>
