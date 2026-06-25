@@ -4681,7 +4681,8 @@ function coachAwardBonus(name, awards, names) {
   return Math.min(bonus, 20);
 }
 function awardsForHolder(name, scope, awards, names) {
-  return (awards || []).filter(a => a.scope === scope && awardHolderMatches(a.holder_name, name, names));
+  return (awards || []).filter(a => a.scope === scope && awardHolderMatches(a.holder_name, name, names))
+    .sort((a, b) => String(b.season || "").localeCompare(String(a.season || ""))); // newest-first (chronological), matches season/title lists
 }
 function awardLabel(a) {
   if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
@@ -4849,7 +4850,7 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
   const winPct = coach.wins+coach.losses+(coach.ties||0)>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
   const seasons = (school.seasons||[]).filter(s=>(s.coach||s["coach"]||"").trim()===coach.name);
   const notableSeasons = seasons.filter(s=>getSeasonSuccessScore(s.notes||s["notes"]||"")>0)
-    .sort((a,b)=>getSeasonSuccessScore(b.notes||b["notes"]||"")-getSeasonSuccessScore(a.notes||a["notes"]||""));
+    .sort((a,b)=>String(b.season||b["season"]||"").localeCompare(String(a.season||a["season"]||""))); // chronological (newest-first)
 
   const statRows = [
     ["Total wins",      coach.wins,         [...allCoaches].sort((a,b)=>b.wins-a.wins)],
@@ -4959,7 +4960,7 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
             <div style={{ marginBottom:18 }}>
               <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:8 }}>Notable seasons</div>
               <div style={{ display:"flex",flexDirection:"column",gap:5 }}>
-                {notableSeasons.slice(0,6).map(s => {
+                {notableSeasons.map(s => {
                   const notes = s.notes||s["notes"]||"";
                   return (
                     <div key={s.season||s["season"]} style={{ display:"flex",justifyContent:"space-between",background:"#f9fafb",borderRadius:8,padding:"7px 12px",fontSize:13 }}>
@@ -5676,7 +5677,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
             const blocks = shownContexts
               .map(({ school: s, player: pl }) => ({
                 s,
-                secs: (s.seasons || []).filter(season => playerSeasonOverlap(pl, season) && getSeasonSuccessScore(season.notes) > 0)
+                secs: (s.seasons || []).filter(season => playerSeasonOverlap(pl, season) && getSeasonSuccessScore(season.notes) > 0).sort((a, b) => String(b.season).localeCompare(String(a.season)))
               }))
               .filter(b => b.secs.length);
             if (!blocks.length) return null;
