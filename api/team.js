@@ -6,7 +6,7 @@ import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor, withDerivedStats,
-  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
@@ -84,6 +84,7 @@ export default async function handler(req, res) {
     ...longestRecordsFrom(seasonRows, team.sport),
     ...autoStatRecords(seasonRows, careerPool, statsToDisplay(careerPool, team.sport).filter(s => !/^Longest /.test(s)), team.sport),
     ...coachWinsRecordsFrom(seasonsList, team.sport, team.coach_prior || {}),
+    ...lowCountingRecordsFrom(seasonRows, careerPool, team.sport, team.record_minimums),
   ];
   // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
   const manualKeys = new Set(storedRecords.map((r) => r.statName + "|" + r.variant));
@@ -114,8 +115,10 @@ export default async function handler(req, res) {
       }
       const holderList = [...g.filter((r) => r.holderName).map((r) => ({ name: r.holderName, year: r.holderYear })), ...tied];
       const holders = holderList.map((h) => `<div class="holder">🏅 ${esc(h.name)}${h.year ? ` · ${esc(String(h.year))}` : ""}</div>`).join("");
+      const isLow = !!rec.lowerBetter;
       const pctLabel = rec.variant === "Career total" ? "Career best" : rec.variant === "Single season" ? "Season best" : "Best (" + esc(rec.variant) + ")";
-      return `<div class="tile"><div class="top"><span class="vlabel">${isPct ? pctLabel : esc(rec.variant)}</span><span class="val">${isPct ? esc(fmtRateVal(RATE_FMT[rec.statName], rec.value)) : fmtNum(rec.value)}</span></div>${holders}</div>`;
+      const vlabel = isPct ? pctLabel : isLow ? (rec.variant === "Career total" ? "Career fewest" : "Season fewest") : esc(rec.variant);
+      return `<div class="tile"><div class="top"><span class="vlabel">${vlabel}</span><span class="val">${isPct ? esc(fmtRateVal(RATE_FMT[rec.statName], rec.value)) : fmtNum(rec.value)}</span></div>${holders}</div>`;
     }).join("");
     return `<div class="statcard"><div class="hd">${esc(sn)}</div><div class="tiles">${tiles}</div></div>`;
   };
@@ -496,6 +499,7 @@ export default async function handler(req, res) {
         ...pergameRecordsFrom(pss, cp, t.sport),
         ...longestRecordsFrom(pss, t.sport),
         ...autoStatRecords(pss, cp, statsToDisplay(cp, t.sport).filter((s) => !/^Longest /.test(s)), t.sport),
+        ...lowCountingRecordsFrom(pss, cp, t.sport, t.record_minimums),
       ];
       const stored = recs.map((r) => ({ statName: r.stat_name, variant: r.variant, holderName: r.holder_name, value: r.value }));
       const mk = new Set(stored.map((r) => r.statName + "|" + r.variant));
