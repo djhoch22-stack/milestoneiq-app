@@ -340,6 +340,35 @@ export function minsFor(d, recordMins) {
   const s = Number(o.season), c = Number(o.career);
   return { season: s > 0 ? s : d.minSeason, career: c > 0 ? c : d.minCareer };
 }
+// Counting stats whose RECORD is the FEWEST (lower is better, golf-style), qualified by a volume stat so a
+// tiny sample can't "win" with 0. Mirrors MilestoneIQ.jsx LOW_RECORD_DEFS / lowCountingRecordsFrom.
+export const LOW_RECORD_DEFS = {
+  baseball: [{ stat: "Earned Runs", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40 }],
+  softball: [{ stat: "Earned Runs", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40 }],
+};
+export function isLowRecordStat(sport, stat) { return (LOW_RECORD_DEFS[sport] || []).some(d => d.stat === stat); }
+// Fewest-value records (career + single-season) for the lower-is-better counting stats, gated by volume.
+export function lowCountingRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
+  const out = [];
+  for (const d of (LOW_RECORD_DEFS[sport] || [])) {
+    const mn = minsFor({ name: d.stat, minSeason: d.minSeason, minCareer: d.minCareer }, recordMins);
+    let ss = null;
+    for (const r of (seasonRows || [])) {
+      if ((Number(r.stats?.[d.qualStat]) || 0) < mn.season) continue;
+      const v = Number(r.stats?.[d.stat]); if (isNaN(v)) continue;
+      if (!ss || v < ss.value) ss = { value: v, holderName: r.player_name, holderYear: r.season || "" };
+    }
+    if (ss) out.push({ id: `auto-low-ss-${d.stat}`, statName: d.stat, variant: "Single season", sport, auto: true, lowerBetter: true, ...ss });
+    let car = null;
+    for (const pl of (careerPlayers || [])) {
+      if ((Number(pl.stats?.[d.qualStat]) || 0) < mn.career) continue;
+      const v = Number(pl.stats?.[d.stat]); if (isNaN(v)) continue;
+      if (!car || v < car.value) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+    }
+    if (car) out.push({ id: `auto-low-c-${d.stat}`, statName: d.stat, variant: "Career total", sport, auto: true, lowerBetter: true, ...car });
+  }
+  return out;
+}
 // Auto record-holders for the rate stats (career + single-season), gated by minimum volume.
 export function pctRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
   const out = [];
@@ -436,6 +465,7 @@ export function longestRecordsFrom(seasonRows, sport) {
 export function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
   const out = [];
   for (const stat of (statNames || [])) {
+    if (isLowRecordStat(sport, stat)) continue; // shown as a "fewest" record by lowCountingRecordsFrom instead
     let mc = 0;
     for (const p of (careerPlayers || [])) { const v = Number(p.stats?.[stat]); if (v > mc) mc = v; }
     if (mc > 0) {
