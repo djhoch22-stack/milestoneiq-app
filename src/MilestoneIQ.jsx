@@ -5396,9 +5396,13 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
   const sportContexts = (crossSport && allScores && allScores.length > 1)
     ? allScores.map(a => ({ school: a.school, player: a.player }))
     : [{ school, player }];
-  // Multi-sport athletes: a toggle to switch which sport's stats show (defaults to the top-scoring sport).
+  // Multi-sport athletes: ONE toggle scopes EVERY section (stats, honors, records, team success) to a single
+  // sport — so on basketball you see only her basketball accomplishments. Defaults to the top-scoring sport.
   const [viewSportId, setViewSportId] = useState(null);
-  const effSportId = viewSportId || sportContexts[0]?.school.id;
+  const isMulti = crossSport && sportContexts.length > 1;
+  const effSportId = (isMulti && viewSportId) ? viewSportId : sportContexts[0]?.school.id;
+  const effSport = sportContexts.find(c => c.school.id === effSportId)?.school.sport;
+  const shownContexts = isMulti ? sportContexts.filter(c => c.school.id === effSportId) : sportContexts;
   const buildStatBreakdown = (pl, rost) => Object.entries(pl.stats || {})
     .filter(([stat]) => HOF_STAT_WEIGHTS[stat] > 0)
     .map(([stat, val]) => {
@@ -5516,7 +5520,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
           {/* Stat rankings — per sport when multi-sport; toggle switches which sport's stats show */}
           <div style={{ marginBottom:20 }}>
             <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>Statistical rank</div>
-            {crossSport && sportContexts.length > 1 && (
+            {isMulti && (
               <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
                 {sportContexts.map(({ school: s }) => (
                   <button key={s.id} onClick={() => setViewSportId(s.id)}
@@ -5526,12 +5530,12 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
                 ))}
               </div>
             )}
-            {sportContexts.filter(c => !(crossSport && sportContexts.length > 1) || c.school.id === effSportId).map(({ school: s, player: pl }) => {
+            {shownContexts.map(({ school: s, player: pl }) => {
               const rows = buildStatBreakdown(pl, s.allTimeRoster || []);
               if (!rows.length) return null;
               return (
                 <div key={s.id} style={{ marginBottom: sportContexts.length > 1 ? 12 : 0 }}>
-                  {sportContexts.length > 1 && (
+                  {shownContexts.length > 1 && (
                     <div style={{ fontSize:12, fontWeight:700, color:"#6b7280", margin:"0 0 6px", display:"flex", alignItems:"center", gap:6 }}>
                       <span style={{ fontSize:14 }}>{SPORTS[s.sport]?.icon}</span> {SPORTS[s.sport]?.label || s.sport}
                     </div>
@@ -5576,9 +5580,17 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
           {/* Honors (all-league / all-state) */}
           {(() => {
             const playerNames = (school.allTimeRoster || []).map(p => p.name);
-            const honors = awardsForHolder(player.name, "player", awards, playerNames);
+            // Pull the player's awards from EVERY sport they played (each context's program carries its own
+            // awards), tag each with its sport, dedupe, then scope to the toggled sport so honors match the rest.
+            const seenAw = new Set();
+            const awSource = [
+              ...sportContexts.flatMap(c => (c.school.awards || []).map(a => ({ ...a, _sport: c.school.sport }))),
+              ...(awards || []).map(a => ({ ...a, _sport: a._sport || school.sport })),
+            ].filter(a => { if (seenAw.has(a.id)) return false; seenAw.add(a.id); return true; });
+            const honors0 = awardsForHolder(player.name, "player", awSource, playerNames);
+            const honors = isMulti ? honors0.filter(a => a._sport === effSport) : honors0;
             if (!honors.length) return null;
-            const bonus = playerAwardBonus(player.name, awards, playerNames);
+            const bonus = honors.reduce((s, a) => s + (AWARD_POINTS[a.kind] || 2), 0);
             return (
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:8 }}>
@@ -5597,7 +5609,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
 
           {/* Records held — per sport when multi-sport */}
           {(() => {
-            const blocks = sportContexts
+            const blocks = shownContexts
               .map(({ school: s, player: pl }) => ({ s, recs: playerHeldRecords(s, pl) }))
               .filter(b => b.recs.length);
             if (!blocks.length) return null;
@@ -5632,7 +5644,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
 
           {/* Team success seasons — per sport when multi-sport, so each sport is differentiated */}
           {(() => {
-            const blocks = sportContexts
+            const blocks = shownContexts
               .map(({ school: s, player: pl }) => ({
                 s,
                 secs: (s.seasons || []).filter(season => playerSeasonOverlap(pl, season) && getSeasonSuccessScore(season.notes) > 0)
