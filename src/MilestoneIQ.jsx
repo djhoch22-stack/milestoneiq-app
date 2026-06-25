@@ -3640,7 +3640,8 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
         <span style={{fontSize:13,color:"#9ca3af",whiteSpace:"nowrap"}}>{filtered.length} players</span>
       </div>
       <div style={{background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+        <table style={{width:"100%",minWidth:480,borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
               <th style={{padding:"10px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:"#6b7280",borderBottom:"1px solid #e5e7eb",width:36}}>#</th>
@@ -3686,6 +3687,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
             })}
           </tbody>
         </table>
+        </div>
         {filtered.length > PAGE_SIZE && (
           <div style={{padding:"10px 16px",borderTop:"1px solid #f3f0ea",background:"#fafaf8",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0}
