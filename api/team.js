@@ -174,7 +174,7 @@ export default async function handler(req, res) {
   // A player's honors/awards (this program) → label strings with year, shown on their profile card.
   const honorsArr = (name) => awardsForHolder(name, "player", awards).map((a) => awardLabel(a) + (a.season ? " (" + a.season + ")" : ""));
   // Team success during a player's career: seasons (with scoring notes) overlapping their active years.
-  const tsFor = (fy, ly, gy) => { const yrs = activeYears(fy, ly, gy); return seasonsList.filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0).map((se) => ({ ssn: se.season, note: se.notes, pts: seasonSuccessScore(se.notes) })); };
+  const tsFor = (fy, ly, gy) => { const yrs = activeYears(fy, ly, gy); return seasonsList.filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0).sort((a, b) => String(b.season).localeCompare(String(a.season))).map((se) => ({ ssn: se.season, note: se.notes, pts: seasonSuccessScore(se.notes) })); };
   const profiles = {};
   careerPool.forEach((p) => {
     const k = normName(p.name); const ath = athByName[k];
@@ -457,7 +457,7 @@ export default async function handler(req, res) {
   const recRowsHtml = (recs, emoji) => recs.length ? `<h3 style="margin:18px 0 8px;font-size:14px">School records held</h3><div>${recs.map((r) => `<div style="font-size:13px;color:#374151;padding:3px 0">${emoji} <b>${esc(r.n)}</b> ${r.v ? `<span style="color:#9ca3af">(${esc(r.v)})</span> ` : ""}— ${esc(String(r.val))}</div>`).join("")}</div>` : "";
   const tsRowsHtml = (seasons, row, emoji) => {
     const yrs = activeYears(row.first_year, row.last_year, row.grad_year);
-    const secs = (seasons || []).filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0);
+    const secs = (seasons || []).filter((se) => yrs.includes(seasonEndYear(se.season)) && seasonSuccessScore(se.notes) > 0).sort((a, b) => String(b.season).localeCompare(String(a.season)));
     if (!secs.length) return "";
     return `<h3 style="margin:18px 0 8px;font-size:14px">Team success during career</h3><div style="display:flex;flex-direction:column;gap:5px">${secs.map((se) => `<div style="display:flex;justify-content:space-between;gap:10px;background:#f9fafb;border-radius:8px;padding:7px 12px;font-size:13px"><span style="font-weight:600;color:#111;white-space:nowrap">${emoji} ${esc(se.season)}</span><span style="color:#6b7280;flex:1">${esc(se.notes)}</span></div>`).join("")}</div>`;
   };
