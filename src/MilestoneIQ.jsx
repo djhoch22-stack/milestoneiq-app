@@ -4359,11 +4359,41 @@ function playerSeasonOverlap(player, season) {
   return playerYrs.includes(endYr);
 }
 
-// Core HOF score for one player in one program (0–100 raw)
-function calcProgramHofScore(player, school) {
+// Precompute per-program lookups used by HOF scoring (rank-by-stat + record bonus) ONCE, so scoring 300+
+// players doesn't re-filter/re-sort the whole roster for every player×stat (the HOF tab's O(n²) bottleneck).
+function buildHofCtx(school) {
+  const roster = (school && school.allTimeRoster) || [];
+  const rankByStat = {};   // stat -> Map(playerId -> 1-based rank among roster)
+  const totalByStat = {};  // stat -> # of players with that stat > 0
+  for (const stat in HOF_STAT_WEIGHTS) {
+    const sorted = roster
+      .filter(p => (((p.stats && p.stats[stat]) || 0) > 0))
+      .sort((a, b) => (((b.stats && b.stats[stat]) || 0) - ((a.stats && a.stats[stat]) || 0)));
+    if (!sorted.length) continue;
+    const m = new Map();
+    for (let i = 0; i < sorted.length; i++) m.set(sorted[i].id, i + 1);
+    rankByStat[stat] = m;
+    totalByStat[stat] = sorted.length;
+  }
+  // Record-holder bonus per (lowercased) holder name: +5 career record, +3 single-season.
+  const recordBonusByName = new Map();
+  for (const rec of (school.records || [])) {
+    const holderLower = (rec.holderName || "").toLowerCase().trim();
+    if (!holderLower || holderLower === "multiple players") continue;
+    if (TEAM_STATS.has(rec.statName)) continue; // team records (e.g. Wins) aren't individual achievements
+    const add = (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
+    recordBonusByName.set(holderLower, (recordBonusByName.get(holderLower) || 0) + add);
+  }
+  return { rankByStat, totalByStat, recordBonusByName };
+}
+
+// Core HOF score for one player in one program (0–100 raw). Hot callers pass a precomputed `ctx`
+// (buildHofCtx); if omitted it's built on the fly so the function still works standalone.
+function calcProgramHofScore(player, school, ctx) {
   if (!player || !school) return 0;
   const roster = school.allTimeRoster || [];
   if (!roster.length) return 0;
+  if (!ctx) ctx = buildHofCtx(school);
 
   const stats = player.stats || {};
   let statScore = 0;
@@ -4375,13 +4405,12 @@ function calcProgramHofScore(player, school) {
     if (!weight || !val) return;
     totalWeight += weight;
 
-    // Rank among all roster players with this stat
-    const sorted = roster
-      .filter(p => (p.stats[stat] || 0) > 0)
-      .sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
-    const rank = sorted.findIndex(p => p.id === player.id) + 1;
-    const total = sorted.length;
-    if (!rank || !total) return;
+    // Rank among all roster players with this stat (looked up from the precomputed map)
+    const rankMap = ctx.rankByStat[stat];
+    const total = ctx.totalByStat[stat];
+    if (!rankMap || !total) return;
+    const rank = rankMap.get(player.id);
+    if (!rank) return;
 
     // Score: #1 = 100%, #2 = 85%, #3 = 70%, top 10% = 50%, top 25% = 30%, else 10%
     let rankPct;
@@ -4415,20 +4444,8 @@ function calcProgramHofScore(player, school) {
   const teamSuccessNorm = Math.min(teamScore / 3, 30);
   const teamNorm = teamSuccessNorm * (0.2 + 0.8 * impact);
 
-  // Record-holder bonus: +5 per career record held, +3 per single-season record
-  const records = school.records || [];
-  const playerNameLower = (player.name || "").toLowerCase().trim();
-  let recordBonus = 0;
-  records.forEach(rec => {
-    const holderLower = (rec.holderName || "").toLowerCase().trim();
-    if (!holderLower || holderLower === "multiple players") return;
-    if (TEAM_STATS.has(rec.statName)) return; // team records (e.g. Wins) aren't individual achievements
-    if (holderLower === playerNameLower) {
-      recordBonus += (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
-    }
-  });
-  // Cap record bonus at 20 points
-  const recordNorm = Math.min(recordBonus, 20);
+  // Record-holder bonus (precomputed in ctx): +5 per career record, +3 per single-season, capped at 20
+  const recordNorm = Math.min(ctx.recordBonusByName.get((player.name || "").toLowerCase().trim()) || 0, 20);
 
   const raw = statNorm + teamNorm + recordNorm;
   return Math.min(Math.round(raw), 100);
@@ -4468,7 +4485,7 @@ function sportsLinkable(a, b) {
   const ga = sportGender(a), gb = sportGender(b);
   return ga === "X" || gb === "X" || ga === gb;
 }
-function calcCrossSportScore(playerName, allSchools, homeSport) {
+function calcCrossSportScore(playerName, allSchools, homeSport, ctxById) {
   const norm = (n) => String(n || "").toLowerCase().replace(/\s+/g, " ").trim();
   const nameLower = norm(playerName);
   const programScores = [];
@@ -4484,7 +4501,7 @@ function calcCrossSportScore(playerName, allSchools, homeSport) {
       if (fuzzy.length === 1) match = fuzzy[0];
     }
     if (match) {
-      const score = calcProgramHofScore(match, school);
+      const score = calcProgramHofScore(match, school, ctxById && ctxById.get(school.id));
       if (score > 0) programScores.push({ school, player: match, score });
     }
   });
@@ -5109,36 +5126,46 @@ function HallOfFameTab({ school, allSchools, allSeasonRows = [], onUpdate }) {
   const roster = school.allTimeRoster || [];
   const hasSeasons = (school.seasons || []).length > 0;
   // A player inducted (school OR state HOF) for ANY program is recognized as a HOF member across
-  // ALL their sports (mirrors coach cross-sport induction). Name-matched case-insensitively.
-  const hofSchoolNames = new Set();
-  const hofStateNames = new Set();
-  const hofYearByName = {}; // induction year per inducted name from ANY gender-compatible program → editable from any sport
-  ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
-    if (!sportsLinkable(school.sport, p.sport)) return; // gender-gate cross-sport HOF recognition (football bridges)
-    (p.allTimeRoster || []).forEach(pl => {
-      const nm = normName(pl.name);
-      if (pl.schoolHallOfFame) hofSchoolNames.add(nm);
-      if (pl.stateHallOfFame) hofStateNames.add(nm);
-      if ((pl.schoolHallOfFame || pl.stateHallOfFame) && pl.hofYear && hofYearByName[nm] == null) hofYearByName[nm] = pl.hofYear;
+  // ALL their sports (mirrors coach cross-sport induction). Memoized so the Sets aren't rebuilt every render.
+  const { hofSchoolNames, hofStateNames, hofYearByName } = useMemo(() => {
+    const hofSchoolNames = new Set();
+    const hofStateNames = new Set();
+    const hofYearByName = {}; // induction year per inducted name from ANY gender-compatible program
+    ((allSchools && allSchools.length ? allSchools : [school])).forEach(p => {
+      if (!sportsLinkable(school.sport, p.sport)) return; // gender-gate cross-sport HOF recognition (football bridges)
+      (p.allTimeRoster || []).forEach(pl => {
+        const nm = normName(pl.name);
+        if (pl.schoolHallOfFame) hofSchoolNames.add(nm);
+        if (pl.stateHallOfFame) hofStateNames.add(nm);
+        if ((pl.schoolHallOfFame || pl.stateHallOfFame) && pl.hofYear && hofYearByName[nm] == null) hofYearByName[nm] = pl.hofYear;
+      });
     });
-  });
+    return { hofSchoolNames, hofStateNames, hofYearByName };
+  }, [allSchools, school.sport, school.allTimeRoster]);
 
-  // Build scored athletes list — memoized so it only recalculates when roster changes
+  // Build scored athletes list — memoized; per-program lookups (rank maps + record bonus) are precomputed
+  // ONCE per program (buildHofCtx) so we don't re-sort the whole roster for every player.
   const hofPlayerNames = (roster || []).map(p => p.name);
-  const scored = useMemo(() => roster.map(player => {
-    try {
-      const ab = playerAwardBonus(player.name, awards, hofPlayerNames);
-      const programScore = Math.min(calcProgramHofScore(player, school) + ab, 100);
-      const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools, school.sport) : null;
-      const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
-      const nm = normName(player.name);
-      const xState = hofStateNames.has(nm);
-      const confirmed = hofSchoolNames.has(nm) || xState; // inducted in ANY of their sports
-      return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed, xState };
-    } catch(e) {
-      return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false, xState: false };
-    }
-  }), [school.id, school.allTimeRoster, school.seasons, school.records, allSchools, hofScope, awards]); // eslint-disable-line
+  const scored = useMemo(() => {
+    const ctxById = new Map();
+    const ctxFor = (sc) => { let c = ctxById.get(sc.id); if (!c) { c = buildHofCtx(sc); ctxById.set(sc.id, c); } return c; };
+    ((allSchools && allSchools.length ? allSchools : [school])).forEach(ctxFor);
+    const homeCtx = ctxFor(school);
+    return roster.map(player => {
+      try {
+        const ab = playerAwardBonus(player.name, awards, hofPlayerNames);
+        const programScore = Math.min(calcProgramHofScore(player, school, homeCtx) + ab, 100);
+        const crossResult = (hofScope === "multi" && allSchools.length > 1) ? calcCrossSportScore(player.name, allSchools, school.sport, ctxById) : null;
+        const finalScore = crossResult ? Math.min(crossResult.finalScore + ab, 100) : programScore;
+        const nm = normName(player.name);
+        const xState = hofStateNames.has(nm);
+        const confirmed = hofSchoolNames.has(nm) || xState; // inducted in ANY of their sports
+        return { player, programScore, crossSport: crossResult?.crossSport || false, allScores: crossResult?.allScores || [], finalScore, confirmed, xState };
+      } catch(e) {
+        return { player, programScore: 0, crossSport: false, allScores: [], finalScore: 0, confirmed: false, xState: false };
+      }
+    });
+  }, [school.id, school.allTimeRoster, school.seasons, school.records, school.sport, allSchools, hofScope, awards, hofSchoolNames, hofStateNames]); // eslint-disable-line
 
   const filtered = scored
     .filter(r => {
@@ -6824,13 +6851,16 @@ function AllSportsHof({ schools = [], onUpdate }) {
   // ATHLETES: score each roster entry in scope, dedupe multi-sport athletes to their best score.
   const players = useMemo(() => {
     const byName = new Map();
+    const ctxById = new Map();
+    const ctxFor = (sc) => { let c = ctxById.get(sc.id); if (!c) { c = buildHofCtx(sc); ctxById.set(sc.id, c); } return c; };
+    (schools || []).forEach(ctxFor);
     for (const p of scoped) {
       const names = (p.allTimeRoster || []).map(x => x.name);
       for (const player of (p.allTimeRoster || [])) {
         try {
           const ab = playerAwardBonus(player.name, mergedAwards, names);
-          const programScore = Math.min(calcProgramHofScore(player, p) + ab, 100);
-          const cross = (schools.length > 1) ? calcCrossSportScore(player.name, schools, p.sport) : null;
+          const programScore = Math.min(calcProgramHofScore(player, p, ctxFor(p)) + ab, 100);
+          const cross = (schools.length > 1) ? calcCrossSportScore(player.name, schools, p.sport, ctxById) : null;
           const finalScore = cross ? Math.min(cross.finalScore + ab, 100) : programScore;
           const nm = normName(player.name);
           const ind = inducted.get(nm);
