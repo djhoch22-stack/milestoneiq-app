@@ -2587,7 +2587,7 @@ const SEASON_STAT_MAP = {
   "Steals": "Steals", "Blocks": "Blocks", "FGM": "Field Goals Made", "FGA": "Field Goals Attempted",
   "3pFGM": "Three Pointers Made", "3pFGA": "Three Pointers Attempted", "FTM": "Free Throws Made", "FTA": "Free Throws Attempted",
   // Volleyball (sheet short-names → canonical; "Points" is sport-specific, handled below)
-  "Sets": "Sets Played", "Attacks": "Attack Attempts", "Serving Aces": "Aces", "Serves": "Total Serves",
+  "Matches": "Matches Played", "Sets": "Sets Played", "Attacks": "Attack Attempts", "Serving Aces": "Aces", "Serves": "Total Serves",
 };
 // Sport-specific sheet-name overrides (win when present) — resolve cross-sport collisions like
 // volleyball "Points" (= Service Points) vs basketball "Points".
@@ -2651,13 +2651,15 @@ function parseSeasonsWorkbook(XLSX, buf, sport) {
   const sportMap = SEASON_STAT_MAP_BY_SPORT[sport] || {};
   for (const sheetName of wb.SheetNames) {
     const raw = String(sheetName).trim();
-    // Sport override first (volleyball "Points"→Service Points), then the short-name map (Games→Games
-    // Played…), else accept a full canonical category name so templates round-trip on re-upload.
-    const stat = sportMap[raw] || SEASON_STAT_MAP[raw] || (ALL_DISPLAY_STATS.has(raw) ? raw : null);
-    if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, blankrows: false });
     if (!grid.length) continue;
     const header = grid[0] || [];
+    // Resolve the stat from the SHEET NAME first (short-name map / sport override), then fall back to the
+    // A1 cell — which holds the full canonical name (e.g. "Matches Played") — so a tab whose short name
+    // isn't in the map still imports instead of being silently dropped.
+    const resolveStat = (k) => sportMap[k] || SEASON_STAT_MAP[k] || (ALL_DISPLAY_STATS.has(k) ? k : null);
+    const stat = resolveStat(raw) || resolveStat(String(header[0] || "").trim());
+    if (!stat) continue; // skip unmapped sheets (e.g. "Seasons")
     const seasonCols = [];
     for (let c = 1; c < header.length; c++) {
       const h = String(header[c] || "").trim();
