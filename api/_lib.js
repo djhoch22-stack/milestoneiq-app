@@ -658,7 +658,8 @@ export function coachAwardBonus(name, awards) {
 }
 export function awardsForHolder(name, scope, awards) {
   const n = normName(name);
-  return (awards || []).filter((a) => a.scope === scope && normName(a.holder_name) === n);
+  return (awards || []).filter((a) => a.scope === scope && normName(a.holder_name) === n)
+    .sort((a, b) => String(b.season || "").localeCompare(String(a.season || ""))); // newest-first (chronological), matches season/title lists
 }
 export function awardLabel(a) {
   if (a.kind === "coach_of_year") return (a.level === "state" ? "State" : "League") + " Coach of the Year";
