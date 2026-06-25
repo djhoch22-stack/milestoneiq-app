@@ -6876,9 +6876,8 @@ function AllSportsHof({ schools = [], onUpdate }) {
       }
     }
     let arr = [...byName.values()];
-    if (search) arr = arr.filter(e => e.player.name.toLowerCase().includes(search.toLowerCase()));
     return arr.sort((a, b) => b.finalScore - a.finalScore);
-  }, [scoped, mergedAwards, schools, inducted, search]); // eslint-disable-line
+  }, [scoped, mergedAwards, schools, inducted]); // search filter applied at baseList (cheap) so typing doesn't re-score everyone // eslint-disable-line
 
   // COACHES: aggregate each coach's record across all in-scope programs (cross-sport), then rank.
   const coaches = useMemo(() => {
@@ -6893,9 +6892,8 @@ function AllSportsHof({ schools = [], onUpdate }) {
       const coyCount = awardsForHolder(coach.name, "coach", mergedAwards, names).length;
       return { ...coach, score: Math.min(calcCoachHofScore(coach, all) + ab, 100), coyCount, confirmed: inductedC.has(normName(coach.name)) };
     });
-    if (search) arr = arr.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
     return { list: arr.sort((a, b) => b.score - a.score), combined };
-  }, [scoped, mergedAwards, schools, search, includePrior]); // eslint-disable-line
+  }, [scoped, mergedAwards, schools, includePrior]); // search filter applied at baseList (cheap) // eslint-disable-line
 
   const coachAwardsBySport = useMemo(() => {
     const m = {};
@@ -6934,7 +6932,11 @@ function AllSportsHof({ schools = [], onUpdate }) {
     }
   };
 
-  const baseList = view === "athletes" ? players : coaches.list;
+  // Search filtering happens HERE (cheap) — not inside the players/coaches memos — so typing a name
+  // doesn't re-score every athlete/coach across every program on each keystroke.
+  const q = search.trim().toLowerCase();
+  const rawList = view === "athletes" ? players : coaches.list;
+  const baseList = q ? rawList.filter(x => (((view === "athletes" ? (x.player && x.player.name) : x.name)) || "").toLowerCase().includes(q)) : rawList;
   const confCount = baseList.filter(x => x.confirmed).length;
   // Confirmed filter: by default hide already-inducted HOF members (the ranking is for *candidates*);
   // "all" shows everyone, "inducted" shows only confirmed members.
