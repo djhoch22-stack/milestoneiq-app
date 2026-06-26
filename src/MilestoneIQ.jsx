@@ -647,6 +647,7 @@ const RATE_FMT = {
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
   "Completion Percentage": "pct",
+  "Yards per Rush": "per1", "Yards per Pass": "per1", "Yards per Reception": "per1",
   "Kill Percentage": "pct",
   "Kills Per Set": "perSet", "Assists Per Set": "perSet", "Aces Per Set": "perSet", "Digs Per Set": "perSet", "Blocks Per Set": "perSet", "Receptions Per Set": "perSet",
   "Serve Percentage": "pct",
@@ -658,6 +659,7 @@ function fmtRateVal(fmt, v) {
   if (fmt === "pct") return v + "%";
   if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
   if (fmt === "perSet") return Number(v).toFixed(2); // 3.52 kills/set
+  if (fmt === "per1") return Number(v).toFixed(1); // 5.2 yards per carry/attempt/reception
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305  (1.000+ keeps its leading digit)
 }
@@ -738,6 +740,15 @@ const FOOTBALL_RATE_DEFS = [
   { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200,
     calc: (g) => { const a = g("Passing Attempts"); return a > 0 ? Math.round((g("Completions") / a) * 1000) / 10 : null; },
     note: (g) => `${g("Passing Attempts").toLocaleString()} att` },
+  { name: "Yards per Rush", short: "YPC", after: "Rushing Yards", fmt: "per1", qualStat: "Rushes", minSeason: 40, minCareer: 100,
+    calc: (g) => { const r = g("Rushes"); return r > 0 ? g("Rushing Yards") / r : null; },
+    note: (g) => `${g("Rushes").toLocaleString()} rush` },
+  { name: "Yards per Pass", short: "YPA", after: "Passing Yards", fmt: "per1", qualStat: "Passing Attempts", minSeason: 40, minCareer: 100,
+    calc: (g) => { const a = g("Passing Attempts"); return a > 0 ? g("Passing Yards") / a : null; },
+    note: (g) => `${g("Passing Attempts").toLocaleString()} att` },
+  { name: "Yards per Reception", short: "YPR", after: "Receiving Yards", fmt: "per1", qualStat: "Receptions", minSeason: 12, minCareer: 30,
+    calc: (g) => { const r = g("Receptions"); return r > 0 ? g("Receiving Yards") / r : null; },
+    note: (g) => `${g("Receptions").toLocaleString()} rec` },
 ];
 function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
