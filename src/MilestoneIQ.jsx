@@ -223,13 +223,13 @@ const SPORTS = {
   },
   baseball: {
     label: "Baseball", icon: "⚾",
-    groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: STAT_VARIANTS_STANDARD })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   softball: {
     label: "Softball", icon: "🥎",
     // Softball is IDENTICAL to baseball — same stats, order, groups, derived rates, and import.
-    groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    groups: BASEBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: STAT_VARIANTS_STANDARD })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   flag_football_girls: {
@@ -257,14 +257,14 @@ const SPORTS = {
   },
   volleyball_girls: {
     label: "Girls Volleyball", icon: "🏐",
-    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: STAT_VARIANTS_STANDARD })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   volleyball: {
     label: "Boys Volleyball", icon: "🏐",
     // Boys volleyball — identical to girls volleyball (same stats/order/groups/rates/import). Bare
     // "volleyball" is the boys side, mirroring how bare soccer/basketball are the boys versions.
-    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: ["Career total", "Single season"] })) })),
+    groups: VBALL_GROUPS.map(g => ({ group: g.group, stats: g.names.map(name => ({ name, variants: STAT_VARIANTS_STANDARD })) })),
     get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   // ── Coming soon: not in AVAILABLE_SPORTS, so the add-program picker shows them disabled as "Coming soon".
