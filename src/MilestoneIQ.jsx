@@ -3496,7 +3496,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   // Derived rates (AVG/OBP/SLG/OPS/FLD% · FG%/3P%/FT%) rank too — each listed right after its
   // anchor stat. Rate leaderboards only count QUALIFIED careers (same minimums as the records).
   const RATE_DEFS = rateDefsFor(school?.sport);
-  const SORT_OPTIONS = ALL_STATS.flatMap(s => [s, ...RATE_DEFS.filter(d => d.after === s).map(d => d.name)]);
+  const SORT_OPTIONS = ALL_STATS.filter(s => !RATE_DEFS.some(d => d.name === s)); // percentages/rates excluded from the All-Time stat picker (they live on the Records tab)
 
   const defaultStat = ALL_STATS.find(s => s === "Points") || ALL_STATS.find(s => s === "Completions") || ALL_STATS.find(s => s === "Rushing Yards") || ALL_STATS[0] || "Points";
   const [sortStat, setSortStat] = useState(defaultStat);
