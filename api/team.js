@@ -259,7 +259,7 @@ export default async function handler(req, res) {
       return `<tr data-p="${esc(normName(p.name))}"><td class="rank">${i + 1}</td><td><b>${esc(p.name)}</b> ${bd}${p.isCurrent ? '<span class="badge active">Active</span>' : ""}${yearsStr(p) ? `<div style="font-size:11px;color:#9ca3af">${yearsStr(p)}</div>` : ""}</td><td class="num"><b>${v.toLocaleString()}</b></td><td><div style="height:6px;background:#f0f0ee;border-radius:3px"><div style="width:${bar}%;height:100%;background:${p.isCurrent ? "#1a56db" : "#94a3b8"};border-radius:3px"></div></div></td></tr>`;
     }).join("");
     // Sort options: each derived rate (AVG/OBP/… · FG%/…) right after its anchor counting stat.
-    const sortOpts = base.flatMap((s) => [s, ...rateDefsFor(team.sport).filter((d) => d.after === s).map((d) => d.name)]);
+    const sortOpts = base.filter((s) => !rateDefsFor(team.sport).some((d) => d.name === s)); // percentages/rates excluded from the All-Time stat picker (they live on the Records tab)
     const opts = sortOpts.map((s) => `<option value="${esc(s)}"${s === lead ? " selected" : ""}>${esc(s)}</option>`).join("");
     alltimeSection =
       `<div class="ctrls">
