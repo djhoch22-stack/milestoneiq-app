@@ -167,10 +167,20 @@ export const deleteAthlete = async (athleteId) => {
 // always reflect the current Hits/2B/3B/HR). Applied to every stats object as it loads — works on a
 // season line or a career total since the formula is linear. Other sports pass through unchanged.
 export function withDerivedStats(stats, sport) {
-  if (!stats || (sport !== "baseball" && sport !== "softball")) return stats || {};
-  if (stats["Hits"] == null) return stats; // no batting line (e.g. a pitcher-only row) → nothing to derive
-  const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
-  return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
+  if (!stats) return {};
+  if (sport === "baseball" || sport === "softball") {
+    if (stats["Hits"] == null) return stats; // no batting line (e.g. a pitcher-only row) → nothing to derive
+    const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
+    return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
+  }
+  if (sport === "football") {
+    // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
+    // Derived so it never goes stale when a component (e.g. Rushing Yards) is edited.
+    if (stats["Rushing Yards"] == null && stats["Receiving Yards"] == null) return stats;
+    const rush = Number(stats["Rushing Yards"]) || 0, rec = Number(stats["Receiving Yards"]) || 0;
+    return { ...stats, "Total Yards": rush + rec };
+  }
+  return stats;
 }
 
 // ── All-time roster helpers ───────────────────────────────────────────────────
