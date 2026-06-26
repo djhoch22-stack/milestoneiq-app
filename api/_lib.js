@@ -174,6 +174,7 @@ export const RATE_FMT = {
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
   "Completion Percentage": "pct",
+  "Yards per Rush": "per1", "Yards per Pass": "per1", "Yards per Reception": "per1",
   "Kill Percentage": "pct",
   "Kills Per Set": "perSet", "Assists Per Set": "perSet", "Aces Per Set": "perSet", "Digs Per Set": "perSet", "Blocks Per Set": "perSet", "Receptions Per Set": "perSet",
   "Serve Percentage": "pct",
@@ -184,6 +185,7 @@ export function fmtRateVal(fmt, v) {
   if (fmt === "pct") return v + "%";
   if (fmt === "era2") return Number(v).toFixed(2); // 4.20 / 0.62 — ERA keeps its leading digit
   if (fmt === "perSet") return Number(v).toFixed(2); // 3.52 kills/set
+  if (fmt === "per1") return Number(v).toFixed(1); // 5.2 yards per carry/attempt/reception
   const s = Number(v).toFixed(3);
   return s.charAt(0) === "0" ? s.slice(1) : s; // .305 (1.000+ keeps its leading digit)
 }
@@ -265,6 +267,12 @@ const VBALL_RATE_DEFS = [
 const FOOTBALL_RATE_DEFS = [
   { name: "Completion Percentage", short: "COMP%", after: "Passing Attempts", fmt: "pct", qualStat: "Passing Attempts", minSeason: 75, minCareer: 200, noteAbbr: "att",
     spec: { kind: "pct", made: "Completions", att: "Passing Attempts" } },
+  { name: "Yards per Rush", short: "YPC", after: "Rushing Yards", fmt: "per1", qualStat: "Rushes", minSeason: 40, minCareer: 100, noteAbbr: "rush",
+    spec: { kind: "ratio", num: [["Rushing Yards", 1]], den: [["Rushes", 1]] } },
+  { name: "Yards per Pass", short: "YPA", after: "Passing Yards", fmt: "per1", qualStat: "Passing Attempts", minSeason: 40, minCareer: 100, noteAbbr: "att",
+    spec: { kind: "ratio", num: [["Passing Yards", 1]], den: [["Passing Attempts", 1]] } },
+  { name: "Yards per Reception", short: "YPR", after: "Receiving Yards", fmt: "per1", qualStat: "Receptions", minSeason: 12, minCareer: 30, noteAbbr: "rec",
+    spec: { kind: "ratio", num: [["Receiving Yards", 1]], den: [["Receptions", 1]] } },
 ];
 // ── Record categorization (mirrors the in-app sport.groups; names only) ──────
 // Lets the public Records section group by category (Passing/Rushing/…) like the app.
