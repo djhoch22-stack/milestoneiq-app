@@ -1310,6 +1310,53 @@ function RecordMinimumsModal({ school, onClose, onSave }) {
 }
 
 // ── Records Manager Modal ──────────────────────────────────────────────────────
+// ── New-coach getting-started checklist (Overview tab) ─────────────────────────
+// Each step auto-checks from the program's own data; clicking a step deep-links to
+// its tab. Dismissable per browser (localStorage); turns green when complete.
+function GettingStarted({ school, setActiveTab }) {
+  const key = "mq_getstarted_hidden_" + (school.id || "");
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch (e) { return false; } });
+  if (hidden) return null;
+  const items = [
+    { label: "Add your season history", done: (school.seasons || []).length > 0, tab: "seasons", hint: "Do this first — your team's W-L then auto-fills each player's wins when you import stats" },
+    { label: "Add your players & career stats", done: ((school.allTimeRoster || []).length + (school.athletes || []).length) > 0, tab: "all-time", hint: "Import a roster (Excel · CSV · photo) or add players one by one" },
+    { label: "Set your program records", done: (school.records || []).length > 0, tab: "records", hint: "Your all-time record book — the numbers athletes chase" },
+    { label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", hint: "All-league, all-state, player & coach of the year" },
+  ];
+  const done = items.filter((i) => i.done).length, total = items.length, allDone = done === total;
+  const hide = () => { try { localStorage.setItem(key, "1"); } catch (e) {} setHidden(true); };
+  return (
+    <div style={{ background: allDone ? "#f0fdf4" : "#eff6ff", border: "1px solid " + (allDone ? "#bbf7d0" : "#bfdbfe"), borderRadius: 12, padding: 16, marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{allDone ? "🎉 You're all set up" : "👋 Getting started"}</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{allDone ? "Your program is fully loaded — you can hide this." : "A few steps to bring your program to life."}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: allDone ? "#166534" : "#1a56db" }}>{done}/{total}</span>
+          <button onClick={hide} title="Hide" aria-label="Hide getting started" style={{ background: "none", border: "none", color: "#9ca3af", fontSize: 18, lineHeight: 1, cursor: "pointer", padding: 0 }}>✕</button>
+        </div>
+      </div>
+      <div style={{ height: 6, background: "#e5e7eb", borderRadius: 4, overflow: "hidden", marginBottom: 12 }}>
+        <div style={{ height: "100%", width: (total ? (done / total) * 100 : 0) + "%", background: allDone ? "#22c55e" : "#1a56db", transition: "width .3s" }} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((it) => (
+          <button key={it.label} onClick={() => setActiveTab(it.tab)}
+            style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", background: "#fff", border: "1px solid #e8e4dd", borderRadius: 8, padding: "10px 12px", cursor: "pointer", width: "100%" }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>{it.done ? "✅" : "⬜"}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: it.done ? "#9ca3af" : "#111", textDecoration: it.done ? "line-through" : "none" }}>{it.label}</span>
+              {!it.done && <span style={{ display: "block", fontSize: 12, color: "#6b7280", marginTop: 1 }}>{it.hint}</span>}
+            </span>
+            {!it.done && <span style={{ fontSize: 13, color: "#1a56db", fontWeight: 600, flexShrink: 0 }}>Set up →</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RecordsModal({ school, onClose, onSave }) {
   const sportDef = SPORTS[school.sport] || SPORTS.football;
   // Every stat a record can be submitted for: the sport's canonical display stats UNION its
@@ -5890,6 +5937,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
           <div>
+            <GettingStarted school={school} setActiveTab={setActiveTab} />
             {(() => {
               // Public record book (SEO). Public-by-default; this is the opt-out + share control.
               const isPub = school.isPublic !== false;
