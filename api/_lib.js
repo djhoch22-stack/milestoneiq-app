@@ -596,8 +596,15 @@ export function calcProgramHofScore(player, school) {
   });
   return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
 }
-// Coach aggregation (public: no prior-school fold). Adds firstYear/lastYear/titles like the Seasons tab.
-export function buildCoachStats(seasons) {
+// Legacy hardcoded prior (predates the DB coach_prior; DB entries override by key). Mirrors the app so
+// public + in-app coach totals match exactly.
+const COACH_PRIOR_STATS = {
+  "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
+};
+// Coach aggregation. Adds firstYear/lastYear/titles like the Seasons tab, and folds in each coach's
+// prior-school record (wins/losses/ties + postseason) from `prior` when includePrior — parity with the app.
+export function buildCoachStats(seasons, opts = {}) {
+  const { includePrior = true, prior = {} } = opts;
   const coaches = {};
   (seasons || []).forEach((s) => {
     const name = (s.coach || "").trim(); if (!name) return;
@@ -622,6 +629,13 @@ export function buildCoachStats(seasons) {
     if (/champion/i.test(s.notes || "")) co.titles += 1;
     if (String(s.season) < String(co.firstYear)) co.firstYear = s.season;
     if (String(s.season) > String(co.lastYear)) co.lastYear = s.season;
+  });
+  // Fold in each coach's prior-school record — only into coaches who actually have seasons here
+  // (keyed by exact name), mirroring the in-app buildCoachStats so public + app totals match.
+  if (includePrior) Object.entries({ ...COACH_PRIOR_STATS, ...prior }).forEach(([name, pr]) => {
+    if (!coaches[name] || !pr) return;
+    const co = coaches[name];
+    Object.keys(pr).forEach((k) => { if (typeof co[k] === "number" && typeof pr[k] === "number") co[k] += pr[k]; });
   });
   return Object.values(coaches);
 }
