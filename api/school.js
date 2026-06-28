@@ -121,7 +121,7 @@ export default async function handler(req, res) {
     return { hd: head(p.name, "🏛️", homeM, sub), tabs };
   };
   const coachProfile = (c, m, year, coy) => {
-    const tot = c.wins + c.losses + (c.ties || 0), pct = tot > 0 ? Math.round(c.wins / tot * 1000) / 10 : null;
+    const tot = c.wins + c.losses + (c.ties || 0), pct = tot > 0 ? Math.round((c.wins + (c.ties || 0) / 2) / tot * 1000) / 10 : null;
     const yrs = String(c.firstYear) === String(c.lastYear) ? String(c.firstYear) : String(c.firstYear) + "–" + String(c.lastYear);
     const tile = (l, v, s) => `<div class="ptile"><div class="pl">${esc(l)}</div><div class="pv">${esc(String(v))}</div><div class="psub">${esc(s || "")}</div></div>`;
     const lt = (c.leagueWins || 0) + (c.leagueLosses || 0) + (c.leagueTies || 0);
