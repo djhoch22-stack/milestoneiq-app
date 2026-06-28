@@ -639,18 +639,17 @@ export function buildCoachStats(seasons, opts = {}) {
   });
   return Object.values(coaches);
 }
-export function calcCoachHofScore(coach, all) {
-  const total = all.length; if (!total) return 0;
-  const winRank = [...all].sort((a, b) => b.wins - a.wins).findIndex((c) => c.name === coach.name) + 1;
-  const winScore = winRank === 1 ? 25 : winRank === 2 ? 20 : winRank === 3 ? 15 : (winRank / total) <= 0.25 ? 10 : 5;
-  const games = coach.wins + coach.losses; const pct = games >= 20 ? coach.wins / games : 0;
-  const pctScore = pct >= 0.75 ? 15 : pct >= 0.65 ? 12 : pct >= 0.55 ? 8 : pct >= 0.45 ? 4 : 0;
-  const seasRank = [...all].sort((a, b) => b.seasons - a.seasons).findIndex((c) => c.name === coach.name) + 1;
-  const seasScore = seasRank === 1 ? 10 : seasRank === 2 ? 8 : seasRank === 3 ? 6 : (coach.seasons >= 5 ? 4 : 2);
-  const postScore = Math.min(coach.stateChamps * 10 + coach.stateRunnerUp * 6 + coach.finalFours * 5 + coach.eliteEights * 3 + coach.sweetSixteens * 2 + coach.leagueChamps * 2, 35);
-  const lgRank = [...all].sort((a, b) => b.leagueChamps - a.leagueChamps).findIndex((c) => c.name === coach.name) + 1;
-  const lgScore = lgRank === 1 && coach.leagueChamps > 0 ? 15 : lgRank === 2 && coach.leagueChamps > 0 ? 10 : coach.leagueChamps > 0 ? 5 : 0;
-  return Math.min(Math.round(winScore + pctScore + seasScore + postScore + lgScore), 100);
+// Absolute, peer-independent HOF résumé score (0–90; Coach-of-the-Year adds up to 10 via coachAwardBonus → 100).
+// Mirrors the in-app calcCoachHofScore exactly. Era/state/sport-neutral: win % (ties = ½) + per-season longevity.
+export function calcCoachHofScore(coach) {
+  const w = coach.wins || 0, l = coach.losses || 0, t = coach.ties || 0, games = w + l + t, s = coach.seasons || 0;
+  const pct = games >= 20 ? (w + t / 2) / games : 0;
+  const winScore = pct >= 0.70 ? 30 : pct >= 0.65 ? 25 : pct >= 0.60 ? 20 : pct >= 0.55 ? 14 : pct >= 0.50 ? 9 : pct >= 0.45 ? 4 : 0;
+  const longScore = s >= 25 ? 24 : s >= 20 ? 21 : s >= 15 ? 17 : s >= 12 ? 14 : s >= 10 ? 11 : s >= 7 ? 7 : s >= 5 ? 4 : s >= 3 ? 2 : s >= 1 ? 1 : 0;
+  const lg = coach.leagueChamps || 0;
+  const lgScore = lg >= 10 ? 18 : lg >= 7 ? 15 : lg >= 5 ? 13 : lg >= 3 ? 9 : lg >= 2 ? 5 : lg >= 1 ? 3 : 0;
+  const postScore = Math.min((coach.stateChamps||0) * 8 + (coach.stateRunnerUp||0) * 4 + (coach.finalFours||0) * 3 + (coach.eliteEights||0) * 2 + (coach.sweetSixteens||0) * 1, 18);
+  return Math.min(winScore + longScore + lgScore + postScore, 90);
 }
 export function hofTier(score) {
   if (score >= 90) return { label: "Legend", color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" };
@@ -684,9 +683,9 @@ export function playerAwardBonus(name, awards) {
   return Math.min(b, 20);
 }
 export function coachAwardBonus(name, awards) {
-  const n = normName(name); let b = 0;
-  for (const a of (awards || [])) { if (a.scope !== "coach" || normName(a.holder_name) !== n) continue; b += COACH_AWARD_POINTS[a.level] || COACH_AWARD_POINTS.league; }
-  return Math.min(b, 20);
+  const n = normName(name); let coy = 0;
+  for (const a of (awards || [])) { if (a.scope === "coach" && normName(a.holder_name) === n) coy += 1; }
+  return coy >= 6 ? 10 : coy >= 4 ? 8 : coy >= 3 ? 6 : coy >= 2 ? 4 : coy >= 1 ? 2 : 0;
 }
 export function awardsForHolder(name, scope, awards) {
   const n = normName(name);
