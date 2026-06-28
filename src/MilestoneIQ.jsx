@@ -4418,6 +4418,10 @@ const HOF_STAT_WEIGHTS = {
   "Blocked Field Goals":       5,
   "Safeties":                  6,
   "Total TDs":                 9,
+  "Total Yards":               7,  "All-Purpose Yards":         8,  // combined production (rush+rec, + returns)
+  "Forced Fumbles":            6,  "Fumble Recoveries":         5,  // defensive takeaways
+  "Pass Break Ups":            4,  "Punt Return TDs":           6,  "Kick Off Return TDs":       6,
+  "Flag Pull Yards Lost":      4,  // flag-football TFL ("Field Goals Made" = kicker is a football override, vs basketball's 4)
   // Soccer ("Points" = goals+assists and "Assists" are weighted in the shared section above)
   "Goals":                    10,
   "Shutouts":                  7,  // clean sheets — keeper QUALITY
@@ -4440,6 +4444,7 @@ const SPORT_STAT_OVERRIDES = {
   soccer:     { "Points": 8 },
   baseball:   { "Assists": 4 },
   volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },  // setting / serve-receive passing / solo stuffs
+  football:   { "Field Goals Made": 6 },  // kicker FGs — basketball "Field Goals Made" stays 4
 };
 // Rate-stat records that COUNT toward HOF (importance ÷ 10). Computed per player from rateDefsFor(sport),
 // gated by the def's min-playing-time qualifier; the qualified leader holds the "title" (ERA = lowest-is-best).
