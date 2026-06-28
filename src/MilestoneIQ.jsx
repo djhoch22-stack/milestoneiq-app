@@ -4153,7 +4153,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
   const totalWins = seasonsWithRecord.reduce((a, s) => a + (s.wins || 0), 0);
   const totalLosses = seasonsWithRecord.reduce((a, s) => a + (s.losses || 0), 0);
   const totalTies = seasons.reduce((a, s) => a + (s.ties || 0), 0);
-  const totalPct = totalWins + totalLosses + totalTies > 0 ? ((totalWins / (totalWins + totalLosses + totalTies)) * 100).toFixed(1) : "—";
+  const totalPct = totalWins + totalLosses + totalTies > 0 ? (((totalWins + totalTies / 2) / (totalWins + totalLosses + totalTies)) * 100).toFixed(1) : "—";
   const totalLeagueWins = seasons.reduce((a, s) => a + (s.leagueWins || 0), 0);
   const totalLeagueLosses = seasons.reduce((a, s) => a + (s.leagueLosses || 0), 0);
   const totalLeagueTies = seasons.reduce((a, s) => a + (s.leagueTies || 0), 0);
@@ -4253,7 +4253,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
             .sort((a,b) => b[1].wins - a[1].wins)
             .map(([coach, rec], i) => {
               const isCurrent = coach === mostRecentCoach;
-              const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? ((rec.wins/(rec.wins+rec.losses+(rec.ties||0)))*100).toFixed(1) : "—";
+              const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? (((rec.wins+(rec.ties||0)/2)/(rec.wins+rec.losses+(rec.ties||0)))*100).toFixed(1) : "—";
               const lPct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins/(rec.leagueWins+rec.leagueLosses+(rec.leagueTies||0)))*100).toFixed(1) : "—";
               const yearRange = rec.firstYear === rec.lastYear ? rec.firstYear : `${rec.firstYear} – ${rec.lastYear}`;
               const coyCount = awardsForHolder(coach, "coach", coachAwards).length;
@@ -4383,7 +4383,7 @@ const HOF_STAT_WEIGHTS = {
   "Points":                   10,
   "Assists":                   7,
   "Total Rebounds":            6,
-  "Steals":                    6,
+  "Steals":                    5,
   "Blocks":                    5,
   "Wins":                      0,  // TEAM stat — given to every roster player; never an individual rank/record
   "Games Played":              3, "Matches Played": 3,
@@ -4484,6 +4484,7 @@ function buildHofCtx(school) {
   const roster = (school && school.allTimeRoster) || [];
   const rankByStat = {};   // stat -> Map(playerId -> 1-based rank among roster)
   const totalByStat = {};  // stat -> # of players with that stat > 0
+  const top2ByStat = {};   // stat -> { v1, v2 } top two values, for record margin-over-#2
   for (const stat in HOF_STAT_WEIGHTS) {
     const sorted = roster
       .filter(p => (((p.stats && p.stats[stat]) || 0) > 0))
@@ -4493,17 +4494,34 @@ function buildHofCtx(school) {
     for (let i = 0; i < sorted.length; i++) m.set(sorted[i].id, i + 1);
     rankByStat[stat] = m;
     totalByStat[stat] = sorted.length;
+    top2ByStat[stat] = { v1: ((sorted[0].stats && sorted[0].stats[stat]) || 0), v2: (sorted[1] ? ((sorted[1].stats && sorted[1].stats[stat]) || 0) : 0) };
   }
-  // Record-holder bonus per (lowercased) holder name: +5 career record, +3 single-season.
+  // Record-holder bonus, weighted by stat IMPORTANCE × MARGIN over #2 (career) × how long the mark has STOOD.
+  const now = new Date().getFullYear();
   const recordBonusByName = new Map();
   for (const rec of (school.records || [])) {
     const holderLower = (rec.holderName || "").toLowerCase().trim();
     if (!holderLower || holderLower === "multiple players") continue;
     if (TEAM_STATS.has(rec.statName)) continue; // team records (e.g. Wins) aren't individual achievements
-    const add = (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
-    recordBonusByName.set(holderLower, (recordBonusByName.get(holderLower) || 0) + add);
+    recordBonusByName.set(holderLower, (recordBonusByName.get(holderLower) || 0) + recordWeight(rec, top2ByStat[rec.statName], now));
   }
   return { rankByStat, totalByStat, recordBonusByName };
+}
+// One record's contribution to a holder's HOF bonus: importance (Points 1.0 … FT made 0.3) × variant
+// (career 5 / season-or-avg 3 / single-game 2) × margin over #2 (career only) × longevity multiplier.
+function recordWeight(rec, t2, now) {
+  const v = (rec.variant || "").toLowerCase();
+  const imp = (HOF_STAT_WEIGHTS[rec.statName] || 3) / 10;
+  const variantBase = v.includes("career") ? 5 : v.includes("game") ? 2 : 3;
+  let marginMult = 1;
+  if (v.includes("career") && t2 && t2.v1 > 0 && t2.v2 > 0) {
+    const m = (t2.v1 - t2.v2) / t2.v2;
+    marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7;
+  }
+  const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
+  const yrs = endYear ? now - endYear : 0;
+  const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
+  return imp * variantBase * marginMult * longMult;
 }
 
 // Core HOF score for one player in one program (0–100 raw). Hot callers pass a precomputed `ctx`
@@ -4898,7 +4916,7 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
         {scored.map((coach, i) => {
           const tier = coachHofTier(coach.score);
           const winPct = coach.wins + coach.losses + (coach.ties||0) > 0
-            ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
+            ? Math.round((coach.wins+(coach.ties||0)/2)/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
           return (
             <div key={coach.name}
               style={{ background:"#fff", borderRadius:10, border:`1px solid ${coach.confirmed?"#c4b5fd":"#e8e4dd"}`,
@@ -4972,14 +4990,14 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
 
 function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport = {}, confirmed, onClose, onToggle }) {
   const tier = coachHofTier(coach.score);
-  const winPct = coach.wins+coach.losses+(coach.ties||0)>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
+  const winPct = coach.wins+coach.losses+(coach.ties||0)>0 ? Math.round((coach.wins+(coach.ties||0)/2)/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
   const seasons = (school.seasons||[]).filter(s=>(s.coach||s["coach"]||"").trim()===coach.name);
   const notableSeasons = seasons.filter(s=>getSeasonSuccessScore(s.notes||s["notes"]||"")>0)
     .sort((a,b)=>String(b.season||b["season"]||"").localeCompare(String(a.season||a["season"]||""))); // chronological (newest-first)
 
   const statRows = [
     ["Total wins",      coach.wins,         [...allCoaches].sort((a,b)=>b.wins-a.wins)],
-    ["Win %",           winPct+"%",         [...allCoaches].sort((a,b)=>(b.wins/(b.wins+b.losses||1))-(a.wins/(a.wins+a.losses||1)))],
+    ["Win %",           winPct+"%",         [...allCoaches].sort((a,b)=>((b.wins+(b.ties||0)/2)/((b.wins+b.losses+(b.ties||0))||1))-((a.wins+(a.ties||0)/2)/((a.wins+a.losses+(a.ties||0))||1)))],
     ["Seasons coached", coach.seasons,      [...allCoaches].sort((a,b)=>b.seasons-a.seasons)],
     ["State titles",    coach.stateChamps,  [...allCoaches].sort((a,b)=>b.stateChamps-a.stateChamps)],
     ["League titles",   coach.leagueChamps, [...allCoaches].sort((a,b)=>b.leagueChamps-a.leagueChamps)],
@@ -5017,7 +5035,7 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
               <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:8 }}>By sport</div>
               {Object.keys(coach.byTeam).sort().map(tm => {
                 const b = coach.byTeam[tm];
-                const p = b.wins+b.losses+(b.ties||0)>0 ? Math.round(b.wins/(b.wins+b.losses+(b.ties||0))*100) : 0;
+                const p = b.wins+b.losses+(b.ties||0)>0 ? Math.round((b.wins+(b.ties||0)/2)/(b.wins+b.losses+(b.ties||0))*100) : 0;
                 const aw = awardsBySport[normName(coach.name) + "|" + tm] || [];
                 return (
                   <div key={tm} style={{ padding:"6px 0",borderBottom:"1px solid #f3f0ea" }}>
@@ -7156,7 +7174,7 @@ function AllSportsHof({ schools = [], onUpdate }) {
 
         {view==="coaches" && shown.map((coach, i) => {
           const tier = coachHofTier(coach.score);
-          const winPct = (coach.wins+coach.losses+(coach.ties||0))>0 ? Math.round(coach.wins/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
+          const winPct = (coach.wins+coach.losses+(coach.ties||0))>0 ? Math.round((coach.wins+(coach.ties||0)/2)/(coach.wins+coach.losses+(coach.ties||0))*100) : 0;
           return (
             <div key={coach.name} onClick={()=>setSelCoach(coach)}
               style={{ background:"#fff", borderRadius:12, border:`1px solid ${coach.confirmed?"#c4b5fd":"#e8e4dd"}`, padding:"12px 16px", cursor:"pointer", boxShadow: coach.confirmed?"0 0 0 2px #7c3aed22":"none" }}>
