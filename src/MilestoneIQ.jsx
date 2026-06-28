@@ -1316,11 +1316,20 @@ function RecordMinimumsModal({ school, onClose, onSave }) {
 function GettingStarted({ school, onStep, hideWhenDone, programName }) {
   const key = "mq_getstarted_hidden_" + (school.id || "");
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch (e) { return false; } });
+  const [open, setOpen] = useState(null);
   const items = [
-    { label: "Add your season history", done: (school.seasons || []).length > 0, tab: "seasons", hint: "Do this first — your team's W-L then auto-fills each player's wins when you import stats" },
-    { label: "Add your players & career stats", done: ((school.allTimeRoster || []).length + (school.athletes || []).length) > 0, tab: "all-time", hint: "Import a roster (Excel · CSV · photo) or add players one by one" },
-    { label: "Set your program records", done: (school.records || []).length > 0, tab: "records", hint: "Your all-time record book — the numbers athletes chase" },
-    { label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", hint: "All-league, all-state, player & coach of the year" },
+    { label: "Add your season history", done: (school.seasons || []).length > 0, tab: "seasons", tabLabel: "Seasons",
+      what: "Your team's year-by-year record — wins, losses, league finish, coach, and playoff runs.",
+      how: ["Click + Add season, then fill in the year (e.g. 2024-2025), overall W-L, league record, head coach, and notes.", "Add one row for every season you have records for.", "Have a spreadsheet of seasons? Use Import to load them all at once.", "Doing this first means each player's wins auto-fill when you import their stats."] },
+    { label: "Add your players & career stats", done: ((school.allTimeRoster || []).length + (school.athletes || []).length) > 0, tab: "all-time", tabLabel: "All-Time",
+      what: "Your all-time roster and every player's career numbers.",
+      how: ["Click Import to upload from MaxPreps, GameChanger, Hudl, a spreadsheet, or even a photo of a stat sheet.", "Or click + Add player to enter someone by hand.", "Wins fill in automatically from the season history you added above."] },
+    { label: "Set your program records", done: (school.records || []).length > 0, tab: "records", tabLabel: "Records",
+      what: "Your all-time record book — the bests every athlete is chasing.",
+      how: ["Click + Add / edit records.", "Pick the stat, the record type (career, single-season, or single-game), the holder, the year, and the value.", "Many records auto-fill from the stats you import — you mainly enter the ones only you have on file (single-game marks, older records)."] },
+    { label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", tabLabel: "HOF",
+      what: "All-league, all-state, player & coach of the year — and your Hall of Fame.",
+      how: ["On the HOF tab, open the awards manager.", "Log each honor — the player, the award, the level (league or state), and the year.", "Hall of Famers are then calculated automatically from awards plus career stats."] },
   ];
   const done = items.filter((i) => i.done).length, total = items.length, allDone = done === total;
   if (hidden || (hideWhenDone && allDone)) return null;
@@ -1330,7 +1339,7 @@ function GettingStarted({ school, onStep, hideWhenDone, programName }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{allDone ? "🎉 You're all set up" : ("👋 Getting started" + (programName ? " · " + programName : ""))}</div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{allDone ? "Your program is fully loaded — you can hide this." : "A few steps to bring your program to life."}</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{allDone ? "Your program is fully loaded — you can hide this." : "Tap any step to see exactly what to do."}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: allDone ? "#166534" : "#1a56db" }}>{done}/{total}</span>
@@ -1341,17 +1350,31 @@ function GettingStarted({ school, onStep, hideWhenDone, programName }) {
         <div style={{ height: "100%", width: (total ? (done / total) * 100 : 0) + "%", background: allDone ? "#22c55e" : "#1a56db", transition: "width .3s" }} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {items.map((it) => (
-          <button key={it.label} onClick={() => onStep(it.tab)}
-            style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", background: "#fff", border: "1px solid #e8e4dd", borderRadius: 8, padding: "10px 12px", cursor: "pointer", width: "100%" }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>{it.done ? "✅" : "⬜"}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: it.done ? "#9ca3af" : "#111", textDecoration: it.done ? "line-through" : "none" }}>{it.label}</span>
-              {!it.done && <span style={{ display: "block", fontSize: 12, color: "#6b7280", marginTop: 1 }}>{it.hint}</span>}
-            </span>
-            {!it.done && <span style={{ fontSize: 13, color: "#1a56db", fontWeight: 600, flexShrink: 0 }}>Set up →</span>}
-          </button>
-        ))}
+        {items.map((it, idx) => {
+          const isOpen = open === idx;
+          return (
+            <div key={it.label} style={{ background: "#fff", border: "1px solid " + (isOpen ? "#bfdbfe" : "#e8e4dd"), borderRadius: 8, overflow: "hidden" }}>
+              <button onClick={() => setOpen(isOpen ? null : idx)}
+                style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", background: "none", border: "none", padding: "10px 12px", cursor: "pointer", width: "100%" }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{it.done ? "✅" : "⬜"}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: it.done ? "#9ca3af" : "#111", textDecoration: it.done ? "line-through" : "none" }}>{it.label}</span>
+                <span style={{ fontSize: 12, color: "#1a56db", fontWeight: 600, flexShrink: 0 }}>{isOpen ? "Hide" : (it.done ? "Review" : "How?")}</span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: "2px 12px 12px 38px" }}>
+                  <div style={{ fontSize: 12, color: "#374151", marginBottom: 8, lineHeight: 1.5 }}>{it.what}</div>
+                  <ol style={{ margin: "0 0 10px", paddingLeft: 16, fontSize: 12, color: "#4b5563", lineHeight: 1.55 }}>
+                    {it.how.map((s, i) => <li key={i} style={{ marginBottom: 3 }}>{s}</li>)}
+                  </ol>
+                  <button onClick={() => onStep(it.tab)}
+                    style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    Go to {it.tabLabel} →
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
