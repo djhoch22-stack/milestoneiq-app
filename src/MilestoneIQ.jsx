@@ -1313,10 +1313,9 @@ function RecordMinimumsModal({ school, onClose, onSave }) {
 // ── New-coach getting-started checklist (Overview tab) ─────────────────────────
 // Each step auto-checks from the program's own data; clicking a step deep-links to
 // its tab. Dismissable per browser (localStorage); turns green when complete.
-function GettingStarted({ school, setActiveTab }) {
+function GettingStarted({ school, onStep, hideWhenDone, programName }) {
   const key = "mq_getstarted_hidden_" + (school.id || "");
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch (e) { return false; } });
-  if (hidden) return null;
   const items = [
     { label: "Add your season history", done: (school.seasons || []).length > 0, tab: "seasons", hint: "Do this first — your team's W-L then auto-fills each player's wins when you import stats" },
     { label: "Add your players & career stats", done: ((school.allTimeRoster || []).length + (school.athletes || []).length) > 0, tab: "all-time", hint: "Import a roster (Excel · CSV · photo) or add players one by one" },
@@ -1324,12 +1323,13 @@ function GettingStarted({ school, setActiveTab }) {
     { label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", hint: "All-league, all-state, player & coach of the year" },
   ];
   const done = items.filter((i) => i.done).length, total = items.length, allDone = done === total;
+  if (hidden || (hideWhenDone && allDone)) return null;
   const hide = () => { try { localStorage.setItem(key, "1"); } catch (e) {} setHidden(true); };
   return (
     <div style={{ background: allDone ? "#f0fdf4" : "#eff6ff", border: "1px solid " + (allDone ? "#bbf7d0" : "#bfdbfe"), borderRadius: 12, padding: 16, marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{allDone ? "🎉 You're all set up" : "👋 Getting started"}</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{allDone ? "🎉 You're all set up" : ("👋 Getting started" + (programName ? " · " + programName : ""))}</div>
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{allDone ? "Your program is fully loaded — you can hide this." : "A few steps to bring your program to life."}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
@@ -1342,7 +1342,7 @@ function GettingStarted({ school, setActiveTab }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.map((it) => (
-          <button key={it.label} onClick={() => setActiveTab(it.tab)}
+          <button key={it.label} onClick={() => onStep(it.tab)}
             style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", background: "#fff", border: "1px solid #e8e4dd", borderRadius: 8, padding: "10px 12px", cursor: "pointer", width: "100%" }}>
             <span style={{ fontSize: 16, flexShrink: 0 }}>{it.done ? "✅" : "⬜"}</span>
             <span style={{ flex: 1, minWidth: 0 }}>
@@ -5937,7 +5937,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
           <div>
-            <GettingStarted school={school} setActiveTab={setActiveTab} />
+            <GettingStarted school={school} onStep={setActiveTab} />
             {(() => {
               // Public record book (SEO). Public-by-default; this is the opt-out + share control.
               const isPub = school.isPublic !== false;
@@ -7558,6 +7558,11 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
             </div>
           )}
 
+          {orderedSchools.map(school => (
+            <GettingStarted key={"gs-"+school.id} school={school} hideWhenDone
+              programName={SPORTS[school.sport]?.label || school.mascot || school.name}
+              onStep={(tab) => { try { sessionStorage.setItem("mq_dash_tab", tab); } catch (e) {} setActiveSchool(school); }} />
+          ))}
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14 }}>
             {orderedSchools.map(school=>{
               const sport = SPORTS[school.sport]||SPORTS.football;
