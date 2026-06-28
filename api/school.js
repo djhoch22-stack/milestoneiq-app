@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (!slug) { res.statusCode = 404; return res.end(notFound()); }
 
   // No school_slug column yet, so match on slugified school_name (same transform the links use).
-  const all = await sb(`public_teams?select=id,slug,name,school_name,sport,city,state,primary_color,logo_url,coach_hof,record_minimums&limit=5000`);
+  const all = await sb(`public_teams?select=id,slug,name,school_name,sport,city,state,primary_color,logo_url,coach_hof,coach_prior,record_minimums&limit=5000`);
   const teams = all.filter((t) => slugify(t.school_name || t.name || "") === slug);
   if (!teams.length) { res.statusCode = 404; return res.end(notFound()); }
 
@@ -151,7 +151,8 @@ export default async function handler(req, res) {
     prof[key] = pr;
     inductees.push({ key, kind: "Athlete", name: p.name, sport: (meta[p.program_id] || {}).sport || "", year: p.hof_year || null });
   });
-  const coachByName = {}; buildCoachStats(orgSeasons).forEach((c) => { coachByName[normName(c.name)] = c; });
+  const coachPrior = Object.assign({}, ...teams.map((t) => t.coach_prior || {}));
+  const coachByName = {}; buildCoachStats(orgSeasons, { includePrior: true, prior: coachPrior }).forEach((c) => { coachByName[normName(c.name)] = c; });
   const seenCoach = new Set();
   teams.forEach((t) => { Object.entries(t.coach_hof || {}).forEach(([nm, v]) => {
     if (!v) return; const k2 = normName(nm); if (seenCoach.has(k2)) return; seenCoach.add(k2);
