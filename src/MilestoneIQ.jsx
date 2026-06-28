@@ -4418,11 +4418,12 @@ const HOF_STAT_WEIGHTS = {
   "Blocked Field Goals":       5,
   "Safeties":                  6,
   "Total TDs":                 9,
-  // Soccer
+  // Soccer ("Points" = goals+assists and "Assists" are weighted in the shared section above)
   "Goals":                    10,
-  "Saves":                     8,
-  "Shutouts":              7,
-  "Shots":                     4,  // attacking involvement — below Goals/Assists (a shot isn't a goal)
+  "Shutouts":                  7,  // clean sheets — keeper QUALITY
+  "Saves":                     6,  // keeper VOLUME (more shots faced ≈ weaker team) — below shutouts/assists
+  "Shots on Goal":             5,  // on-target — above raw shots, below the scoring stats
+  "Shots":                     4,  // attacking involvement — a shot isn't a goal
   // Baseball — hitting + pitching impact (fielding Put Outs/Assists count too; "Assists" is shared above)
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
@@ -4432,6 +4433,27 @@ const HOF_STAT_WEIGHTS = {
   // Generic
   "Coach Wins":                0,  // excluded from player scoring
 };
+// Per-sport overrides — the same stat name means different things across sports, so these WIN over the
+// shared weights above. "Assists" is a PRIMARY stat in basketball/volleyball (setting) but FIELDING in
+// baseball (minor); soccer "Points" (goals+assists) overlaps Goals, so it's discounted below the 10 marquee.
+const SPORT_STAT_OVERRIDES = {
+  soccer:     { "Points": 8 },
+  baseball:   { "Assists": 4 },
+  volleyball: { "Assists": 9 },
+};
+function sportGroup(sport) {
+  const s = String(sport || "");
+  if (s.indexOf("basketball") === 0) return "basketball";
+  if (s.indexOf("soccer") === 0) return "soccer";
+  if (s.indexOf("volleyball") === 0) return "volleyball";
+  if (s === "baseball" || s === "softball") return "baseball";
+  if (s === "football" || s === "flag_football_girls") return "football";
+  return s;
+}
+function weightFor(sport, stat) {
+  const o = SPORT_STAT_OVERRIDES[sportGroup(sport)];
+  return (o && o[stat] != null) ? o[stat] : HOF_STAT_WEIGHTS[stat];
+}
 // TEAM / participation stats are assigned to every roster player, so they are NOT individual
 // achievements — excluded from the impact score AND the record bonus (a benchwarmer must not rank
 // #1 on "team wins" or hold the team-wins record).
@@ -4506,7 +4528,7 @@ function buildHofCtx(school) {
   for (const stat in HOF_STAT_WEIGHTS) {
     if (TEAM_STATS.has(stat)) continue;
     const t = topByStat[stat]; if (!t || !(t.v1 > 0)) continue;
-    const imp = (HOF_STAT_WEIGHTS[stat] || 3) / 10;
+    const imp = (weightFor(school && school.sport, stat) || 3) / 10;
     let marginMult = 1;
     if (t.v2 > 0) { const mm = (t.v1 - t.v2) / t.v2; marginMult = mm < 0.05 ? 1 : mm < 0.15 ? 1.15 : mm < 0.30 ? 1.3 : mm < 0.50 ? 1.5 : 1.7; }
     const endYear = parseInt(t.year.slice(-4), 10);
@@ -4518,25 +4540,20 @@ function buildHofCtx(school) {
   for (const rec of (school.records || [])) {
     if ((rec.variant || "").toLowerCase().includes("career")) continue; // career handled above from live data
     if (TEAM_STATS.has(rec.statName)) continue;
-    add(rec.holderName, recordWeight(rec, null, now));
+    add(rec.holderName, recordWeight(rec, school && school.sport, now));
   }
   return { rankByStat, totalByStat, recordBonusByName };
 }
-// One record's contribution to a holder's HOF bonus: importance (Points 1.0 … FT made 0.3) × variant
-// (career 5 / season-or-avg 3 / single-game 2) × margin over #2 (career only) × longevity multiplier.
-function recordWeight(rec, t2, now) {
+// One single-season / single-game record's HOF bonus: importance × variant (season-or-avg 3, game 2) ×
+// longevity. (CAREER records are credited separately from the live leaderboard, with margin-over-#2.)
+function recordWeight(rec, sport, now) {
   const v = (rec.variant || "").toLowerCase();
-  const imp = (HOF_STAT_WEIGHTS[rec.statName] || 3) / 10;
-  const variantBase = v.includes("career") ? 5 : v.includes("game") ? 2 : 3;
-  let marginMult = 1;
-  if (v.includes("career") && t2 && t2.v1 > 0 && t2.v2 > 0) {
-    const m = (t2.v1 - t2.v2) / t2.v2;
-    marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7;
-  }
+  const imp = (weightFor(sport, rec.statName) || 3) / 10;
+  const variantBase = v.includes("game") ? 2 : 3;
   const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
   const yrs = endYear ? now - endYear : 0;
   const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-  return imp * variantBase * marginMult * longMult;
+  return imp * variantBase * longMult;
 }
 
 // Core HOF score for one player in one program (0–100 raw). Hot callers pass a precomputed `ctx`
@@ -4553,7 +4570,7 @@ function calcProgramHofScore(player, school, ctx) {
 
   // For each stat the player has, compute rank-based contribution
   Object.entries(stats).forEach(([stat, val]) => {
-    const weight = HOF_STAT_WEIGHTS[stat];
+    const weight = weightFor(school.sport, stat);
     if (!weight || !val) return;
     totalWeight += weight;
 
@@ -5592,7 +5609,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
   const effSport = sportContexts.find(c => c.school.id === effSportId)?.school.sport;
   const shownContexts = isMulti ? sportContexts.filter(c => c.school.id === effSportId) : sportContexts;
   const buildStatBreakdown = (pl, rost) => Object.entries(pl.stats || {})
-    .filter(([stat]) => HOF_STAT_WEIGHTS[stat] > 0)
+    .filter(([stat]) => !TEAM_STATS.has(stat))
     .map(([stat, val]) => {
       const sorted = rost.filter(p => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
       const rank = sorted.findIndex(p => p.id === pl.id) + 1;
