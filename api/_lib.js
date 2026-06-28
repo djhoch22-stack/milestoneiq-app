@@ -540,7 +540,7 @@ const HOF_STAT_WEIGHTS = {
   "Total Tackles": 8, "Solo Tackles": 4, "Assisted Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
   "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
   "Goals": 10, "Shutouts": 7, "Saves": 6, "Shots on Goal": 5, "Shots": 4, "Coach Wins": 0,
-  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
+  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Total Bases": 7, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
 };
@@ -548,8 +548,9 @@ const HOF_STAT_WEIGHTS = {
 const SPORT_STAT_OVERRIDES = {
   soccer:     { "Points": 8 },
   baseball:   { "Assists": 4 },
-  volleyball: { "Assists": 9 },
+  volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },
 };
+const HOF_RATE_WEIGHTS = { "Batting Average": 9, "ERA": 9, "Kill Percentage": 8 };  // rate titles that count toward HOF (mirror of app)
 function sportGroup(sport) {
   const s = String(sport || "");
   if (s.indexOf("basketball") === 0) return "basketball";
@@ -623,13 +624,35 @@ export function calcProgramHofScore(player, school) {
     const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
     recordBonus += imp * 5 * marginMult * longMult;
   }
+  // CAREER RATE records (AVG, ERA, …): credit THIS player if they're the qualified rate leader.
+  for (const d of (rateDefsFor(school.sport) || [])) {
+    const impW = HOF_RATE_WEIGHTS[d.name]; if (!impW) continue;
+    const qualed = [];
+    for (const p of roster) {
+      if ((Number((p.stats || {})[d.qualStat]) || 0) < (d.minCareer || 0)) continue;
+      const rv = rateValue(d, p.stats || {});
+      if (rv == null || !(rv > 0)) continue;
+      qualed.push({ p, v: rv });
+    }
+    if (!qualed.length) continue;
+    qualed.sort((a, b) => d.lowerIsBetter ? (a.v - b.v) : (b.v - a.v));
+    const r0 = qualed[0];
+    if ((r0.p.name || "").toLowerCase().trim() !== pn) continue;
+    const r1 = qualed[1];
+    let rMargin = 1;
+    if (r1 && r0.v > 0 && r1.v > 0) { const m = d.lowerIsBetter ? (r1.v - r0.v) / r0.v : (r0.v - r1.v) / r1.v; rMargin = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; }
+    const rys = playerYears(r0.p); const rey = rys.length ? rys[rys.length - 1] : 0;
+    const ry = rey ? now - rey : 0;
+    const rLong = ry >= 40 ? 1.3 : ry >= 25 ? 1.2 : ry >= 15 ? 1.1 : 1;
+    recordBonus += (impW / 10) * 5 * rMargin * rLong;
+  }
   // Single-season / single-game / per-game marks still come from the stored record book.
   (school.records || []).forEach((rec) => {
     if ((rec.variant || "").toLowerCase().includes("career")) return; // career handled above from live data
     const h = (rec.holderName || "").toLowerCase().trim();
     if (!h || h === "multiple players" || h !== pn || TEAM_STATS.has(rec.statName)) return;
     const v = (rec.variant || "").toLowerCase();
-    const imp = (weightFor(school.sport, rec.statName) || 3) / 10;
+    const imp = ((HOF_RATE_WEIGHTS[rec.statName] || weightFor(school.sport, rec.statName)) || 3) / 10;
     const variantBase = v.includes("game") ? 2 : 3;
     const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
     const yrs = endYear ? now - endYear : 0;
