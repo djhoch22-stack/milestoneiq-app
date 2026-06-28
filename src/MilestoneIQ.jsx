@@ -4484,7 +4484,7 @@ function buildHofCtx(school) {
   const roster = (school && school.allTimeRoster) || [];
   const rankByStat = {};   // stat -> Map(playerId -> 1-based rank among roster)
   const totalByStat = {};  // stat -> # of players with that stat > 0
-  const top2ByStat = {};   // stat -> { v1, v2 } top two values, for record margin-over-#2
+  const topByStat = {};    // stat -> { name, year, v1, v2 } #1 holder + #2 value, for live career records
   for (const stat in HOF_STAT_WEIGHTS) {
     const sorted = roster
       .filter(p => (((p.stats && p.stats[stat]) || 0) > 0))
@@ -4494,16 +4494,31 @@ function buildHofCtx(school) {
     for (let i = 0; i < sorted.length; i++) m.set(sorted[i].id, i + 1);
     rankByStat[stat] = m;
     totalByStat[stat] = sorted.length;
-    top2ByStat[stat] = { v1: ((sorted[0].stats && sorted[0].stats[stat]) || 0), v2: (sorted[1] ? ((sorted[1].stats && sorted[1].stats[stat]) || 0) : 0) };
+    const p0 = sorted[0];
+    topByStat[stat] = { name: p0.name, year: String(p0.lastYear || p0.firstYear || p0.gradYear || ""),
+      v1: ((p0.stats && p0.stats[stat]) || 0), v2: (sorted[1] ? ((sorted[1].stats && sorted[1].stats[stat]) || 0) : 0) };
   }
-  // Record-holder bonus, weighted by stat IMPORTANCE × MARGIN over #2 (career) × how long the mark has STOOD.
   const now = new Date().getFullYear();
   const recordBonusByName = new Map();
+  const add = (name, amt) => { const k = (name || "").toLowerCase().trim(); if (k && k !== "multiple players") recordBonusByName.set(k, (recordBonusByName.get(k) || 0) + amt); };
+  // CAREER records come straight from the LIVE LEADERBOARD — the #1 in each scored stat IS the career record
+  // holder — so every program gets consistent, current credit without depending on a hand-entered record book.
+  for (const stat in HOF_STAT_WEIGHTS) {
+    if (TEAM_STATS.has(stat)) continue;
+    const t = topByStat[stat]; if (!t || !(t.v1 > 0)) continue;
+    const imp = (HOF_STAT_WEIGHTS[stat] || 3) / 10;
+    let marginMult = 1;
+    if (t.v2 > 0) { const mm = (t.v1 - t.v2) / t.v2; marginMult = mm < 0.05 ? 1 : mm < 0.15 ? 1.15 : mm < 0.30 ? 1.3 : mm < 0.50 ? 1.5 : 1.7; }
+    const endYear = parseInt(t.year.slice(-4), 10);
+    const yrs = endYear ? now - endYear : 0;
+    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
+    add(t.name, imp * 5 * marginMult * longMult);
+  }
+  // Single-season / single-game / per-game marks still come from the stored record book.
   for (const rec of (school.records || [])) {
-    const holderLower = (rec.holderName || "").toLowerCase().trim();
-    if (!holderLower || holderLower === "multiple players") continue;
-    if (TEAM_STATS.has(rec.statName)) continue; // team records (e.g. Wins) aren't individual achievements
-    recordBonusByName.set(holderLower, (recordBonusByName.get(holderLower) || 0) + recordWeight(rec, top2ByStat[rec.statName], now));
+    if ((rec.variant || "").toLowerCase().includes("career")) continue; // career handled above from live data
+    if (TEAM_STATS.has(rec.statName)) continue;
+    add(rec.holderName, recordWeight(rec, null, now));
   }
   return { rankByStat, totalByStat, recordBonusByName };
 }
