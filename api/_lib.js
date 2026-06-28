@@ -539,11 +539,30 @@ const HOF_STAT_WEIGHTS = {
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
   "Total Tackles": 8, "Solo Tackles": 4, "Assisted Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
   "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
-  "Goals": 10, "Saves": 8, "Shutouts": 7, "Shots": 4, "Coach Wins": 0,
+  "Goals": 10, "Shutouts": 7, "Saves": 6, "Shots on Goal": 5, "Shots": 4, "Coach Wins": 0,
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
 };
+// Per-sport overrides (mirror of the app) — win over the shared weights above.
+const SPORT_STAT_OVERRIDES = {
+  soccer:     { "Points": 8 },
+  baseball:   { "Assists": 4 },
+  volleyball: { "Assists": 9 },
+};
+function sportGroup(sport) {
+  const s = String(sport || "");
+  if (s.indexOf("basketball") === 0) return "basketball";
+  if (s.indexOf("soccer") === 0) return "soccer";
+  if (s.indexOf("volleyball") === 0) return "volleyball";
+  if (s === "baseball" || s === "softball") return "baseball";
+  if (s === "football" || s === "flag_football_girls") return "football";
+  return s;
+}
+function weightFor(sport, stat) {
+  const o = SPORT_STAT_OVERRIDES[sportGroup(sport)];
+  return (o && o[stat] != null) ? o[stat] : HOF_STAT_WEIGHTS[stat];
+}
 // TEAM / participation stats — given to every roster player, so NOT individual achievements
 // (excluded from impact scoring AND the record bonus).
 const TEAM_STATS = new Set(["Wins", "Coach Wins"]);
@@ -573,7 +592,7 @@ export function calcProgramHofScore(player, school) {
   const roster = school.allTimeRoster || []; if (!roster.length) return 0;
   const stats = player.stats || {}; let statScore = 0, totalWeight = 0;
   Object.entries(stats).forEach(([stat, val]) => {
-    const weight = HOF_STAT_WEIGHTS[stat]; if (!weight || !val) return; totalWeight += weight;
+    const weight = weightFor(school.sport, stat); if (!weight || !val) return; totalWeight += weight;
     const sorted = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
     const rank = sorted.findIndex((p) => p.id === player.id) + 1; const total = sorted.length; if (!rank || !total) return;
     let rankPct;
@@ -596,7 +615,7 @@ export function calcProgramHofScore(player, school) {
     const top = sorted[0];
     if (!top || (top.name || "").toLowerCase().trim() !== pn || !((top.stats[stat] || 0) > 0)) continue;
     const v1 = top.stats[stat] || 0, v2 = sorted[1] ? (sorted[1].stats[stat] || 0) : 0;
-    const imp = (HOF_STAT_WEIGHTS[stat] || 3) / 10;
+    const imp = (weightFor(school.sport, stat) || 3) / 10;
     let marginMult = 1;
     if (v2 > 0) { const m = (v1 - v2) / v2; marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; }
     const ys = playerYears(top); const endYear = ys.length ? ys[ys.length - 1] : 0;
@@ -610,7 +629,7 @@ export function calcProgramHofScore(player, school) {
     const h = (rec.holderName || "").toLowerCase().trim();
     if (!h || h === "multiple players" || h !== pn || TEAM_STATS.has(rec.statName)) return;
     const v = (rec.variant || "").toLowerCase();
-    const imp = (HOF_STAT_WEIGHTS[rec.statName] || 3) / 10;
+    const imp = (weightFor(school.sport, rec.statName) || 3) / 10;
     const variantBase = v.includes("game") ? 2 : 3;
     const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
     const yrs = endYear ? now - endYear : 0;
