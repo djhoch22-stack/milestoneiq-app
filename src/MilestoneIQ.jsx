@@ -4854,15 +4854,30 @@ function CoachHofSection({ school, allSchools = [], awards = [], onUpdate }) {
     .sort((a, b) => b.score - a.score);
 
   const toggleCoachHof = (coachName) => {
-    const updated = { ...confirmedHof };
-    if (updated[coachName]) delete updated[coachName];          // was inducted → remove
-    else updated[coachName] = new Date().getFullYear();         // induct with current year (editable)
-    onUpdate({ ...school, coachHof: updated });
+    const key = normName(coachName);
+    const progs = (allSchools && allSchools.length ? allSchools : [school]);
+    // HOF induction is unioned across every team a coach led — read inducted-state from ALL of them.
+    const inducted = progs.some(p => Object.entries(p.coachHof || {}).some(([n, v]) => v && normName(n) === key));
+    if (inducted) {
+      // Uninduct: clear from EVERY program, else the union keeps the coach inducted via another team.
+      progs.forEach(p => {
+        const ch = { ...(p.coachHof || {}) }; let changed = false;
+        Object.keys(ch).forEach(n => { if (normName(n) === key) { delete ch[n]; changed = true; } });
+        if (changed) onUpdate({ ...p, coachHof: ch });
+      });
+    } else {
+      onUpdate({ ...school, coachHof: { ...(school.coachHof || {}), [coachName]: new Date().getFullYear() } });   // induct on the current team
+    }
   };
   // Edit a coach's HOF induction year (inline year box on inducted coaches).
   const setCoachHofYear = (coachName, year) => {
-    const updated = { ...confirmedHof, [coachName]: String(year).trim() === "" ? true : Number(year) };
-    onUpdate({ ...school, coachHof: updated });
+    const key = normName(coachName), val = String(year).trim() === "" ? true : Number(year);
+    // Update the year wherever the coach is actually inducted (cross-sport), not just the current team.
+    (allSchools && allSchools.length ? allSchools : [school]).forEach(p => {
+      const ch = { ...(p.coachHof || {}) }; let changed = false;
+      Object.keys(ch).forEach(n => { if (normName(n) === key) { ch[n] = val; changed = true; } });
+      if (changed) onUpdate({ ...p, coachHof: ch });
+    });
   };
 
   return (
@@ -7034,10 +7049,20 @@ function AllSportsHof({ schools = [], onUpdate }) {
     return best;
   };
   const toggleCoach = (coachName) => {
-    const p = coachHomeProgram(coachName); if (!p) return;
-    const ch = { ...(p.coachHof || {}) };
-    if (ch[coachName]) delete ch[coachName]; else ch[coachName] = new Date().getFullYear();
-    onUpdate({ ...p, coachHof: ch });
+    const key = normName(coachName);
+    // HOF induction is unioned across every team a coach led, so read inducted-state from ALL programs.
+    const inducted = (schools || []).some(p => Object.entries(p.coachHof || {}).some(([n, v]) => v && normName(n) === key));
+    if (inducted) {
+      // Uninduct: clear the coach from EVERY program, else the cross-sport union re-marks them inducted.
+      (schools || []).forEach(p => {
+        const ch = { ...(p.coachHof || {}) }; let changed = false;
+        Object.keys(ch).forEach(n => { if (normName(n) === key) { delete ch[n]; changed = true; } });
+        if (changed) onUpdate({ ...p, coachHof: ch });
+      });
+    } else {
+      const p = coachHomeProgram(coachName); if (!p) return;   // induct on the coach's home program
+      onUpdate({ ...p, coachHof: { ...(p.coachHof || {}), [coachName]: new Date().getFullYear() } });
+    }
   };
   const openPlayer = async (entry) => {
     setSelPlayer(entry);
