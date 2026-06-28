@@ -588,25 +588,34 @@ export function calcProgramHofScore(player, school) {
   (school.seasons || []).forEach((s) => { if (playerSeasonOverlap(player, s)) teamScore += getSeasonSuccessScore(s.notes); });
   const teamNorm = Math.min(teamScore / 3, 30) * (0.2 + 0.8 * impact); // team success scaled by the player's impact
   const pn = (player.name || "").toLowerCase().trim(); let recordBonus = 0;
-  const now = new Date().getFullYear(); const t2Cache = {};
-  const top2For = (stat) => t2Cache[stat] || (t2Cache[stat] = (() => {
-    const s = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
-    return { v1: (s[0] ? (s[0].stats[stat] || 0) : 0), v2: (s[1] ? (s[1].stats[stat] || 0) : 0) };
-  })());
+  const now = new Date().getFullYear();
+  // CAREER records from the LIVE LEADERBOARD: each scored stat where THIS player is the all-time #1.
+  for (const stat in HOF_STAT_WEIGHTS) {
+    if (TEAM_STATS.has(stat)) continue;
+    const sorted = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
+    const top = sorted[0];
+    if (!top || (top.name || "").toLowerCase().trim() !== pn || !((top.stats[stat] || 0) > 0)) continue;
+    const v1 = top.stats[stat] || 0, v2 = sorted[1] ? (sorted[1].stats[stat] || 0) : 0;
+    const imp = (HOF_STAT_WEIGHTS[stat] || 3) / 10;
+    let marginMult = 1;
+    if (v2 > 0) { const m = (v1 - v2) / v2; marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; }
+    const ys = playerYears(top); const endYear = ys.length ? ys[ys.length - 1] : 0;
+    const yrs = endYear ? now - endYear : 0;
+    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
+    recordBonus += imp * 5 * marginMult * longMult;
+  }
+  // Single-season / single-game / per-game marks still come from the stored record book.
   (school.records || []).forEach((rec) => {
+    if ((rec.variant || "").toLowerCase().includes("career")) return; // career handled above from live data
     const h = (rec.holderName || "").toLowerCase().trim();
-    if (!h || h === "multiple players" || h !== pn) return;
-    if (TEAM_STATS.has(rec.statName)) return; // team records (Wins) aren't individual achievements
-    // importance (Points 1.0 … FT made 0.3) × variant (career 5 / season-or-avg 3 / game 2) × margin over #2 × longevity
+    if (!h || h === "multiple players" || h !== pn || TEAM_STATS.has(rec.statName)) return;
     const v = (rec.variant || "").toLowerCase();
     const imp = (HOF_STAT_WEIGHTS[rec.statName] || 3) / 10;
-    const variantBase = v.includes("career") ? 5 : v.includes("game") ? 2 : 3;
-    let marginMult = 1;
-    if (v.includes("career")) { const t2 = top2For(rec.statName); if (t2.v1 > 0 && t2.v2 > 0) { const m = (t2.v1 - t2.v2) / t2.v2; marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; } }
+    const variantBase = v.includes("game") ? 2 : 3;
     const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
     const yrs = endYear ? now - endYear : 0;
     const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-    recordBonus += imp * variantBase * marginMult * longMult;
+    recordBonus += imp * variantBase * longMult;
   });
   return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
 }
