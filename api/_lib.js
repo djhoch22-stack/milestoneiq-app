@@ -533,7 +533,7 @@ export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
 
 // ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
 const HOF_STAT_WEIGHTS = {
-  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 6, "Blocks": 5, "Wins": 0, "Games Played": 3, "Matches Played": 3,
+  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 5, "Blocks": 5, "Wins": 0, "Games Played": 3, "Matches Played": 3,
   "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
   "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
   "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
@@ -588,11 +588,25 @@ export function calcProgramHofScore(player, school) {
   (school.seasons || []).forEach((s) => { if (playerSeasonOverlap(player, s)) teamScore += getSeasonSuccessScore(s.notes); });
   const teamNorm = Math.min(teamScore / 3, 30) * (0.2 + 0.8 * impact); // team success scaled by the player's impact
   const pn = (player.name || "").toLowerCase().trim(); let recordBonus = 0;
+  const now = new Date().getFullYear(); const t2Cache = {};
+  const top2For = (stat) => t2Cache[stat] || (t2Cache[stat] = (() => {
+    const s = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
+    return { v1: (s[0] ? (s[0].stats[stat] || 0) : 0), v2: (s[1] ? (s[1].stats[stat] || 0) : 0) };
+  })());
   (school.records || []).forEach((rec) => {
     const h = (rec.holderName || "").toLowerCase().trim();
-    if (!h || h === "multiple players") return;
+    if (!h || h === "multiple players" || h !== pn) return;
     if (TEAM_STATS.has(rec.statName)) return; // team records (Wins) aren't individual achievements
-    if (h === pn) recordBonus += (rec.variant || "").toLowerCase().includes("career") ? 5 : 3;
+    // importance (Points 1.0 … FT made 0.3) × variant (career 5 / season-or-avg 3 / game 2) × margin over #2 × longevity
+    const v = (rec.variant || "").toLowerCase();
+    const imp = (HOF_STAT_WEIGHTS[rec.statName] || 3) / 10;
+    const variantBase = v.includes("career") ? 5 : v.includes("game") ? 2 : 3;
+    let marginMult = 1;
+    if (v.includes("career")) { const t2 = top2For(rec.statName); if (t2.v1 > 0 && t2.v2 > 0) { const m = (t2.v1 - t2.v2) / t2.v2; marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; } }
+    const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
+    const yrs = endYear ? now - endYear : 0;
+    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
+    recordBonus += imp * variantBase * marginMult * longMult;
   });
   return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
 }
