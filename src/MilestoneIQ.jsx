@@ -1313,27 +1313,34 @@ function RecordMinimumsModal({ school, onClose, onSave }) {
 // ── New-coach getting-started checklist (Overview tab) ─────────────────────────
 // Each step auto-checks from the program's own data; clicking a step deep-links to
 // its tab. Dismissable per browser (localStorage); turns green when complete.
-function GettingStarted({ school, onStep, hideWhenDone, programName }) {
+function GettingStarted({ school, onStep, hideWhenDone, programName, tier }) {
   const key = "mq_getstarted_hidden_" + (school.id || "");
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === "1"; } catch (e) { return false; } });
   const [open, setOpen] = useState(null);
   const items = [
     { label: "Add your season history", done: (school.seasons || []).length > 0, tab: "seasons", tabLabel: "Seasons",
       what: "Your team's year-by-year record — wins, losses, league finish, coach, and playoff runs.",
-      how: ["Click + Add season, then fill in the year (e.g. 2024-2025), overall W-L, league record, head coach, and notes.", "Add one row for every season you have records for.", "Have a spreadsheet of seasons? Use Import to load them all at once.", "Doing this first means each player's wins auto-fill when you import their stats."] },
+      yearMode: "track", intro: "Add each season — most recent first. Click a year to jump in:",
+      note: "Each row takes the year, overall W-L, league record, coach, and notes. Got a spreadsheet? Use Import to load every year at once. Doing seasons first auto-fills each player's wins when you import stats." },
     { label: "Add your players & career stats", done: ((school.allTimeRoster || []).length + (school.athletes || []).length) > 0, tab: "all-time", tabLabel: "All-Time",
       what: "Your all-time roster and every player's career numbers.",
-      how: ["Click Import to upload from MaxPreps, GameChanger, Hudl, a spreadsheet, or even a photo of a stat sheet.", "Or click + Add player to enter someone by hand.", "Wins fill in automatically from the season history you added above."] },
+      yearMode: "guide", intro: "Import a season's stats at a time — most recent first:",
+      note: "Use Import for each year (Excel, CSV, photo, or a MaxPreps / GameChanger / Hudl export), or + Add player for career totals. Wins fill in from the season history above." },
     { label: "Set your program records", done: (school.records || []).length > 0, tab: "records", tabLabel: "Records",
       what: "Your all-time record book — the bests every athlete is chasing.",
       how: ["Click + Add / edit records.", "Pick the stat, the record type (career, single-season, or single-game), the holder, the year, and the value.", "Many records auto-fill from the stats you import — you mainly enter the ones only you have on file (single-game marks, older records)."] },
-    { label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", tabLabel: "HOF",
+    ...(hofEnabled(tier) ? [{ label: "Add awards & Hall of Famers", done: (school.awards || []).length > 0, tab: "hof", tabLabel: "HOF",
       what: "All-league, all-state, player & coach of the year — and your Hall of Fame.",
-      how: ["On the HOF tab, open the awards manager.", "Log each honor — the player, the award, the level (league or state), and the year.", "Hall of Famers are then calculated automatically from awards plus career stats."] },
+      how: ["On the HOF tab, open the awards manager.", "Log each honor — the player, the award, the level (league or state), and the year.", "Hall of Famers are then calculated automatically from awards plus career stats."] }] : []),
   ];
   const done = items.filter((i) => i.done).length, total = items.length, allDone = done === total;
   if (hidden || (hideWhenDone && allDone)) return null;
   const hide = () => { try { localStorage.setItem(key, "1"); } catch (e) {} setHidden(true); };
+  const now = new Date();
+  const curStart = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  const recentYears = [0, 1, 2, 3, 4].map((i) => curStart - i);
+  const hasSeason = (yr) => (school.seasons || []).some((s) => String(s.season || "").slice(0, 4) === String(yr));
+  const hasOlderSeason = (school.seasons || []).some((s) => { const y = parseInt(String(s.season || "").slice(0, 4), 10); return y && y < curStart - 4; });
   return (
     <div style={{ background: allDone ? "#f0fdf4" : "#eff6ff", border: "1px solid " + (allDone ? "#bbf7d0" : "#bfdbfe"), borderRadius: 12, padding: 16, marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 12 }}>
@@ -1363,9 +1370,31 @@ function GettingStarted({ school, onStep, hideWhenDone, programName }) {
               {isOpen && (
                 <div style={{ padding: "2px 12px 12px 38px" }}>
                   <div style={{ fontSize: 12, color: "#374151", marginBottom: 8, lineHeight: 1.5 }}>{it.what}</div>
-                  <ol style={{ margin: "0 0 10px", paddingLeft: 16, fontSize: 12, color: "#4b5563", lineHeight: 1.55 }}>
-                    {it.how.map((s, i) => <li key={i} style={{ marginBottom: 3 }}>{s}</li>)}
-                  </ol>
+                  {it.yearMode ? (
+                    <>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{it.intro}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                        {recentYears.map((yr) => {
+                          const yd = it.yearMode === "track" && hasSeason(yr);
+                          return (
+                            <button key={yr} onClick={() => onStep(it.tab)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 0", cursor: "pointer", textAlign: "left", width: "100%" }}>
+                              <span style={{ fontSize: 14, flexShrink: 0 }}>{it.yearMode === "track" ? (yd ? "✅" : "⬜") : "•"}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: yd ? "#9ca3af" : "#1a56db", textDecoration: yd ? "line-through" : "none" }}>{yr}-{yr + 1}</span>
+                            </button>
+                          );
+                        })}
+                        <button onClick={() => onStep(it.tab)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: "3px 0", cursor: "pointer", textAlign: "left", width: "100%" }}>
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>{it.yearMode === "track" ? (hasOlderSeason ? "✅" : "⬜") : "•"}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: (it.yearMode === "track" && hasOlderSeason) ? "#9ca3af" : "#1a56db" }}>…and any older seasons</span>
+                        </button>
+                      </div>
+                      {it.note && <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 10, lineHeight: 1.5 }}>{it.note}</div>}
+                    </>
+                  ) : (
+                    <ol style={{ margin: "0 0 10px", paddingLeft: 16, fontSize: 12, color: "#4b5563", lineHeight: 1.55 }}>
+                      {it.how.map((s, i) => <li key={i} style={{ marginBottom: 3 }}>{s}</li>)}
+                    </ol>
+                  )}
                   <button onClick={() => onStep(it.tab)}
                     style={{ background: "#1a56db", color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                     Go to {it.tabLabel} →
@@ -5960,7 +5989,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
         {/* OVERVIEW TAB */}
         {activeTab==="overview" && (
           <div>
-            <GettingStarted school={school} onStep={setActiveTab} />
+            <GettingStarted school={school} tier={tier} onStep={setActiveTab} />
             {(() => {
               // Public record book (SEO). Public-by-default; this is the opt-out + share control.
               const isPub = school.isPublic !== false;
@@ -7582,7 +7611,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
           )}
 
           {orderedSchools.map(school => (
-            <GettingStarted key={"gs-"+school.id} school={school} hideWhenDone
+            <GettingStarted key={"gs-"+school.id} school={school} tier={tier} hideWhenDone
               programName={SPORTS[school.sport]?.label || school.mascot || school.name}
               onStep={(tab) => { try { sessionStorage.setItem("mq_dash_tab", tab); } catch (e) {} setActiveSchool(school); }} />
           ))}
