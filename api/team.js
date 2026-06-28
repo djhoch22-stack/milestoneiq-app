@@ -372,7 +372,7 @@ export default async function handler(req, res) {
   // Combine each coach's record across EVERY public program in the school (cross-sport),
   // mirroring the app's "Combine all teams" — so e.g. a coach who led soccer + basketball
   // shows one aggregated HOF record. Falls back to this program if the org lookup is empty.
-  const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof,sport`);
+  const orgTeams = await sb(`public_teams?org_id=eq.${team.org_id}&select=id,coach_hof,sport,coach_prior`);
   const orgIds = orgTeams.map((p) => p.id).filter(Boolean);
   const sportById = {}; orgTeams.forEach((p) => { sportById[p.id] = prettySport(p.sport); });
   const labelEmoji = {}; orgTeams.forEach((p) => { labelEmoji[prettySport(p.sport)] = SPORT_ICON[p.sport] || "🏅"; });
@@ -389,7 +389,8 @@ export default async function handler(req, res) {
   const orgAwardsRaw = orgIds.length ? await sb(`awards?program_id=in.(${orgIds.join(",")})&scope=eq.coach&select=program_id,kind,level,holder_name,season`) : [];
   const awBySport = {};
   orgAwardsRaw.forEach((a) => { const k = normName(a.holder_name) + "|" + (sportById[a.program_id] || ""); (awBySport[k] = awBySport[k] || []).push(a); });
-  const coaches = buildCoachStats(orgSeasons);
+  const orgCoachPrior = Object.assign({}, team.coach_prior || {}, ...orgTeams.map((p) => p.coach_prior || {}));
+  const coaches = buildCoachStats(orgSeasons, { includePrior: true, prior: orgCoachPrior });
   const inductedCoaches = coaches.filter((c) => inducted.has(normName(c.name))).sort((a, b) => b.wins - a.wins);
   const coachHofYear = {};
   Object.entries(team.coach_hof || {}).forEach(([k, v]) => { if (v) coachHofYear[normName(k)] = (typeof v === "number" ? v : null); });
