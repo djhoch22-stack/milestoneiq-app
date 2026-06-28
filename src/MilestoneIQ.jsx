@@ -3878,7 +3878,7 @@ function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
     ["leagueChamps", "League Championships"], ["stateChamps", "State Championships"],
     ["stateRunnerUp", "State Runner-Ups"], ["finalFours", "Final Fours"], ["eliteEights", "Elite Eights"],
   ];
-  const FIELDS = [...OVERALL, ...LEAGUE, ...ACCOLADES];
+  const FIELDS = [["seasons", "Seasons coached"], ...OVERALL, ...LEAGUE, ...ACCOLADES];
   const [vals, setVals] = useState(() => {
     const o = {}; FIELDS.forEach(([k]) => { o[k] = prior[k] != null ? String(prior[k]) : ""; });
     o.note = prior.note || ""; return o;
@@ -3901,6 +3901,10 @@ function CoachPriorModal({ coach, prior = {}, onClose, onSave }) {
       <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:14, padding:24, width:"100%", maxWidth:480, maxHeight:"90vh", overflowY:"auto" }}>
         <div style={{ fontSize:18, fontWeight:700, color:"#111", marginBottom:4 }}>Prior-school record — {coach}</div>
         <div style={{ fontSize:13, color:"#6b7280", marginBottom:16 }}>Wins &amp; accomplishments {coach} earned at other schools. These add to their career Coach Wins record and Hall of Fame résumé.</div>
+        <div style={sectionLabel}>Tenure</div>
+        <label style={{ ...fieldLabel, display:"block", marginBottom:14 }}>Seasons coached at prior school(s){numInput("seasons")}
+          <span style={{ display:"block", fontSize:11, fontWeight:400, color:"#9ca3af", marginTop:2 }}>Counts toward the longevity part of their Hall of Fame rating.</span>
+        </label>
         <div style={sectionLabel}>Overall record</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:10 }}>
           {OVERALL.map(([k, label]) => (<label key={k} style={fieldLabel}>{label}{numInput(k)}</label>))}
@@ -4699,39 +4703,32 @@ function buildCoachStats(seasons, opts = {}) {
   return Object.values(coaches);
 }
 
-function calcCoachHofScore(coach, allCoachesInProgram) {
-  const total = allCoachesInProgram.length;
-  if (!total) return 0;
+// Absolute, peer-independent HOF résumé score (0–90; Coach-of-the-Year adds up to 10 via coachAwardBonus → 100).
+// Every part is era/state/sport-neutral: win % (ties = ½ win) and per-season longevity — never raw game/win volume,
+// since games-per-season drifts by era and differs by state. Not rank-based, so a coach's score never moves
+// because of another coach's record or the prior-schools toggle.
+function calcCoachHofScore(coach) {
+  const w = coach.wins || 0, l = coach.losses || 0, t = coach.ties || 0, games = w + l + t, s = coach.seasons || 0;
 
-  // Win total rank (0–25 pts)
-  const winRank = [...allCoachesInProgram].sort((a,b)=>b.wins-a.wins).findIndex(c=>c.name===coach.name)+1;
-  const winScore = winRank===1?25:winRank===2?20:winRank===3?15:(winRank/total)<=0.25?10:5;
+  // Win % — ties count as a half win (0–30); needs a real sample (20+ games) to count
+  const pct = games >= 20 ? (w + t / 2) / games : 0;
+  const winScore = pct>=0.70?30:pct>=0.65?25:pct>=0.60?20:pct>=0.55?14:pct>=0.50?9:pct>=0.45?4:0;
 
-  // Win % (min 20 games) (0–15 pts)
-  const games = coach.wins + coach.losses;
-  const pct = games >= 20 ? coach.wins / games : 0;
-  const pctScore = pct>=0.75?15:pct>=0.65?12:pct>=0.55?8:pct>=0.45?4:0;
+  // Longevity — seasons coached, incl. prior schools (0–24)
+  const longScore = s>=25?24:s>=20?21:s>=15?17:s>=12?14:s>=10?11:s>=7?7:s>=5?4:s>=3?2:s>=1?1:0;
 
-  // Seasons coached (longevity) (0–10 pts)
-  const seasRank = [...allCoachesInProgram].sort((a,b)=>b.seasons-a.seasons).findIndex(c=>c.name===coach.name)+1;
-  const seasScore = seasRank===1?10:seasRank===2?8:seasRank===3?6:(coach.seasons>=5?4:2);
+  // League titles (0–18)
+  const lg = coach.leagueChamps || 0;
+  const lgScore = lg>=10?18:lg>=7?15:lg>=5?13:lg>=3?9:lg>=2?5:lg>=1?3:0;
 
-  // Postseason success (0–35 pts)
+  // Postseason / state-level success (0–18) — titles weighted above deep runs, capped so a couple
+  // of strong runs can't outweigh a sustained career
   const postScore = Math.min(
-    coach.stateChamps   * 10 +
-    coach.stateRunnerUp *  6 +
-    coach.finalFours    *  5 +
-    coach.eliteEights   *  3 +
-    coach.sweetSixteens *  2 +
-    coach.leagueChamps  *  2,
-    35
+    (coach.stateChamps||0)*8 + (coach.stateRunnerUp||0)*4 + (coach.finalFours||0)*3 + (coach.eliteEights||0)*2 + (coach.sweetSixteens||0)*1,
+    18
   );
 
-  // League titles rank (0–15 pts)
-  const lgRank = [...allCoachesInProgram].sort((a,b)=>b.leagueChamps-a.leagueChamps).findIndex(c=>c.name===coach.name)+1;
-  const lgScore = lgRank===1&&coach.leagueChamps>0?15:lgRank===2&&coach.leagueChamps>0?10:coach.leagueChamps>0?5:0;
-
-  return Math.min(Math.round(winScore + pctScore + seasScore + postScore + lgScore), 100);
+  return Math.min(winScore + longScore + lgScore + postScore, 90);
 }
 
 function coachHofTier(score) {
@@ -4785,13 +4782,13 @@ function playerAwardBonus(name, awards, names) {
   }
   return Math.min(bonus, 20);
 }
+// Coach-of-the-Year recognition (0–10), banded on count so it complements — not dominates — the résumé score.
 function coachAwardBonus(name, awards, names) {
-  let bonus = 0;
+  let coy = 0;
   for (const a of (awards || [])) {
-    if (a.scope !== "coach" || !awardHolderMatches(a.holder_name, name, names)) continue;
-    bonus += COACH_AWARD_POINTS[a.level] || COACH_AWARD_POINTS.league;
+    if (a.scope === "coach" && awardHolderMatches(a.holder_name, name, names)) coy += 1;
   }
-  return Math.min(bonus, 20);
+  return coy>=6?10:coy>=4?8:coy>=3?6:coy>=2?4:coy>=1?2:0;
 }
 function awardsForHolder(name, scope, awards, names) {
   return (awards || []).filter(a => a.scope === scope && awardHolderMatches(a.holder_name, name, names))
