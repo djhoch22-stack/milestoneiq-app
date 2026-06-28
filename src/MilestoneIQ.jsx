@@ -4424,8 +4424,8 @@ const HOF_STAT_WEIGHTS = {
   "Saves":                     6,  // keeper VOLUME (more shots faced ≈ weaker team) — below shutouts/assists
   "Shots on Goal":             5,  // on-target — above raw shots, below the scoring stats
   "Shots":                     4,  // attacking involvement — a shot isn't a goal
-  // Baseball — hitting + pitching impact (fielding Put Outs/Assists count too; "Assists" is shared above)
-  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
+  // Baseball / Softball — hitting + pitching ("Assists" = fielding, overridden to 4 below; AVG/ERA are computed rates → unweighted)
+  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Total Bases": 7, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
   // Girls volleyball ("Assists" shared above)
@@ -4439,8 +4439,11 @@ const HOF_STAT_WEIGHTS = {
 const SPORT_STAT_OVERRIDES = {
   soccer:     { "Points": 8 },
   baseball:   { "Assists": 4 },
-  volleyball: { "Assists": 9 },
+  volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },  // setting / serve-receive passing / solo stuffs
 };
+// Rate-stat records that COUNT toward HOF (importance ÷ 10). Computed per player from rateDefsFor(sport),
+// gated by the def's min-playing-time qualifier; the qualified leader holds the "title" (ERA = lowest-is-best).
+const HOF_RATE_WEIGHTS = { "Batting Average": 9, "ERA": 9, "Kill Percentage": 8 };
 function sportGroup(sport) {
   const s = String(sport || "");
   if (s.indexOf("basketball") === 0) return "basketball";
@@ -4536,6 +4539,31 @@ function buildHofCtx(school) {
     const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
     add(t.name, imp * 5 * marginMult * longMult);
   }
+  // CAREER RATE records (Batting Average, ERA, …) — computed from the roster, qualified by the def's min
+  // playing time, ranked best-first (ERA is lowest-is-best). The qualified leader holds the rate title.
+  for (const d of (rateDefsFor(school && school.sport) || [])) {
+    const impW = HOF_RATE_WEIGHTS[d.name]; if (!impW) continue;
+    const qualed = [];
+    for (const p of roster) {
+      const g = (s) => Number((p.stats || {})[s]) || 0;
+      if (g(d.qualStat) < (d.minCareer || 0)) continue;
+      const rv = d.calc(g);
+      if (rv == null || !(rv > 0)) continue;
+      qualed.push({ name: p.name, year: String(p.lastYear || p.firstYear || p.gradYear || ""), v: rv });
+    }
+    if (!qualed.length) continue;
+    qualed.sort((a, b) => d.lowerIsBetter ? (a.v - b.v) : (b.v - a.v));
+    const r0 = qualed[0], r1 = qualed[1];
+    let rMargin = 1;
+    if (r1 && r0.v > 0 && r1.v > 0) {
+      const m = d.lowerIsBetter ? (r1.v - r0.v) / r0.v : (r0.v - r1.v) / r1.v;
+      rMargin = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7;
+    }
+    const rey = parseInt(r0.year.slice(-4), 10);
+    const rys = rey ? now - rey : 0;
+    const rLong = rys >= 40 ? 1.3 : rys >= 25 ? 1.2 : rys >= 15 ? 1.1 : 1;
+    add(r0.name, (impW / 10) * 5 * rMargin * rLong);
+  }
   // Single-season / single-game / per-game marks still come from the stored record book.
   for (const rec of (school.records || [])) {
     if ((rec.variant || "").toLowerCase().includes("career")) continue; // career handled above from live data
@@ -4548,7 +4576,7 @@ function buildHofCtx(school) {
 // longevity. (CAREER records are credited separately from the live leaderboard, with margin-over-#2.)
 function recordWeight(rec, sport, now) {
   const v = (rec.variant || "").toLowerCase();
-  const imp = (weightFor(sport, rec.statName) || 3) / 10;
+  const imp = ((HOF_RATE_WEIGHTS[rec.statName] || weightFor(sport, rec.statName)) || 3) / 10;
   const variantBase = v.includes("game") ? 2 : 3;
   const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
   const yrs = endYear ? now - endYear : 0;
