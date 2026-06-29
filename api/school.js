@@ -5,7 +5,7 @@
 import {
   sb, esc, prettySport, htmlShell, SITE, slugify, SPORT_ICON, sportsLinkable,
   statsToDisplay, rateDefsFor, rateValue, fmtRateVal, RATE_FMT,
-  pctRecordsFrom, pergameRecordsFrom, longestRecordsFrom, autoStatRecords,
+  pctRecordsFrom, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, mergeStoredAuto,
   awardsForHolder, awardLabel, buildCoachStats, normName,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
@@ -68,9 +68,8 @@ export default async function handler(req, res) {
       ...autoStatRecords(sr, cp, statsToDisplay(cp, sport).filter((x) => !/^Longest /.test(x)), sport),
     ];
     const stored = (recsByProg[pid] || []).map((r) => ({ statName: r.stat_name, variant: r.variant, holderName: r.holder_name, value: r.value }));
-    const mk = new Set(stored.map((r) => r.statName + "|" + r.variant));
     const rbh = {};
-    for (const r of [...stored, ...auto.filter((x) => !mk.has(x.statName + "|" + x.variant))]) {
+    for (const r of mergeStoredAuto(stored, auto)) {
       if (!r.holderName) continue;
       const k = normName(r.holderName);
       const val = RATE_FMT[r.statName] ? fmtRateVal(RATE_FMT[r.statName], r.value) : (typeof r.value === "number" ? r.value.toLocaleString() : r.value);
