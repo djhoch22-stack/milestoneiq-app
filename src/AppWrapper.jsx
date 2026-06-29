@@ -108,6 +108,20 @@ function rowToSchool(prog, athletes, allTime, records, milestones, seasons, awar
   };
 }
 
+// Stable serialization of an all-time player's PERSISTED fields, for change-detection on save. Lets
+// handleUpdateSchool upsert only players that actually changed since load, so a stale browser tab can't
+// clobber a direct DB edit or re-insert a row that was merged/deleted in the database.
+function playerSnapKey(p) {
+  const s = p.stats || {};
+  const stats = {};
+  for (const k of Object.keys(s).sort()) stats[k] = s[k];
+  return JSON.stringify({
+    n: p.name, fy: p.firstYear ?? null, ly: p.lastYear ?? null, gy: p.gradYear ?? null,
+    cur: !!p.isCurrent, act: !!p.isActive, shof: !!p.schoolHallOfFame, sthof: !!p.stateHallOfFame,
+    hy: p.hofYear ?? null, st: stats,
+  });
+}
+
 export default function AppWrapper() {
   const [session, setSession] = useState(undefined);
   const [profile, setProfile] = useState(null);
@@ -119,6 +133,9 @@ export default function AppWrapper() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const loadedUserId = useRef(null);
+  // Snapshot of each all-time player's saved state (schoolId -> Map(playerId -> playerSnapKey)), captured at
+  // load and refreshed after every save, so handleUpdateSchool only writes the players that actually changed.
+  const rosterSnapRef = useRef({});
 
   const params = new URLSearchParams(window.location.search);
   const checkoutResult = params.get('checkout');
@@ -219,6 +236,16 @@ export default function AppWrapper() {
           );
         })
       );
+      // Snapshot each roster so a later save can skip unchanged players (prevents stale-tab clobber).
+      const snap = {};
+      for (const sc of schoolsData) {
+        const m = new Map();
+        for (const p of (sc.allTimeRoster || [])) {
+          if (typeof p.id === 'string' && p.id.includes('-')) m.set(p.id, playerSnapKey(p));
+        }
+        snap[sc.id] = m;
+      }
+      rosterSnapRef.current = snap;
       setSchools(schoolsData);
     } catch (e) {
       setError('Failed to load data: ' + e.message);
@@ -304,7 +331,14 @@ export default function AppWrapper() {
         hof_year: p.hofYear || null,
         stats: p.stats || {},
       });
-      const existing = updated.allTimeRoster.filter((p) => isUuid(p.id)).map((p) => ({ id: p.id, ...toRow(p) }));
+      // Only upsert players whose persisted state changed since load — an unchanged player is left alone,
+      // so a stale tab can't overwrite a direct DB edit or revive a merged/deleted row. (No snapshot for a
+      // player => save it, so an edit can never be silently dropped.)
+      const atSnap = rosterSnapRef.current[updated.id];
+      const existing = updated.allTimeRoster
+        .filter((p) => isUuid(p.id))
+        .filter((p) => !atSnap || atSnap.get(p.id) !== playerSnapKey(p))
+        .map((p) => ({ id: p.id, ...toRow(p) }));
       const fresh = updated.allTimeRoster.filter((p) => !isUuid(p.id)).map(toRow);
       // Same duplicate-player guard as athletes: a fresh (temp-id) player gets matched to an existing
       // same-name row and UPDATED, never re-inserted. (Without this, a hand-added player duplicated on
@@ -321,6 +355,9 @@ export default function AppWrapper() {
       }
       for (let i = 0; i < existing.length; i += 500) await supabase.from('all_time_players').upsert(existing.slice(i, i + 500), { onConflict: 'id' });
       for (let i = 0; i < toInsert.length; i += 500) await supabase.from('all_time_players').insert(toInsert.slice(i, i + 500));
+      // Refresh the snapshot to the just-saved state so the next save diffs from here.
+      const atSnapNow = rosterSnapRef.current[updated.id] || (rosterSnapRef.current[updated.id] = new Map());
+      for (const p of updated.allTimeRoster) if (isUuid(p.id)) atSnapNow.set(p.id, playerSnapKey(p));
     }
 
     // Records — update existing by id, INSERT new ones WITHOUT an id (let the DB generate the uuid).
