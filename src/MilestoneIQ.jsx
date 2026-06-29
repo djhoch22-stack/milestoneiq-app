@@ -1072,7 +1072,7 @@ function NotifySettingsModal({ school, onClose, onSave }) {
 }
 
 // ── Milestone Settings Modal ───────────────────────────────────────────────────
-function MilestoneSettingsModal({ school, onClose, onSave }) {
+function MilestoneSettingsModal({ school, records = [], onClose, onSave }) {
   const sportDef = SPORTS[school.sport] || SPORTS.football;
   // Build stat list in the same order as the All-Time tab
   const rawStatNames = [...new Set([
@@ -1233,6 +1233,33 @@ function MilestoneSettingsModal({ school, onClose, onSave }) {
             );
           })}
         </div>
+
+        {/* Auto-tracked all-time career records — every Career-total record is implicitly a milestone,
+            computed live from the leaderboard (same records the alert engine uses), so a current player
+            closing in on one already fires a near_record/record_broken alert. Read-only: they update on
+            their own. */}
+        {(() => {
+          const careerRecs = (records || [])
+            .filter(r => r.variant === "Career total" && r.holderName && typeof r.value === "number" && r.value > 0)
+            .sort((a, b) => a.statName.localeCompare(b.statName));
+          if (!careerRecs.length) return null;
+          return (
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontWeight:700,fontSize:14,color:"#111",marginBottom:6 }}>🏆 All-time career records — auto-tracked ({careerRecs.length})</div>
+              <div style={{ background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:12,fontSize:13,color:"#78350f",marginBottom:10 }}>
+                Every career record is automatically a milestone — you're alerted when a current player closes in on one. They update live as players climb, so there's nothing to set up.
+              </div>
+              <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
+                {careerRecs.map(r => (
+                  <div key={r.statName} style={{ background:"#fff",border:"1px solid #e5e7eb",borderRadius:10,padding:"8px 12px",fontSize:13,minWidth:130 }}>
+                    <div style={{ fontWeight:600,color:"#111" }}>{r.statName}</div>
+                    <div style={{ color:"#6b7280",fontSize:12 }}>{Number(r.value).toLocaleString()} · {r.holderName}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{ display:"flex",gap:10 }}>
           <button onClick={() => setMilestones(defaultMilestonesFor(school.sport).map(m => ({ ...m, _valStr: m.values.join(", ") })))}
@@ -6047,7 +6074,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
       {showAddAthlete && <AddAthleteModal onClose={()=>setShowAddAthlete(false)} sport={school.sport} existingNames={[...(school.allTimeRoster||[]), ...(school.athletes||[])].map(p=>p.name)} onAdd={a=>{ const upd = withAddedPlayer(school, a); if (upd) onUpdate(upd); }} />}
       {showRecords && <RecordsModal school={school} onClose={()=>setShowRecords(false)} onSave={recs=>onUpdate({...school,records:recs})} />}
       {showRecMins && <RecordMinimumsModal school={school} onClose={()=>setShowRecMins(false)} onSave={mins=>onUpdate({...school, recordMins: mins})} />}
-      {showMilestoneSettings && <MilestoneSettingsModal school={school} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
+      {showMilestoneSettings && <MilestoneSettingsModal school={school} records={alertRecords} onClose={()=>setShowMilestoneSettings(false)} onSave={ms=>onUpdate({...school,milestones:ms})} />}
       {showNotifySettings && <NotifySettingsModal school={school} onClose={()=>setShowNotifySettings(false)} onSave={ns=>onUpdate({...school, notifySettings: ns})} />}
       {showEmailPreview && <EmailPreviewModal allAlerts={allAlerts} school={school} onClose={()=>setShowEmailPreview(false)} />}
 
