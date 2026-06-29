@@ -2353,6 +2353,21 @@ function hofMemberCount(school, allSchools) {
   const { schoolNames, stateNames } = hofInductedNames(school, allSchools);
   return (school.allTimeRoster || []).filter(p => { const nm = normName(p.name); return schoolNames.has(nm) || stateNames.has(nm); }).length;
 }
+// Merge stored (hand-entered) records with auto-computed ones. Stored wins by default (single-season/game
+// marks + hidden null-markers), EXCEPT a CAREER counting total the live leaderboard has surpassed — so the
+// record book self-updates as new data lands. (Rate stats keep stored precedence; HOF scores already read live.)
+function mergeStoredAuto(stored, auto) {
+  const autoByKey = new Map((auto || []).map((x) => [x.statName + "|" + x.variant, x]));
+  const out = [], seen = new Set();
+  for (const r of (stored || [])) {
+    const k = r.statName + "|" + r.variant; seen.add(k);
+    const au = autoByKey.get(k);
+    if (au && r.variant === "Career total" && r.value != null && !RATE_FMT[r.statName] && Number(au.value) > Number(r.value)) out.push(au);
+    else out.push(r);
+  }
+  for (const x of (auto || [])) if (!seen.has(x.statName + "|" + x.variant)) out.push(x);
+  return out;
+}
 // Records used for "about to break a record" alerts: stored records + auto-computed CAREER and
 // SINGLE-SEASON counting records (the current leaders), deduped. Covers every stat, so a sport with no
 // manually stored records still gets record-approach alerts. (Rate/%/per-game/longest aren't alertable.)
@@ -2361,8 +2376,7 @@ function recordsForAlerts(school, seasonRows) {
   const statNames = statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s));
   const auto = autoStatRecords(seasonRows || [], school.allTimeRoster || [], statNames, school.sport);
   const stored = school.records || [];
-  const manualKeys = new Set(stored.map(r => r.statName + "|" + r.variant));
-  return [...stored, ...auto.filter(r => !manualKeys.has(r.statName + "|" + r.variant))];
+  return mergeStoredAuto(stored, auto);
 }
 // Total records a program shows on the Records tab = stored records + every auto-computed record
 // (career / single-season / per-game / % / longest / coach-wins), minus auto rows a manual record overrides.
@@ -5666,8 +5680,7 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
       ...autoStatRecords(seasonRows, (sch.allTimeRoster || []), statsToDisplay(recPool, sch.sport).filter(s => !/^Longest /.test(s)), sch.sport),
       ...coachWinsRecordsFrom(sch.seasons || [], sch.sport, sch.coachPrior || {}),
     ];
-    const manualKeys = new Set((sch.records || []).map(r => r.statName + "|" + r.variant));
-    const all = [...(sch.records || []), ...auto.filter(r => !manualKeys.has(r.statName + "|" + r.variant))];
+    const all = mergeStoredAuto(sch.records || [], auto);
     const nameLower = (pl.name || "").toLowerCase().trim();
     return all.filter(r => {
       const h = (r.holderName || "").toLowerCase().trim();
@@ -6448,12 +6461,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   // Manual records are AUTHORITATIVE: a manually entered/edited record overrides the
                   // auto-computed one for the same stat+variant (e.g. an edited best FG%/3P%/FT%).
                   // Auto-computed records fill in only where there's no manual entry.
-                  const manualKeys = new Set((school.records||[]).map(r => r.statName + "|" + r.variant));
-                  const hiddenKeys = new Set((school.records||[]).filter(r => r.value == null).map(r => r.statName + "|" + r.variant)); // a null-value record = a "hidden" marker for that statName|variant (a deleted per-game/per-match avg)
-                  const allRecords = [
-                    ...(school.records||[]),
-                    ...autoRecs.filter(r => !manualKeys.has(r.statName + "|" + r.variant)),
-                  ].filter(r => !hiddenKeys.has(r.statName + "|" + r.variant)); // drop any record (manual OR auto) whose statName|variant has a hidden marker; the manual record stays in school.records so a restore brings back its exact value
+                  const hiddenKeys = new Set((school.records||[]).filter(r => r.value == null).map(r => r.statName + "|" + r.variant)); // a null-value record = a "hidden" marker (a deleted per-game/per-match avg)
+                  // Stored wins, except a career total the live leaderboard has surpassed (mergeStoredAuto); hidden markers dropped.
+                  const allRecords = mergeStoredAuto(school.records||[], autoRecs).filter(r => !hiddenKeys.has(r.statName + "|" + r.variant));
                   const byGroup = {};
                   allRecords.forEach(r => {
                     const tileStat = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName;
