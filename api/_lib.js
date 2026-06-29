@@ -180,6 +180,22 @@ export const RATE_FMT = {
   "Serve Percentage": "pct",
   "Ace Percentage": "pct",
 };
+// Merge stored (hand-entered) records with auto-computed ones. Stored wins by default (single-season/game
+// marks + hidden null-markers), EXCEPT a CAREER counting total the live leaderboard has surpassed — so the
+// record book self-updates as new data lands instead of showing a stale stored mark. (Rate stats keep
+// stored precedence; the HOF score side already reads the live leaderboard.)
+export function mergeStoredAuto(stored, auto) {
+  const autoByKey = new Map((auto || []).map((x) => [x.statName + "|" + x.variant, x]));
+  const out = [], seen = new Set();
+  for (const r of (stored || [])) {
+    const k = r.statName + "|" + r.variant; seen.add(k);
+    const au = autoByKey.get(k);
+    if (au && r.variant === "Career total" && r.value != null && !RATE_FMT[r.statName] && Number(au.value) > Number(r.value)) out.push(au);
+    else out.push(r);
+  }
+  for (const x of (auto || [])) if (!seen.has(x.statName + "|" + x.variant)) out.push(x);
+  return out;
+}
 export function fmtRateVal(fmt, v) {
   if (v == null || isNaN(v)) return "—";
   if (fmt === "pct") return v + "%";
