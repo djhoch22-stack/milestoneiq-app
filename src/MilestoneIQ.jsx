@@ -6701,6 +6701,18 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   return { target, approaching };
                 });
 
+                // Auto-milestone: append this stat's all-time CAREER RECORD as a final tile, showing which
+                // active athletes are chasing it. Read live from the same records the alert engine uses.
+                const rec = !isCoachWins ? (alertRecords || []).find(r => r.variant === "Career total" && r.statName === ms.statName && r.holderName && typeof r.value === "number" && r.value > 0) : null;
+                const recordTile = rec ? {
+                  target: rec.value, isRecord: true, holder: rec.holderName,
+                  approaching: activeAthletes
+                    .filter(a => { const v = a.stats[ms.statName]; return typeof v === "number" && v > 0 && v / rec.value >= 0.5; })
+                    .map(a => ({ athlete: a, val: a.stats[ms.statName], p: a.stats[ms.statName] / rec.value }))
+                    .sort((a, b) => b.p - a.p).slice(0, 3),
+                } : null;
+                const tiles = recordTile ? [...leadersByVal, recordTile] : leadersByVal;
+
                 return (
                   <div key={ms.id} style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",marginBottom:12,overflow:"hidden" }}>
                     <div style={{ padding:"12px 16px",borderBottom:"1px solid #f3f0ea",display:"flex",alignItems:"center",gap:10 }}>
@@ -6709,18 +6721,19 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                       <span style={{ fontSize:12,color:"#9ca3af",marginLeft:"auto" }}>Alert at {100 - ms.alertPct}% away</span>
                     </div>
                     <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:8 }}>
-                      {leadersByVal.map(({ target, approaching }) => (
-                        <div key={target} style={{ background:"#f9fafb",borderRadius:8,padding:12 }}>
-                          <div style={{ fontSize:20,fontWeight:700,color:"#111",marginBottom:6 }}>{target.toLocaleString()}</div>
-                          {approaching.length === 0
+                      {tiles.map((t) => (
+                        <div key={t.isRecord ? "record" : t.target} style={{ background: t.isRecord ? "#fffbeb" : "#f9fafb", border: t.isRecord ? "1px solid #fde68a" : "1px solid transparent", borderRadius:8, padding:12 }}>
+                          <div style={{ fontSize:20,fontWeight:700,color:"#111",marginBottom: t.isRecord ? 2 : 6 }}>{t.target.toLocaleString()}</div>
+                          {t.isRecord && <div style={{ fontSize:11,fontWeight:700,color:"#b45309",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.3px" }}>🏆 Record · {t.holder}</div>}
+                          {t.approaching.length === 0
                             ? <div style={{ fontSize:12,color:"#d1d5db" }}>No {isCoachWins ? "coaches" : "athletes"} in range yet</div>
-                            : approaching.map(({ athlete, val, p }) => (
+                            : t.approaching.map(({ athlete, val, p }) => (
                               <div key={athlete.id} style={{ marginBottom:6 }}>
                                 <div style={{ display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:2 }}>
                                   <span style={{ fontWeight:600,color: p >= 1 ? "#14532d" : "#111" }}>{athlete.name}</span>
                                   <span style={{ color: p >= 1 ? "#14532d" : "#6b7280" }}>{val.toLocaleString()}</span>
                                 </div>
-                                <ProgressBar value={val} max={target} color={p >= 1 ? "#22c55e" : p >= (ms.alertPct/100) ? "#f59e0b" : "#1a56db"} />
+                                <ProgressBar value={val} max={t.target} color={p >= 1 ? "#22c55e" : p >= (ms.alertPct/100) ? "#f59e0b" : "#1a56db"} />
                               </div>
                             ))
                           }
