@@ -6,7 +6,7 @@ import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor, withDerivedStats,
-  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom, mergeStoredAuto,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
@@ -86,13 +86,10 @@ export default async function handler(req, res) {
     ...coachWinsRecordsFrom(seasonsList, team.sport, team.coach_prior || {}),
     ...lowCountingRecordsFrom(seasonRows, careerPool, team.sport, team.record_minimums),
   ];
-  // Manual records are authoritative — they override the auto-computed one for the same stat+variant.
-  const manualKeys = new Set(storedRecords.map((r) => r.statName + "|" + r.variant));
-  const hiddenKeys = new Set(storedRecords.filter((r) => r.value == null).map((r) => r.statName + "|" + r.variant)); // null-value record = a "hidden" marker for that statName|variant
-  const allRecords = [
-    ...storedRecords,
-    ...autoRecs.filter((r) => !manualKeys.has(r.statName + "|" + r.variant)),
-  ].filter((r) => !hiddenKeys.has(r.statName + "|" + r.variant)); // drop any record (manual OR auto) whose statName|variant has a hidden marker
+  // Stored records override the auto one for the same stat+variant — EXCEPT a career total the live
+  // leaderboard has surpassed (mergeStoredAuto). A null-value stored record is a "hidden" marker, dropped below.
+  const hiddenKeys = new Set(storedRecords.filter((r) => r.value == null).map((r) => r.statName + "|" + r.variant));
+  const allRecords = mergeStoredAuto(storedRecords, autoRecs).filter((r) => !hiddenKeys.has(r.statName + "|" + r.variant));
   const byStat = {};
   for (const r of allRecords) { const ts = PCT_PARENT[r.statName] || LONGEST_PARENT[r.statName] || r.statName; (byStat[ts] = byStat[ts] || []).push(r); }
   // One stat's tile (variants collapsed, ties expanded) — rendered inside its category group.
@@ -503,9 +500,8 @@ export default async function handler(req, res) {
         ...lowCountingRecordsFrom(pss, cp, t.sport, t.record_minimums),
       ];
       const stored = recs.map((r) => ({ statName: r.stat_name, variant: r.variant, holderName: r.holder_name, value: r.value }));
-      const mk = new Set(stored.map((r) => r.statName + "|" + r.variant));
       const recByHolder = {};
-      for (const r of [...stored, ...auto.filter((x) => !mk.has(x.statName + "|" + x.variant))]) {
+      for (const r of mergeStoredAuto(stored, auto)) {
         if (!r.holderName) continue;
         const k = normName(r.holderName);
         const val = RATE_FMT[r.statName] ? fmtRateVal(RATE_FMT[r.statName], r.value) : (typeof r.value === "number" ? r.value.toLocaleString() : r.value);
