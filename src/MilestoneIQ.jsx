@@ -6711,7 +6711,9 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                     .map(a => ({ athlete: a, val: a.stats[ms.statName], p: a.stats[ms.statName] / rec.value }))
                     .sort((a, b) => b.p - a.p).slice(0, 3),
                 } : null;
-                const tiles = recordTile ? [...leadersByVal, recordTile] : leadersByVal;
+                // Order every tile (thresholds + the record) by value, so the record lands in its correct
+                // numerical slot rather than always at the end.
+                const tiles = (recordTile ? [...leadersByVal, recordTile] : [...leadersByVal]).sort((a, b) => a.target - b.target);
 
                 return (
                   <div key={ms.id} style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",marginBottom:12,overflow:"hidden" }}>
