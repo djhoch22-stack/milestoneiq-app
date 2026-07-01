@@ -79,6 +79,31 @@ conservative for a $1,000 account. Key knobs:
 
 ---
 
+## Alternative strategy: mirror a member of Congress ("track Pelosi")
+
+Set `strategy.mode: congress` to mirror a member's disclosed stock **buys**
+instead of running momentum. It pulls free STOCK Act disclosure data (House Stock
+Watcher, sourced from official filings) and holds, equal-weighted, the stocks the
+member most recently disclosed buying and hasn't since sold.
+
+Configure it under `strategy.congress` (member name, lookback window, `top_n`,
+whether to mirror call-option buys as underlying shares).
+
+**Know what you're signing up for:**
+- **~30–45 day lag.** Disclosures are filed weeks after the trade — you are never
+  early, and the move has often already happened.
+- **Options become shares.** Members often trade long-dated call options; this
+  equities-only account can only buy the underlying, a much lower-leverage
+  approximation with different risk.
+- **Sporadic & concentrated.** A few trades a year in a few names — the bot may
+  hold 1–3 stocks or, some periods, nothing (it sits in cash).
+
+Preview what it would buy, risk-free, before switching your live account:
+
+```bash
+python scripts/preview_congress.py
+```
+
 ## Run it (dry run — no real money)
 
 ```bash

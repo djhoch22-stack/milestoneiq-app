@@ -12,11 +12,22 @@ import yaml
 
 
 @dataclass
+class CongressConfig:
+    member: str
+    lookback_days: int
+    top_n: int
+    data_url: str
+    include_call_options: bool
+
+
+@dataclass
 class StrategyConfig:
+    mode: str                 # "momentum" or "congress"
     watchlist: list[str]
     lookback_days: int
     top_n: int
     trend_filter_sma_days: int
+    congress: CongressConfig
 
 
 @dataclass
@@ -78,6 +89,21 @@ def load_config(path: str | os.PathLike) -> Config:
     if strat["top_n"] < 1:
         raise ValueError("strategy.top_n must be >= 1")
 
+    strat_mode = strat.get("mode", "momentum")
+    if strat_mode not in ("momentum", "congress"):
+        raise ValueError(
+            f"strategy.mode must be 'momentum' or 'congress', got {strat_mode!r}")
+    cg = strat.get("congress", {}) or {}
+    congress = CongressConfig(
+        member=str(cg.get("member", "Pelosi")),
+        lookback_days=int(cg.get("lookback_days", 365)),
+        top_n=int(cg.get("top_n", 5)),
+        data_url=cg.get("data_url",
+                        "https://house-stock-watcher-data.s3-us-west-2."
+                        "amazonaws.com/data/all_transactions.json"),
+        include_call_options=bool(cg.get("include_call_options", True)),
+    )
+
     for k in ("max_position_pct", "min_cash_pct", "trailing_stop_pct",
               "max_drawdown_kill_pct"):
         v = float(risk[k])
@@ -105,10 +131,12 @@ def load_config(path: str | os.PathLike) -> Config:
         mode=mode,
         starting_cash=float(raw["starting_cash"]),
         strategy=StrategyConfig(
+            mode=strat_mode,
             watchlist=watchlist,
             lookback_days=int(strat["lookback_days"]),
             top_n=int(strat["top_n"]),
             trend_filter_sma_days=int(strat["trend_filter_sma_days"]),
+            congress=congress,
         ),
         risk=RiskConfig(
             max_position_pct=float(risk["max_position_pct"]),

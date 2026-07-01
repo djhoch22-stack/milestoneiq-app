@@ -51,6 +51,22 @@ execution:
 
 # How the bot decides what to buy/sell.
 strategy:
+  # "momentum" -> rank the watchlist by momentum (the default strategy).
+  # "congress" -> mirror a member of Congress's disclosed stock BUYS
+  #               (e.g. "track Nancy Pelosi"). See the congress: block below.
+  #               Read the README section on this before enabling — it lags the
+  #               real trades by up to ~45 days and can only buy shares, not the
+  #               call options the member often actually trades.
+  mode: momentum
+
+  # ---- congress-mirroring settings (used only when mode: congress) ----
+  congress:
+    member: "Pelosi"          # substring matched against the filer's name
+    lookback_days: 365        # consider disclosures within this many days
+    top_n: 5                  # max number of names to hold
+    include_call_options: true  # treat call-option buys as bullish (buy shares)
+    data_url: "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json"
+
   # Only these symbols may ever be traded. The bot cannot touch anything else,
   # no matter what its signals say. Keep these liquid (tight spreads) — small
   # accounts get eaten alive by wide spreads on thin names.

@@ -63,19 +63,39 @@ def main() -> int:
     state = State.load_or_create(cfg.state_file, cfg.starting_cash)
     now = datetime.now()
 
-    # Refresh prices for everything we care about (watchlist + held names).
-    symbols = sorted(set(cfg.strategy.watchlist) | set(state.positions))
-    closes = fetch_prices(symbols, cfg.strategy.lookback_days,
-                          cfg.strategy.trend_filter_sma_days)
-    prices = {s: float(closes[s].dropna().iloc[-1])
-              for s in closes.columns if not closes[s].dropna().empty}
+    # Determine the symbol universe to price, based on the active strategy.
+    picks = []
+    if cfg.strategy.mode == "congress":
+        from bot.congress import fetch_transactions, member_picks
+        cg = cfg.strategy.congress
+        try:
+            txns = fetch_transactions(cg.data_url)
+        except Exception as e:  # noqa: BLE001 - no disclosures -> don't trade blind
+            print(f"  ABORT: could not fetch congressional disclosures: {e}")
+            audit.write("congress_fetch_failed", error=str(e))
+            return 3
+        picks = member_picks(txns, cg, now.date())
+        audit.write("congress_picks", member=cg.member,
+                    picks=[{"ticker": p.ticker, "date": p.last_date.isoformat(),
+                            "is_option": p.is_option} for p in picks])
+        print(f"  {cg.member} recent buys: "
+              f"{[p.ticker for p in picks] or '(none)'}")
+        universe = sorted({p.ticker for p in picks} | set(state.positions))
+    else:
+        universe = sorted(set(cfg.strategy.watchlist) | set(state.positions))
 
-    # Flag any watchlist names we couldn't price this run — they're excluded from
-    # ranking, so keep a record rather than dropping them silently.
-    missing = [s for s in cfg.strategy.watchlist if s not in prices]
+    closes = fetch_prices(universe, cfg.strategy.lookback_days,
+                          cfg.strategy.trend_filter_sma_days) if universe else None
+    prices = {s: float(closes[s].dropna().iloc[-1])
+              for s in (closes.columns if closes is not None else [])
+              if not closes[s].dropna().empty}
+
+    # Flag anything we couldn't price this run — it's excluded from targeting.
+    want = ([p.ticker for p in picks] if cfg.strategy.mode == "congress"
+            else cfg.strategy.watchlist)
+    missing = [s for s in want if s not in prices]
     if missing:
-        print(f"  ⚠ No price data for: {', '.join(missing)} "
-              f"(excluded from ranking this run)")
+        print(f"  ⚠ No price data for: {', '.join(missing)} (excluded this run)")
         audit.write("data_warning", missing_symbols=missing)
 
     if args.status:
@@ -109,13 +129,18 @@ def main() -> int:
         return 0
 
     # Strategy -> target portfolio.
-    signals = compute_signals(closes, cfg.strategy)
-    targets = target_portfolio(signals, cfg.strategy)
-    audit.write("signals",
-                signals=[{"symbol": s.symbol, "momentum": round(s.momentum, 4),
-                          "uptrend": s.in_uptrend, "eligible": s.eligible}
-                         for s in signals],
-                targets=targets)
+    if cfg.strategy.mode == "congress":
+        from bot.congress import target_weights
+        targets = target_weights([p for p in picks if p.ticker in prices])
+        audit.write("targets", mode="congress", targets=targets)
+    else:
+        signals = compute_signals(closes, cfg.strategy)
+        targets = target_portfolio(signals, cfg.strategy)
+        audit.write("signals",
+                    signals=[{"symbol": s.symbol, "momentum": round(s.momentum, 4),
+                              "uptrend": s.in_uptrend, "eligible": s.eligible}
+                             for s in signals],
+                    targets=targets)
 
     # Risk engine -> allowed orders.
     engine = RiskEngine(cfg.risk)
