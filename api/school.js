@@ -178,6 +178,7 @@ export default async function handler(req, res) {
   const script = `var PROF=${JSON.stringify(prof).replace(/</g, "\\u003c")};(function(){var ov=document.getElementById("pmodal");if(!ov)return;var CUR=null;function bar(p,si){if(p.tabs.length<2)return "";var o='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';for(var i=0;i<p.tabs.length;i++){var on=i===si;o+='<button type="button" class="psptab" data-si="'+i+'" style="display:flex;align-items:center;gap:5px;border:none;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:700;cursor:pointer;background:'+(on?"#111":"#f0f0ee")+';color:'+(on?"#fff":"#374151")+'">'+p.tabs[i].ic+" "+p.tabs[i].lbl+"</button>";}return o+"</div>";}function render(p,si){document.getElementById("pmcard").innerHTML=p.hd+'<div class="pmbody">'+bar(p,si)+'<div id="psbody">'+p.tabs[si].body+"</div></div>";}function openX(k){var p=PROF[k];if(!p)return;CUR=p;render(p,0);ov.style.display="flex";}document.addEventListener("click",function(ev){var t=ev.target;if(!t)return;if(t.closest&&t.closest(".pmx")){ov.style.display="none";return;}if(t===ov){ov.style.display="none";return;}var tb=t.closest&&t.closest(".psptab");if(tb&&CUR){render(CUR,+tb.getAttribute("data-si"));return;}var el=t.closest&&t.closest("[data-hk]");if(el){openX(el.getAttribute("data-hk"));}});})();`;
 
   const body = `
+    <a href="/teams" class="backbtn">← All programs</a>
     <div class="hero">
       ${logo ? `<img src="${esc(logo)}" alt="${esc(school)}" style="height:64px;width:auto;margin-bottom:12px"/>` : ""}
       <span class="eyebrow">Athletics</span>
@@ -193,6 +194,8 @@ export default async function handler(req, res) {
     <div id="pmodal"><div id="pmcard"></div></div>
     <script>${script}</script>
     <style>
+      .backbtn{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:7px 14px;border:1px solid #e8e4dd;border-radius:999px;background:#fff;color:#374151;text-decoration:none;font-size:13px;font-weight:600;transition:background .15s,border-color .15s}
+      .backbtn:hover{background:#f9fafb;border-color:#d1cdc4}
       .schoolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:8px}
       .schoolcard{display:block;background:#fff;border:1px solid #e8e4dd;border-radius:14px;padding:20px 18px;text-decoration:none;color:#111;transition:box-shadow .15s,transform .15s}
       .schoolcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.08);transform:translateY(-2px)}
