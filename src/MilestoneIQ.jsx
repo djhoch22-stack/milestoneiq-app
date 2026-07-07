@@ -646,6 +646,7 @@ const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Shot Accuracy": "avg3",
   "Completion Percentage": "pct",
   "Yards per Rush": "per1", "Yards per Pass": "per1", "Yards per Reception": "per1",
   "Kill Percentage": "pct",
@@ -701,7 +702,7 @@ const BASEBALL_RATE_DEFS = [
 // everywhere, never stored. Gated on "Shots on Goal" so it only surfaces where that's tracked; record-
 // eligible above a shots-on-goal minimum so a 1-for-1 can't take the record. Same for boys & girls.
 const SOCCER_RATE_DEFS = [
-  { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "pct", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25,
+  { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "avg3", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25,
     calc: (g) => { const sh = g("Shots"); return sh > 0 ? g("Shots on Goal") / sh : null; },
     note: (g) => `${g("Shots on Goal").toLocaleString()}/${g("Shots").toLocaleString()}` },
 ];
