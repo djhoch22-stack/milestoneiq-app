@@ -672,7 +672,7 @@ function ipInnings(v) {
   return Math.floor(n) + Math.round((n - Math.floor(n)) * 10) / 3;
 }
 const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
-function rateValue(def, stats) { return def.calc(statGetter(stats)); }
+function rateValue(def, stats) { return def.calc(statGetter(stats), stats); }
 // Basketball: derive the rate defs from PCT_DEFS so the % math stays identical (reuses shootingPct).
 const BBALL_RATE_DEFS = PCT_DEFS.map((d) => ({
   name: d.name, short: d.short, after: d.att, fmt: "pct",
@@ -696,7 +696,7 @@ const BASEBALL_RATE_DEFS = [
   // ERA = 7 × Earned Runs ÷ Innings Pitched (7-inning HS games; matches MaxPreps). LOWER is better —
   // records and leaderboards rank ascending. IP converted from .1/.2 thirds notation by ipInnings.
   { name: "ERA", short: "ERA", after: "Innings Pitched", fmt: "era2", qualStat: "Innings Pitched", minSeason: 15, minCareer: 40, lowerIsBetter: true,
-    calc: (g) => { const ip = ipInnings(g("Innings Pitched")); const er = g("Earned Runs"); return (ip > 0 && er > 0) ? (7 * er) / ip : null; }, note: (g) => `${g("Innings Pitched").toLocaleString()} IP` },
+    calc: (g, stats) => { const ip = ipInnings(g("Innings Pitched")); const hasER = stats != null && stats["Earned Runs"] != null && stats["Earned Runs"] !== ""; return (ip > 0 && hasER) ? (7 * g("Earned Runs")) / ip : null; }, note: (g) => `${g("Innings Pitched").toLocaleString()} IP` },
 ];
 // Soccer: shot accuracy = Shots on Goal ÷ Shots (the SOT% column in Hudl/GameChanger exports). Derived
 // everywhere, never stored. Gated on "Shots on Goal" so it only surfaces where that's tracked; record-
@@ -2295,7 +2295,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                   {orderedCols.map(e => e.pg
                     ? <td key={"pg-" + e.pg.stat} style={{ ...td, fontWeight: 700 }}>{(() => { const v = perGame({ [e.pg.stat]: careerOf(e.pg.stat), "Games Played": careerOf("Games Played") }, e.pg.stat); return v != null ? v : "—"; })()}</td>
                     : e.pct
-                    ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{fmtRateVal(e.pct.fmt, e.pct.calc(careerOf))}</td>
+                    ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{fmtRateVal(e.pct.fmt, e.pct.calc(careerOf, careerStats))}</td>
                     : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{careerOf(e.col).toLocaleString()}</td>)}
                 </tr>
               </tbody>
@@ -4594,7 +4594,7 @@ function buildHofCtx(school) {
     for (const p of roster) {
       const g = (s) => Number((p.stats || {})[s]) || 0;
       if (g(d.qualStat) < (d.minCareer || 0)) continue;
-      const rv = d.calc(g);
+      const rv = d.calc(g, p.stats);
       if (rv == null || !(rv > 0)) continue;
       qualed.push({ name: p.name, year: String(p.lastYear || p.firstYear || p.gradYear || ""), v: rv });
     }
