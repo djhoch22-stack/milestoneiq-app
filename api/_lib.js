@@ -173,6 +173,7 @@ export const RATE_FMT = {
   "Field Goal Percentage": "pct", "Three Point Percentage": "pct", "Free Throw Percentage": "pct",
   "Batting Average": "avg3", "On Base Percentage": "avg3", "Slugging Percentage": "avg3", "OPS": "avg3", "Fielding Percentage": "avg3",
   "ERA": "era2",
+  "Shot Accuracy": "avg3",
   "Completion Percentage": "pct",
   "Yards per Rush": "per1", "Yards per Pass": "per1", "Yards per Reception": "per1",
   "Kill Percentage": "pct",
@@ -257,7 +258,7 @@ const BASEBALL_RATE_DEFS = [
     spec: { kind: "era" } },
 ];
 const SOCCER_RATE_DEFS = [
-  { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "pct", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25, noteAbbr: "SOG",
+  { name: "Shot Accuracy", short: "SOT%", after: "Shots on Goal", fmt: "avg3", qualStat: "Shots on Goal", minSeason: 10, minCareer: 25, noteAbbr: "SOG",
     spec: { kind: "ratio", num: [["Shots on Goal", 1]], den: [["Shots", 1]] } },
 ];
 const VBALL_RATE_DEFS = [
