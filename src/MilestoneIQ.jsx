@@ -991,8 +991,8 @@ function coachWinsRecordsFrom(seasons, sport, prior = {}) {
     byCoach[s.coach] = (byCoach[s.coach] || 0) + w;
     if (w > ssMax) ssMax = w;
   }
-  // wins a coach brought from PRIOR schools count toward their career total
-  Object.entries(prior || {}).forEach(([coach, pr]) => { if (pr && pr.wins) byCoach[coach] = (byCoach[coach] || 0) + Number(pr.wins || 0); });
+  // Program record = wins AT THIS SCHOOL only. Prior-school wins (`prior`) are intentionally NOT folded in
+  // — they still count toward the coach's HOF longevity + profile W-L, just not this Coach Wins record.
   const careerMax = Object.keys(byCoach).length ? Math.max(...Object.values(byCoach)) : 0;
   if (careerMax > 0)
     for (const coach in byCoach) if (byCoach[coach] === careerMax)
