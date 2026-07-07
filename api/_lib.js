@@ -233,8 +233,9 @@ export function evalRateSpec(spec, stats) {
   }
   if (spec.kind === "era") {
     const ip = ipInnings(g("Innings Pitched"));
-    const er = g("Earned Runs");
-    return (ip > 0 && er > 0) ? (7 * er) / ip : null; // 7-inning HS games (matches MaxPreps); no earned runs = no data (not a real 0.00)
+    // A recorded 0 is a real 0.00 ERA; only a truly-missing "Earned Runs" value (no data) → null → "—".
+    const hasER = stats != null && stats["Earned Runs"] != null && stats["Earned Runs"] !== "";
+    return (ip > 0 && hasER) ? (7 * g("Earned Runs")) / ip : null; // 7-inning HS games (matches MaxPreps)
   }
   return null;
 }
