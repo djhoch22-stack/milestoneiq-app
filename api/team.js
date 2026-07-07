@@ -6,7 +6,7 @@ import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
   byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor, withDerivedStats,
-  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom, mergeStoredAuto,
+  PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom, mergeStoredAuto, holderYears,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
@@ -104,7 +104,7 @@ export default async function handler(req, res) {
       let tied = [];
       if (!isPct && rec.variant === "Career total") {
         tied = careerPool.filter((p) => (p.stats?.[rec.statName] ?? null) === rec.value && !seen.has((p.name || "").toLowerCase().trim()))
-          .map((p) => ({ name: p.name, year: (p.firstYear && p.lastYear) ? (String(p.firstYear) === String(p.lastYear) ? p.firstYear : p.firstYear + "-" + p.lastYear) : (p.gradYear ? "Class of " + p.gradYear : "") }));
+          .map((p) => ({ name: p.name, year: holderYears(p.firstYear, p.lastYear, p.gradYear) }));
       } else if (!isPct && rec.variant === "Single season") {
         const ns = new Set();
         tied = (seasonRows || []).filter((r) => (r.stats?.[rec.statName] ?? null) === rec.value && r.player_name && !seen.has(r.player_name.toLowerCase().trim()) && !ns.has(r.player_name.toLowerCase().trim()) && (ns.add(r.player_name.toLowerCase().trim()) || true))
