@@ -673,6 +673,14 @@ function ipInnings(v) {
 }
 const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
 function rateValue(def, stats) { return def.calc(statGetter(stats), stats); }
+// Career "years played" label for a record holder: a single year, a multi-year span "2020-2021–2023-2024",
+// or "Class of 2021" (grad year only). Mirrors the public record book (api/_lib.js holderYears) — keep in sync.
+function holderYears(firstYear, lastYear, gradYear) {
+  if (firstYear && lastYear) return String(firstYear) === String(lastYear) ? String(firstYear) : String(firstYear) + "–" + String(lastYear);
+  if (firstYear) return String(firstYear);
+  if (gradYear) return "Class of " + String(gradYear);
+  return "";
+}
 // Basketball: derive the rate defs from PCT_DEFS so the % math stays identical (reuses shootingPct).
 const BBALL_RATE_DEFS = PCT_DEFS.map((d) => ({
   name: d.name, short: d.short, after: d.att, fmt: "pct",
@@ -808,7 +816,7 @@ function pctRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
     for (const pl of (careerPlayers || [])) {
       if ((Number(pl.stats?.[d.qualStat]) || 0) < mn.career) continue; // missing/NaN volume → 0 → never qualifies
       const p = rateValue(d, pl.stats);
-      if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+      if (p != null && (!car || beats(p, car.value))) car = { value: p, holderName: pl.name, holderYear: holderYears(pl.firstYear, pl.lastYear, pl.gradYear) };
     }
     if (car) out.push({ id: `auto-c-${d.name}`, statName: d.name, variant: "Career total", sport, auto: true, ...car });
   }
@@ -874,7 +882,7 @@ function pergameRecordsFrom(seasonRows, careerPlayers, sport) {
     for (const pl of (careerPlayers || [])) {
       if (Number(pl.stats?.["Games Played"] ?? pl.stats?.["Matches Played"]) < minCareerGP) continue;
       const v = perGame(pl.stats, d.stat);
-      if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+      if (v != null && (!car || v > car.value)) car = { value: v, holderName: pl.name, holderYear: holderYears(pl.firstYear, pl.lastYear, pl.gradYear) };
     }
     if (car) out.push({ id: `auto-pg-c-${d.stat}`, statName: d.stat, variant: `${perLbl} (career)`, sport, auto: true, ...car });
   }
@@ -925,7 +933,7 @@ function lowCountingRecordsFrom(seasonRows, careerPlayers, sport, recordMins) {
     for (const pl of (careerPlayers || [])) {
       if ((Number(pl.stats?.[d.qualStat]) || 0) < mn.career) continue;
       const v = Number(pl.stats?.[d.stat]); if (isNaN(v)) continue;
-      if (!car || v < car.value) car = { value: v, holderName: pl.name, holderYear: pl.firstYear ? String(pl.firstYear) : (pl.gradYear ? String(pl.gradYear) : "") };
+      if (!car || v < car.value) car = { value: v, holderName: pl.name, holderYear: holderYears(pl.firstYear, pl.lastYear, pl.gradYear) };
     }
     if (car) out.push({ id: `auto-low-c-${d.stat}`, statName: d.stat, variant: "Career total", sport, auto: true, lowerBetter: true, ...car });
   }
@@ -951,7 +959,7 @@ function autoStatRecords(seasonRows, careerPlayers, statNames, sport) {
       for (const p of (careerPlayers || [])) {
         if (Number(p.stats?.[stat]) !== mc) continue;
         const k = (p.name || "").toLowerCase().trim(); if (seen.has(k)) continue; seen.add(k);
-        out.push({ id: `auto-c-${stat}-${k}`, statName: stat, variant: "Career total", value: mc, holderName: p.name, holderYear: p.firstYear ? String(p.firstYear) : (p.gradYear ? String(p.gradYear) : ""), sport, auto: true });
+        out.push({ id: `auto-c-${stat}-${k}`, statName: stat, variant: "Career total", value: mc, holderName: p.name, holderYear: holderYears(p.firstYear, p.lastYear, p.gradYear), sport, auto: true });
       }
     }
     let ms = 0;
