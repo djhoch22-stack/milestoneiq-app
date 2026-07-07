@@ -673,11 +673,15 @@ function ipInnings(v) {
 }
 const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
 function rateValue(def, stats) { return def.calc(statGetter(stats), stats); }
-// Career "years played" label for a record holder: a single year, a multi-year span "2020-2021–2023-2024",
-// or "Class of 2021" (grad year only). Mirrors the public record book (api/_lib.js holderYears) — keep in sync.
+// Career "years played" label for a record holder: START year of the first season → END year of the last,
+// so 2021-2022 through 2024-2025 shows as "2021-2025". Mirrors the public record book (api/_lib.js) — keep in sync.
 function holderYears(firstYear, lastYear, gradYear) {
-  if (firstYear && lastYear) return String(firstYear) === String(lastYear) ? String(firstYear) : String(firstYear) + "–" + String(lastYear);
-  if (firstYear) return String(firstYear);
+  const fy = firstYear || lastYear, ly = lastYear || firstYear;
+  if (fy && ly) {
+    const start = String(fy).split("-")[0];
+    const end = String(ly).split("-")[1] || String(ly).split("-")[0];
+    return start === end ? start : start + "-" + end;
+  }
   if (gradYear) return "Class of " + String(gradYear);
   return "";
 }
