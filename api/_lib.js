@@ -212,11 +212,16 @@ function ipInnings(v) {
   const n = Number(v); if (isNaN(n) || n < 0) return 0;
   return Math.floor(n) + Math.round((n - Math.floor(n)) * 10) / 3;
 }
-// Career "years played" label for a record holder: a single year "2020-2021", a multi-year span
-// "2020-2021–2023-2024", or "Class of 2021" when only a grad year is known (matches the roster/HOF display).
+// Career "years played" label for a record holder: START year of the first season → END year of the last,
+// so 2021-2022 through 2024-2025 shows as "2021-2025" (a lone season "2023-2024" stays "2023-2024");
+// or "Class of 2021" when only a grad year is known.
 export function holderYears(firstYear, lastYear, gradYear) {
-  if (firstYear && lastYear) return String(firstYear) === String(lastYear) ? String(firstYear) : String(firstYear) + "–" + String(lastYear);
-  if (firstYear) return String(firstYear);
+  const fy = firstYear || lastYear, ly = lastYear || firstYear;
+  if (fy && ly) {
+    const start = String(fy).split("-")[0];
+    const end = String(ly).split("-")[1] || String(ly).split("-")[0];
+    return start === end ? start : start + "-" + end;
+  }
   if (gradYear) return "Class of " + String(gradYear);
   return "";
 }
