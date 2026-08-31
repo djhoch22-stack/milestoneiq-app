@@ -2881,11 +2881,14 @@ const STAT_ALIASES_BY_SPORT = {
     "ftm": "Free Throws Made", "fta": "Free Throws Attempted",
   },
   soccer: {
-    // Hudl/GameChanger soccer "Totals" export columns: MP, G, A, S (shots), SOT (shots on goal).
-    // S/G and SOT% are DERIVED (the app computes per-game + accuracy) and drop out automatically.
-    "mp": "Matches Played", "matches": "Matches Played", "matches played": "Matches Played", "games": "Matches Played", "gp": "Matches Played", "games played": "Matches Played",
+    // Soccer tracks "Games Played" — NOT "Matches Played" (that's volleyball). Map every game-count
+    // variant (Hudl/GameChanger "MP", MaxPreps PDF "GP") to Games Played, else the valid-stat filter
+    // (which only keeps the canonical soccer stats) silently DROPS it. S/G and SOT% are DERIVED
+    // (the app computes per-game + accuracy) and drop out automatically.
+    "mp": "Games Played", "matches": "Games Played", "matches played": "Games Played", "games": "Games Played", "gp": "Games Played", "games played": "Games Played",
+    "w": "Wins", "wins": "Wins", // team W-L-T record (from the "Overall" line) → every player gets the team's win total
     "g": "Goals", "gls": "Goals", "goals": "Goals",
-    "a": "Assists", "ast": "Assists", "assists": "Assists",
+    "a": "Assists", "ast": "Assists", "asst": "Assists", "assist": "Assists", "assists": "Assists", // MaxPreps PDF field table uses "Asst"
     "s": "Shots", "sh": "Shots", "sht": "Shots", "shts": "Shots", "shots": "Shots",
     "sot": "Shots on Goal", "sog": "Shots on Goal", "shots on goal": "Shots on Goal", "shots on target": "Shots on Goal",
     "sv": "Saves", "svs": "Saves", "saves": "Saves",

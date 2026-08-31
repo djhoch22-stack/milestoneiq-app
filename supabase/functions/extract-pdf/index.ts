@@ -68,7 +68,13 @@ BASKETBALL — a MaxPreps printout has SEVERAL sections in this order: "Game Sta
 - IGNORE every percentage, per-game, and ratio column anywhere (FG%, 3P%, FT%, 2FG%, PPS, AFG%, MPG, PPG, RPG, APG, SPG, BPG, and the Misc-Totals ratios like Ast:TO). Counting TOTALS only — a "Made" total can NEVER exceed its "Attempted" total.
 - SKIP the "Season Totals" team row at the top of each section. A name may carry a grade like "J. Beijer (Jr)" — use the name without the grade; if a season year is shown set gradYear from the grade (Sr = season's ending year, Jr +1, So +2, Fr +3).
 
-For other sports (soccer, volleyball, etc.) there is usually one table — use the exact stat names shown.
+SOCCER — a MaxPreps printout usually has a "Field Stats" table, a Shooting table, and (for keepers) Goaltending tables. Match the SAME player across tables by jersey # + last name and COMBINE into one object. Use these EXACT stat names; IGNORE every rate/average/percentage column (G/G, Asst/G, P/G, S/G, SOG/G, "SOG %", "Save %", GAA) and any column not listed here:
+- Games Played (GP). Wins: read the team's OVERALL win total from the "Overall" W-L-T line near the top (soccer records are Win-Loss-Tie, e.g. "Overall 12-4-1" → 12) and set "Wins" to that number for EVERY athlete — there is no per-player wins column, so never leave it blank or guess.
+- "Field Stats" table (# Athlete GP Min Goals G/G Asst Asst/G Pts P/G Stls CK): Goals→"Goals", Asst→"Assists". IGNORE Min, Pts (Points is auto-computed as Goals×2+Assists — never extract it), Stls, CK.
+- Shooting table (# Athlete GP G Shots SOG PKG PKA GWG YC RC): Shots→"Shots", SOG→"Shots on Goal". IGNORE the "G" column here (it repeats Goals), and PKG, PKA, GWG, YC, RC.
+- Goaltending tables (keepers only): Saves→"Saves", the "SO" (shutouts) column→"Shutouts". IGNORE G. Min, OT Min, Opp SOG, GA, PK Saves, PKA, Win, Loss, Tie.
+
+For other sports (volleyball, etc.) there is usually one table — use the exact stat names shown.
 Include every athlete and every stat you find. Omit zero/blank stats.`;
 
 Deno.serve(async (req) => {
