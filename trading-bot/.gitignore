@@ -1,0 +1,12 @@
+# Your real config (contains your chosen limits/mode) — never commit
+config.yaml
+
+# Runtime state, audit logs, kill switch
+data/
+STOP
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
