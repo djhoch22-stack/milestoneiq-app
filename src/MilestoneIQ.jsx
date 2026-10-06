@@ -6676,17 +6676,21 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
 
               const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
 
-              // Build current head coach win total from seasons data for Coach Wins milestones
+              // Current head coach (most recent season that names a coach) — ALWAYS shown under Coach Wins,
+              // regardless of win count. Coach Wins here use Denver-Christian (this-school) wins only, to
+              // stay consistent with the Coach Wins record (coachWinsRecordsFrom folds in no prior-school wins).
               const currentCoach = (school.seasons || [])
                 .filter(s => s.coach)
                 .sort((a, b) => b.season.localeCompare(a.season))[0]?.coach || null;
               const currentCoachWins = (school.seasons || [])
                 .filter(s => s.coach === currentCoach)
-                .reduce((sum, s) => sum + (s.wins || 0), 0)
-                + (currentCoach && COACH_PRIOR_STATS[currentCoach] ? (COACH_PRIOR_STATS[currentCoach].wins || 0) : 0);
+                .reduce((sum, s) => sum + (Number(s.wins) || 0), 0);
               const coachLeaders = currentCoach
-                ? [{ id: currentCoach, name: currentCoach, wins: currentCoachWins }]
+                ? [{ id: "__current_coach__", name: currentCoach, wins: currentCoachWins }]
                 : [];
+              // All-time Coach Wins career record (this school) → drives the Coaching record tile.
+              const coachWinsRecord = coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {})
+                .find(r => r.variant === "Career total" && typeof r.value === "number" && r.value > 0) || null;
 
               return effectiveMilestones.map(ms => {
                 const isCoachWins = ms.statName === "Coach Wins";
@@ -6702,13 +6706,14 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   const prevTarget = tIdx > 0 ? sortedVals[tIdx - 1] : 0;
                   const isLastTile = tIdx === sortedVals.length - 1;
                   if (isCoachWins) {
+                    // The current coach ALWAYS appears on the tile for the next win total they're working
+                    // toward — no "within 50%" floor, so a brand-new coach shows from their very first win.
                     const approaching = coachLeaders
                       .filter(c => {
                         const v = c.wins;
                         return v >= prevTarget && (isLastTile ? v >= prevTarget : v < target);
                       })
                       .map(c => ({ athlete: c, val: c.wins, p: c.wins / target }))
-                      .filter(x => x.p >= 0.5)
                       .sort((a,b) => b.p - a.p)
                       .slice(0, 3);
                     return { target, approaching };
@@ -6726,16 +6731,27 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                   return { target, approaching };
                 });
 
-                // Auto-milestone: append this stat's all-time CAREER RECORD as a final tile, showing which
-                // active athletes are chasing it. Read live from the same records the alert engine uses.
-                const rec = !isCoachWins ? (alertRecords || []).find(r => r.variant === "Career total" && r.statName === ms.statName && r.holderName && typeof r.value === "number" && r.value > 0) : null;
-                const recordTile = rec ? {
-                  target: rec.value, isRecord: true, holder: rec.holderName,
-                  approaching: activeAthletes
-                    .filter(a => { const v = a.stats[ms.statName]; return typeof v === "number" && v > 0 && v / rec.value >= 0.5; })
-                    .map(a => ({ athlete: a, val: a.stats[ms.statName], p: a.stats[ms.statName] / rec.value }))
-                    .sort((a, b) => b.p - a.p).slice(0, 3),
-                } : null;
+                // Append this stat's all-time CAREER RECORD as a tile, showing who's chasing it. For Coach
+                // Wins that's the winningest coach's total with the CURRENT coach always shown chasing it
+                // (no 50% floor); for every other stat it's the player record with active athletes within 50%.
+                let recordTile = null;
+                if (isCoachWins) {
+                  recordTile = coachWinsRecord ? {
+                    target: coachWinsRecord.value, isRecord: true, holder: coachWinsRecord.holderName,
+                    approaching: coachLeaders
+                      .map(c => ({ athlete: c, val: c.wins, p: c.wins / coachWinsRecord.value }))
+                      .sort((a, b) => b.p - a.p).slice(0, 3),
+                  } : null;
+                } else {
+                  const rec = (alertRecords || []).find(r => r.variant === "Career total" && r.statName === ms.statName && r.holderName && typeof r.value === "number" && r.value > 0);
+                  recordTile = rec ? {
+                    target: rec.value, isRecord: true, holder: rec.holderName,
+                    approaching: activeAthletes
+                      .filter(a => { const v = a.stats[ms.statName]; return typeof v === "number" && v > 0 && v / rec.value >= 0.5; })
+                      .map(a => ({ athlete: a, val: a.stats[ms.statName], p: a.stats[ms.statName] / rec.value }))
+                      .sort((a, b) => b.p - a.p).slice(0, 3),
+                  } : null;
+                }
                 // Order every tile (thresholds + the record) by value, so the record lands in its correct
                 // numerical slot rather than always at the end.
                 const tiles = (recordTile ? [...leadersByVal, recordTile] : [...leadersByVal]).sort((a, b) => a.target - b.target);
