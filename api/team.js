@@ -277,11 +277,11 @@ export default async function handler(req, res) {
     const tW = swr.reduce((a, s) => a + (s.wins || 0), 0);
     const tL = swr.reduce((a, s) => a + (s.losses || 0), 0);
     const tT = seasonsList.reduce((a, s) => a + (s.ties || 0), 0);
-    const tPct = tW + tL + tT > 0 ? ((tW / (tW + tL + tT)) * 100).toFixed(1) : "—";
+    const tPct = tW + tL + tT > 0 ? (((tW + tT / 2) / (tW + tL + tT)) * 100).toFixed(1) : "—"; // tie = ½ win
     const lW = seasonsList.reduce((a, s) => a + (s.leagueWins || 0), 0);
     const lL = seasonsList.reduce((a, s) => a + (s.leagueLosses || 0), 0);
     const lT = seasonsList.reduce((a, s) => a + (s.leagueTies || 0), 0);
-    const lPct = lW + lL + lT > 0 ? ((lW / (lW + lL + lT)) * 100).toFixed(1) : "—";
+    const lPct = lW + lL + lT > 0 ? (((lW + lT / 2) / (lW + lL + lT)) * 100).toFixed(1) : "—"; // tie = ½ win
     const rx = (s, re) => s.notes && re.test(s.notes);
     const champ = seasonsList.filter((s) => rx(s, /league champion|league champ/i)).length;
     const stChamp = seasonsList.filter((s) => rx(s, /state champ|state champion/i)).length;
@@ -314,7 +314,7 @@ export default async function handler(req, res) {
       const cur = coach === mostRecent;
       const coyC = awardsForHolder(coach, "coach", awards).length;
       const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? (((rec.wins + (rec.ties||0) / 2) / (rec.wins + rec.losses + (rec.ties||0))) * 100).toFixed(1) : "—";
-      const lpct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins / (rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0))) * 100).toFixed(1) : "—";
+      const lpct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? (((rec.leagueWins + (rec.leagueTies||0) / 2) / (rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0))) * 100).toFixed(1) : "—"; // tie = ½ win
       const yr = String(rec.firstYear) === String(rec.lastYear) ? esc(String(rec.firstYear)) : esc(String(rec.firstYear)) + " – " + esc(String(rec.lastYear));
       return `<div class="ccard" data-c="${esc(normName(coach))}" style="cursor:pointer;padding:16px 20px;border-bottom:1px solid #f3f0ea;${cur ? "background:#eff6ff;border-left:4px solid #1a56db" : "border-left:4px solid transparent"}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-weight:700;font-size:15px;color:#111">${esc(coach)}</div>${cur ? '<span style="background:#1a56db;color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700">Current</span>' : ""}</div>
@@ -334,7 +334,9 @@ export default async function handler(req, res) {
     const tableRows = seasonsList.slice().sort((a, b) => Number(yr(b)) - Number(yr(a))).map((s, i) => {
       const rec = (s.wins != null) ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
       const lrec = (s.leagueWins != null) ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
-      const wp = s.winPct != null ? s.winPct + "%" : "—";
+      // Recompute from W/L/T (tie = ½ win) so a season stored with the old tie-as-loss win_pct self-corrects.
+      const _sg = (s.wins || 0) + (s.losses || 0) + (s.ties || 0);
+      const wp = (s.wins != null && s.losses != null && _sg > 0) ? (Math.round(((s.wins + (s.ties || 0) / 2) / _sg) * 1000) / 10) + "%" : "—";
       const isSt = s.notes && /state champ/i.test(s.notes);
       const isLg = s.notes && /league champ/i.test(s.notes);
       const isChamp = isSt || isLg;

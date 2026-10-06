@@ -2996,6 +2996,14 @@ function splitCSVRows(text) {
   return rows;
 }
 
+// Winning percentage with ties counted as HALF a win: (W + T/2) / (W + L + T), as a 1-decimal number
+// (e.g. 73.5) or null when no games. Universal across sports — a tie-less sport has T=0 so it reduces to
+// W/(W+L). Used for every team/season win % so soccer & football ties are never scored as losses.
+function winPctOf(wins, losses, ties) {
+  const w = Number(wins) || 0, l = Number(losses) || 0, t = Number(ties) || 0, g = w + l + t;
+  return g > 0 ? Math.round(((w + t / 2) / g) * 1000) / 10 : null;
+}
+
 // Bulk-paste team season records copied from a spreadsheet (tab-separated) or CSV. Maps columns from a
 // header row when present (Season, Wins/Overall W, Losses, League W, League L, Coach, Notes — any order;
 // extra/blank columns ignored), else assumes that order. Skips header/totals/career/blank rows.
@@ -3039,7 +3047,7 @@ function parseSeasonsPaste(text) {
       leagueTies: 0,
       coach: coach || null,
       notes: col.notes >= 0 ? ((r[col.notes] || "").trim() || null) : null,
-      winPct: w != null && l != null && (w + l) > 0 ? Math.round((w / (w + l)) * 1000) / 10 : null,
+      winPct: w != null && l != null ? winPctOf(w, l, 0) : null,
     });
   }
   return out;
@@ -4087,8 +4095,8 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
       leagueTies:   f.leagueTies   !== "" ? Number(f.leagueTies)   : 0,
       coach:  f.coach  || null,
       notes:  f.notes  || null,
-      // Win % counts ties in the denominator: W / (W + L + T)
-      winPct: w != null && l != null && (w + l + t) > 0 ? Math.round(w / (w + l + t) * 1000) / 10 : null
+      // Win % counts a tie as HALF a win: (W + T/2) / (W + L + T)
+      winPct: w != null && l != null ? winPctOf(w, l, t) : null
     };
   };
 
@@ -4214,7 +4222,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
   const totalLeagueWins = seasons.reduce((a, s) => a + (s.leagueWins || 0), 0);
   const totalLeagueLosses = seasons.reduce((a, s) => a + (s.leagueLosses || 0), 0);
   const totalLeagueTies = seasons.reduce((a, s) => a + (s.leagueTies || 0), 0);
-  const leaguePct = totalLeagueWins + totalLeagueLosses + totalLeagueTies > 0 ? ((totalLeagueWins / (totalLeagueWins + totalLeagueLosses + totalLeagueTies)) * 100).toFixed(1) : "—";
+  const leaguePct = totalLeagueWins + totalLeagueLosses + totalLeagueTies > 0 ? (((totalLeagueWins + totalLeagueTies / 2) / (totalLeagueWins + totalLeagueLosses + totalLeagueTies)) * 100).toFixed(1) : "—";
   // Helper reads both legacy notes strings AND boolean flags
   const sf = (s, boolKey, noteRx) => s[boolKey] || (s.notes && noteRx.test(s.notes));
   const champSeasons = seasons.filter(s => sf(s,'leagueChampion', /league champion|league champ/i)).length;
@@ -4311,7 +4319,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
             .map(([coach, rec], i) => {
               const isCurrent = coach === mostRecentCoach;
               const pct = rec.wins + rec.losses + (rec.ties||0) > 0 ? (((rec.wins+(rec.ties||0)/2)/(rec.wins+rec.losses+(rec.ties||0)))*100).toFixed(1) : "—";
-              const lPct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? ((rec.leagueWins/(rec.leagueWins+rec.leagueLosses+(rec.leagueTies||0)))*100).toFixed(1) : "—";
+              const lPct = rec.leagueWins + rec.leagueLosses + (rec.leagueTies||0) > 0 ? (((rec.leagueWins+(rec.leagueTies||0)/2)/(rec.leagueWins+rec.leagueLosses+(rec.leagueTies||0)))*100).toFixed(1) : "—"; // tie = ½ win
               const yearRange = rec.firstYear === rec.lastYear ? rec.firstYear : `${rec.firstYear} – ${rec.lastYear}`;
               const coyCount = awardsForHolder(coach, "coach", coachAwards).length;
               return (
@@ -4383,7 +4391,8 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
           </thead>
           <tbody>
             {sorted.map((s, i) => {
-              const pct = s.winPct != null ? `${s.winPct}%` : "—";
+              const _wp = (s.wins != null && s.losses != null) ? winPctOf(s.wins, s.losses, s.ties) : null; // recompute (ties = ½) so stored values with a tie-as-loss bug self-correct
+              const pct = _wp != null ? `${_wp}%` : "—";
               const record = s.wins != null ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
               const leagueRecord = s.leagueWins != null ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
               const isChamp = s.leagueChampion || (s.notes && /league champion/i.test(s.notes));
