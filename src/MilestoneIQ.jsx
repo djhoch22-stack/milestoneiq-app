@@ -6683,12 +6683,21 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               const currentCoach = (school.seasons || [])
                 .filter(s => s.coach)
                 .sort((a, b) => b.season.localeCompare(a.season))[0]?.coach || null;
+              // Record tile tracks THIS program's DC wins only (vs the DC-only program record below).
               const currentCoachDCWins = (school.seasons || [])
                 .filter(s => s.coach === currentCoach)
                 .reduce((sum, s) => sum + (Number(s.wins) || 0), 0);
-              const coachPriorMap = { ...COACH_PRIOR_STATS, ...(school.coachPrior || {}) };
-              const currentCoachWins = currentCoachDCWins
-                + (currentCoach && coachPriorMap[currentCoach] ? (Number(coachPriorMap[currentCoach].wins) || 0) : 0);
+              // Milestone tiles show the coach's FULL career wins — EVERY DC program they led PLUS prior-
+              // school wins — i.e. their HOF/profile career total (e.g. Brad Homan 444 = girls soccer 326 +
+              // boys soccer 67 + Ontario Christian 51). Aggregated cross-program via buildCoachStats (same
+              // as the Coach HOF section), so a coach who led multiple teams gets credit for all of them.
+              const _coachPrograms = (allSchools && allSchools.length) ? allSchools : [school];
+              const _allProgramSeasons = _coachPrograms.flatMap(p => (p.seasons || []));
+              const _mergedCoachPrior = Object.assign({}, school.coachPrior || {}, ...(allSchools || []).map(x => x.coachPrior || {}));
+              const currentCoachWins = currentCoach
+                ? ((buildCoachStats(_allProgramSeasons, { includePrior: true, prior: _mergedCoachPrior })
+                    .find(c => normName(c.name) === normName(currentCoach)) || {}).wins || 0)
+                : 0;
               const coachLeaders = currentCoach
                 ? [{ id: "__current_coach__", name: currentCoach, wins: currentCoachWins }]
                 : [];
