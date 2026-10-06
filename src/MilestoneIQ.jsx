@@ -6625,23 +6625,49 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
 
             {(() => {
               // Athletes about to break (or who broke) a school record of any kind — career or single-season,
-              // stored or auto-computed. Mirrors the Alerts tab so the same info shows on both.
+              // stored or auto-computed. Mirrors the Alerts tab so the same info shows on both. Dismissed
+              // ones are already filtered out upstream (allAlerts), and can be dismissed/restored right here.
               const recAlerts = allAlerts.flatMap(({ athlete, alerts }) =>
                 (alerts || []).filter(a => a.type === "near_record" || a.type === "record_broken").map(a => ({ athlete, a })));
-              if (!recAlerts.length) return null;
+              const dismissedCount = (school.dismissedAlerts || []).length;
+              const restoreLink = (fs) => (
+                <button onClick={restoreAlerts} style={{ background:"none",border:"none",color:"#1a56db",cursor:"pointer",fontSize:fs,textDecoration:"underline",padding:0 }}>
+                  Restore {dismissedCount} dismissed
+                </button>
+              );
+              // Everything dismissed → just offer a way to bring them back.
+              if (!recAlerts.length) return dismissedCount > 0
+                ? <div style={{ marginBottom:20, fontSize:13, color:"#6b7280" }}>{restoreLink(13)}</div>
+                : null;
               recAlerts.sort((x, y) => (y.a.pct || 0) - (x.a.pct || 0));
+              const dismissAll = () => onUpdate({ ...school, dismissedAlerts: [...new Set([
+                ...(school.dismissedAlerts || []), ...recAlerts.map(({ athlete, a }) => `${athlete.id}|${a.statName}|${a.target}`)
+              ])] });
               return (
                 <div style={{ marginBottom:20, border:"1px solid #fde68a", background:"#fffbeb", borderRadius:12, padding:16 }}>
-                  <div style={{ fontWeight:700, fontSize:14, color:"#92400e", marginBottom:10 }}>🏆 Approaching a school record ({recAlerts.length})</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                    <div style={{ fontWeight:700, fontSize:14, color:"#92400e" }}>🏆 Approaching a school record ({recAlerts.length})</div>
+                    <button onClick={dismissAll} title="Dismiss all of these"
+                      style={{ marginLeft:"auto", background:"none", border:"1px solid #fcd34d", borderRadius:6, padding:"3px 10px", fontSize:11, fontWeight:600, cursor:"pointer", color:"#92400e", whiteSpace:"nowrap" }}>
+                      Dismiss all
+                    </button>
+                  </div>
                   {recAlerts.map(({ athlete, a }, idx) => (
                     <div key={athlete.id + "|" + a.statName + "|" + a.variant + "|" + a.target}
                       style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10, padding:"6px 0", borderTop: idx ? "1px solid #fde68a" : "none" }}>
                       <span style={{ fontSize:13, color:"#111" }}>{a.fullLabel}</span>
-                      <span style={{ fontSize:12, fontWeight:700, whiteSpace:"nowrap", color: a.type === "record_broken" ? "#16a34a" : "#d97706" }}>
-                        {a.type === "record_broken" ? "BROKEN!" : Math.round((a.pct || 0) * 100) + "%"}
+                      <span style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+                        <span style={{ fontSize:12, fontWeight:700, whiteSpace:"nowrap", color: a.type === "record_broken" ? "#16a34a" : "#d97706" }}>
+                          {a.type === "record_broken" ? "BROKEN!" : Math.round((a.pct || 0) * 100) + "%"}
+                        </span>
+                        <button onClick={() => dismissAlert(athlete.id, a.statName, a.target)} title="Dismiss this alert"
+                          style={{ background:"none", border:"none", color:"#b45309", cursor:"pointer", fontSize:18, lineHeight:1, padding:"0 2px" }}>×</button>
                       </span>
                     </div>
                   ))}
+                  {dismissedCount > 0 && (
+                    <div style={{ marginTop:10, paddingTop:10, borderTop:"1px solid #fde68a", fontSize:12 }}>{restoreLink(12)}</div>
+                  )}
                 </div>
               );
             })()}
