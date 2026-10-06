@@ -366,10 +366,17 @@ export function withDerivedStats(stats, sport) {
   }
   if (sport === "football") {
     // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
-    // Derived so it never goes stale when a component (e.g. Rushing Yards) is edited.
-    if (stats["Rushing Yards"] == null && stats["Receiving Yards"] == null) return stats;
+    // All-Purpose Yards = scrimmage + return yards (Rushing + Receiving + Kick Off Return + Punt Return).
+    // Both are DERIVED so they never go stale: a prior static APY backfill drifted after later re-imports
+    // re-summed the career (career APY could fall below a player's own rushing yards). Recomputing here
+    // overrides whatever APY/Total Yards is stored.
     const rush = Number(stats["Rushing Yards"]) || 0, rec = Number(stats["Receiving Yards"]) || 0;
-    return { ...stats, "Total Yards": rush + rec };
+    const kr = Number(stats["Kick Off Return Yards"]) || 0, pr = Number(stats["Punt Return Yards"]) || 0;
+    const out = { ...stats };
+    if (stats["Rushing Yards"] != null || stats["Receiving Yards"] != null) out["Total Yards"] = rush + rec;
+    const apy = rush + rec + kr + pr;
+    if (apy > 0) out["All-Purpose Yards"] = apy; else delete out["All-Purpose Yards"]; // >0 only → non-skill players stay blank
+    return out;
   }
   return stats;
 }
