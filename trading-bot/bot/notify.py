@@ -76,10 +76,12 @@ def _post_webhook(cfg, subject: str, body: str) -> None:
         return
     try:
         import requests
-        # Plain-text POST with a Title header works with ntfy.sh and most
-        # simple webhook receivers; body stays human-readable.
-        requests.post(url, data=f"{subject}\n\n{body}".encode(),
-                      headers={"Title": f"trading-bot: {subject}"}, timeout=15)
+        # Plain-text POST with a Title header works with ntfy.sh and most simple
+        # webhook receivers. HTTP headers must be Latin-1, so strip any non-ASCII
+        # (e.g. emoji) from the Title; the full UTF-8 text stays in the body.
+        title = f"trading-bot: {subject}".encode("ascii", "ignore").decode("ascii")
+        requests.post(url, data=f"{subject}\n\n{body}".encode("utf-8"),
+                      headers={"Title": title}, timeout=15)
     except Exception as e:  # noqa: BLE001
         print(f"  (webhook alert failed: {e})", file=sys.stderr)
 
