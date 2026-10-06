@@ -6677,18 +6677,22 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
               const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
 
               // Current head coach (most recent season that names a coach) — ALWAYS shown under Coach Wins,
-              // regardless of win count. Coach Wins here use Denver-Christian (this-school) wins only, to
-              // stay consistent with the Coach Wins record (coachWinsRecordsFrom folds in no prior-school wins).
+              // regardless of win count. The milestone tiles show the coach's TOTAL career wins (Denver
+              // Christian seasons PLUS prior-school wins), so a veteran coach's full win count shows. The
+              // record tile below stays the Denver-Christian-only record and tracks DC wins only toward it.
               const currentCoach = (school.seasons || [])
                 .filter(s => s.coach)
                 .sort((a, b) => b.season.localeCompare(a.season))[0]?.coach || null;
-              const currentCoachWins = (school.seasons || [])
+              const currentCoachDCWins = (school.seasons || [])
                 .filter(s => s.coach === currentCoach)
                 .reduce((sum, s) => sum + (Number(s.wins) || 0), 0);
+              const coachPriorMap = { ...COACH_PRIOR_STATS, ...(school.coachPrior || {}) };
+              const currentCoachWins = currentCoachDCWins
+                + (currentCoach && coachPriorMap[currentCoach] ? (Number(coachPriorMap[currentCoach].wins) || 0) : 0);
               const coachLeaders = currentCoach
                 ? [{ id: "__current_coach__", name: currentCoach, wins: currentCoachWins }]
                 : [];
-              // All-time Coach Wins career record (this school) → drives the Coaching record tile.
+              // All-time Coach Wins career record (this school, DC-only) → drives the Coaching record tile.
               const coachWinsRecord = coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {})
                 .find(r => r.variant === "Career total" && typeof r.value === "number" && r.value > 0) || null;
 
@@ -6736,11 +6740,14 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 // (no 50% floor); for every other stat it's the player record with active athletes within 50%.
                 let recordTile = null;
                 if (isCoachWins) {
+                  // Record tile stays the DC-only record; the current coach is tracked by their DENVER
+                  // CHRISTIAN wins toward it (prior-school wins don't count toward a DC record), so a veteran
+                  // coach never looks like they passed a DC record they haven't.
                   recordTile = coachWinsRecord ? {
                     target: coachWinsRecord.value, isRecord: true, holder: coachWinsRecord.holderName,
-                    approaching: coachLeaders
-                      .map(c => ({ athlete: c, val: c.wins, p: c.wins / coachWinsRecord.value }))
-                      .sort((a, b) => b.p - a.p).slice(0, 3),
+                    approaching: currentCoach
+                      ? [{ athlete: { id: "__current_coach__", name: currentCoach }, val: currentCoachDCWins, p: currentCoachDCWins / coachWinsRecord.value }]
+                      : [],
                   } : null;
                 } else {
                   const rec = (alertRecords || []).find(r => r.variant === "Career total" && r.statName === ms.statName && r.holderName && typeof r.value === "number" && r.value > 0);
