@@ -3,10 +3,17 @@
 // organizations.subscription_status/tier (the app's gate) + the subscriptions table
 // in sync. AppWrapper unlocks a school only when status is 'active' (or a valid trial).
 //
+// It also emails the FOUNDER (Resend) on the money-moving events: a new paid signup 💰,
+// a downgrade or cancellation ⚠️, and a failed payment 🚨 — each de-duped so Stripe's
+// retries/dunning can't spam. The alert code is best-effort and never throws, so it can
+// never break the billing sync.
+//
 // Deploy:  supabase functions deploy stripe-webhook --no-verify-jwt
 //   Verify JWT OFF (Stripe calls server-to-server, no JWT; we verify the signature).
-//   Secret: STRIPE_WEBHOOK_SECRET (set). Then add this function's URL as a webhook
-//   endpoint in the Stripe dashboard (events: checkout.session.completed,
+//   Secrets: STRIPE_WEBHOOK_SECRET (set). RESEND_API_KEY + RESEND_FROM (for founder alerts —
+//   already set project-wide, shared with support-chat/send-alert). Optional OWNER_EMAIL
+//   (where alerts go; defaults to djhoch22@gmail.com). Then add this function's URL as a
+//   webhook endpoint in the Stripe dashboard (events: checkout.session.completed,
 //   customer.subscription.updated, customer.subscription.deleted, invoice.payment_failed).
 import Stripe from "https://esm.sh/stripe@14?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -85,12 +92,51 @@ Deno.serve(async (req) => {
     }
   };
 
+  // ── Founder alerts ──────────────────────────────────────────────────────────
+  // Email the owner on money-moving events. Everything here is best-effort and MUST NOT
+  // throw — a failed alert can never be allowed to 500 the webhook (which would make Stripe
+  // retry and needlessly re-run the billing sync). Every failure is caught and logged only.
+  const OWNER_EMAIL = Deno.env.get("OWNER_EMAIL") || "djhoch22@gmail.com";
+  const notifyOwner = async (subject: string, text: string) => {
+    const key = Deno.env.get("RESEND_API_KEY"); const from = Deno.env.get("RESEND_FROM");
+    if (!key || !from) { console.error("owner alert NOT sent — RESEND_API_KEY/RESEND_FROM missing on this function"); return; }
+    try {
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [OWNER_EMAIL], subject: subject.slice(0, 150), text }),
+      });
+      if (!resp.ok) { const d = await resp.text().catch(() => ""); console.error("owner alert FAILED:", resp.status, d.slice(0, 400)); }
+      else console.log("owner alert sent:", subject);
+    } catch (e) { console.error("owner alert threw:", String(e)); }
+  };
+  const money = (cents: number | null | undefined, cur?: string) =>
+    (cents == null ? "" : `$${(cents / 100).toFixed(2)}${cur && cur !== "usd" ? " " + String(cur).toUpperCase() : ""}`);
+  const custEmail = async (cid: any) => {
+    if (!cid) return "";
+    try { const c: any = await stripe.customers.retrieve(cid); return (c && !c.deleted && c.email) || ""; } catch { return ""; }
+  };
+  const getOrg = async (orgId: string) => {
+    if (!orgId) return null;
+    const { data } = await admin.from("organizations")
+      .select("name, city, state, ad_name, ad_email, subscription_status, subscription_tier")
+      .eq("id", orgId).maybeSingle();
+    return data as any;
+  };
+  const orgLine = (o: any, orgId: string) => {
+    if (!o) return `School: (org ${orgId || "unknown"})`;
+    const loc = [o.city, o.state].filter(Boolean).join(", ");
+    const ad = [o.ad_name, o.ad_email].filter(Boolean).join(" · ");
+    return `School: ${o.name || `(org ${orgId})`}${loc ? ` — ${loc}` : ""}${ad ? `\nAD: ${ad}` : ""}`;
+  };
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const orgId = session.metadata?.org_id || "";
         const tier = session.metadata?.tier || "program";
+        const before = await getOrg(orgId); // capture state BEFORE we flip to active (dedupe guard + identity)
         const sub = session.subscription ? await stripe.subscriptions.retrieve(session.subscription) : null;
         await setOrg(orgId, { subscription_status: "active", subscription_tier: tier, stripe_customer_id: session.customer });
         if (sub) await upsertSub({
@@ -98,12 +144,23 @@ Deno.serve(async (req) => {
           stripe_subscription_id: sub.id, price_id: priceOf(sub), current_period_end: periodEnd(sub),
         });
         await rewardReferrer(orgId); // two-sided referral: credit the referrer one free month
+        // 💰 Founder alert — only on a genuinely NEW activation (a Stripe retry finds it already 'active' → no dupe).
+        if (before?.subscription_status !== "active") {
+          const email = session.customer_details?.email || session.customer_email || before?.ad_email || "unknown";
+          const amt = money(session.amount_total, session.currency);
+          await notifyOwner(
+            `💰 New RaftersIQ signup: ${tier}`,
+            `A new paying customer just subscribed. 🎉\n\n${orgLine(before, orgId)}\nTier: ${tier}${amt ? `\nPaid: ${amt}` : ""}\nBilling email: ${email}\nStripe customer: ${session.customer}`,
+          );
+        }
         break;
       }
       case "customer.subscription.updated": {
         const sub = event.data.object;
         const orgId = orgOf(sub);
-        const fields: Record<string, unknown> = { subscription_status: sub.status, subscription_tier: tierOf(sub) };
+        const before = await getOrg(orgId); // old tier, for downgrade detection
+        const newTier = tierOf(sub);
+        const fields: Record<string, unknown> = { subscription_status: sub.status, subscription_tier: newTier };
         // During a gifted referral free month the sub is "trialing" — sync trial_ends_at so the org gate stays unlocked.
         if (sub.status === "trialing" && sub.trial_end) fields.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
         await setOrg(orgId, fields);
@@ -111,6 +168,15 @@ Deno.serve(async (req) => {
           org_id: orgId, status: sub.status, stripe_customer_id: sub.customer,
           stripe_subscription_id: sub.id, price_id: priceOf(sub), current_period_end: periodEnd(sub),
         });
+        // ⚠️ Founder alert on a DOWNGRADE only (tier dropped). Upgrades, renewals and trial syncs stay silent.
+        const RANK: Record<string, number> = { program: 1, program_plus: 2, school: 3, school_plus: 4 };
+        const oldTier = before?.subscription_tier || "";
+        if (oldTier && newTier && (RANK[newTier] || 0) < (RANK[oldTier] || 0) && ["active", "trialing"].includes(sub.status)) {
+          await notifyOwner(
+            `⚠️ RaftersIQ downgrade: ${oldTier} → ${newTier}`,
+            `A customer downgraded their plan.\n\n${orgLine(before, orgId)}\nFrom: ${oldTier}\nTo: ${newTier}\nStripe customer: ${sub.customer}`,
+          );
+        }
         break;
       }
       case "customer.subscription.deleted": {
@@ -123,15 +189,35 @@ Deno.serve(async (req) => {
           ? ((await stripe.subscriptions.list({ customer: sub.customer, status: "all", limit: 10 })).data || [])
               .filter((s: any) => s.id !== sub.id && ["active", "trialing", "past_due"].includes(s.status))
           : [];
-        if (others.length) await setOrg(orgId, { subscription_status: others[0].status, subscription_tier: tierOf(others[0]) });
-        else await setOrg(orgId, { subscription_status: "canceled" });
+        if (others.length) {
+          await setOrg(orgId, { subscription_status: others[0].status, subscription_tier: tierOf(others[0]) });
+        } else {
+          await setOrg(orgId, { subscription_status: "canceled" });
+          // ⚠️ Genuine cancellation (no other live sub remains) → founder churn alert.
+          const org = await getOrg(orgId);
+          const email = await custEmail(sub.customer);
+          await notifyOwner(
+            `⚠️ RaftersIQ cancellation`,
+            `A customer canceled their subscription.\n\n${orgLine(org, orgId)}\nTier was: ${tierOf(sub)}${email ? `\nBilling email: ${email}` : ""}\nStripe customer: ${sub.customer}`,
+          );
+        }
         break;
       }
       case "invoice.payment_failed": {
         const inv = event.data.object;
         let orgId = "";
         if (inv.subscription) { const sub = await stripe.subscriptions.retrieve(inv.subscription); orgId = orgOf(sub); }
+        const before = await getOrg(orgId);
         await setOrg(orgId, { subscription_status: "past_due" });
+        // 🚨 Alert once per failure episode — Stripe's dunning retries stay 'past_due', so they won't re-alert.
+        if (before?.subscription_status !== "past_due") {
+          const amt = money(inv.amount_due, inv.currency);
+          const email = inv.customer_email || before?.ad_email || "";
+          await notifyOwner(
+            `🚨 RaftersIQ payment failed`,
+            `A subscription payment failed — the org is now past_due.\n\n${orgLine(before, orgId)}${amt ? `\nAmount due: ${amt}` : ""}${email ? `\nBilling email: ${email}` : ""}\nStripe customer: ${inv.customer}`,
+          );
+        }
         break;
       }
     }
