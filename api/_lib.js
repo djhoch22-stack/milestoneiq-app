@@ -721,18 +721,8 @@ export function buildCoachStats(seasons, opts = {}) {
   });
   return Object.values(coaches);
 }
-// Absolute, peer-independent HOF résumé score (0–90; Coach-of-the-Year adds up to 10 via coachAwardBonus → 100).
-// Mirrors the in-app calcCoachHofScore exactly. Era/state/sport-neutral: win % (ties = ½) + per-season longevity.
-export function calcCoachHofScore(coach) {
-  const w = coach.wins || 0, l = coach.losses || 0, t = coach.ties || 0, games = w + l + t, s = coach.seasons || 0;
-  const pct = games >= 20 ? (w + t / 2) / games : 0;
-  const winScore = pct >= 0.70 ? 30 : pct >= 0.65 ? 25 : pct >= 0.60 ? 20 : pct >= 0.55 ? 14 : pct >= 0.50 ? 9 : pct >= 0.45 ? 4 : 0;
-  const longScore = s >= 25 ? 24 : s >= 20 ? 21 : s >= 15 ? 17 : s >= 12 ? 14 : s >= 10 ? 11 : s >= 7 ? 7 : s >= 5 ? 4 : s >= 3 ? 2 : s >= 1 ? 1 : 0;
-  const lg = coach.leagueChamps || 0;
-  const lgScore = lg >= 10 ? 18 : lg >= 7 ? 15 : lg >= 5 ? 13 : lg >= 3 ? 9 : lg >= 2 ? 5 : lg >= 1 ? 3 : 0;
-  const postScore = Math.min((coach.stateChamps||0) * 8 + (coach.stateRunnerUp||0) * 4 + (coach.finalFours||0) * 3 + (coach.eliteEights||0) * 2 + (coach.sweetSixteens||0) * 1, 18);
-  return Math.min(winScore + longScore + lgScore + postScore, 90);
-}
+// calcCoachHofScore now lives in the shared scoring module — single source of truth for app + public.
+export { calcCoachHofScore } from "../shared/scoring.js";
 export function hofTier(score) {
   if (score >= 90) return { label: "Legend", color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" };
   if (score >= 75) return { label: "Elite", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" };
