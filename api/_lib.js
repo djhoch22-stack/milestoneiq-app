@@ -355,31 +355,8 @@ export function groupsFor(sport) {
   if (sport === "volleyball_girls" || sport === "volleyball") return G_VBALL;
   return null; // no groups → everything falls under "Other" (matches the in-app)
 }
-// Baseball/softball: Singles + Total Bases are COMPUTED from the batting line (never stored, so they
-// always reflect current Hits/2B/3B/HR). Applied to every stats object as it loads. Mirrors the app.
-export function withDerivedStats(stats, sport) {
-  if (!stats) return {};
-  if (sport === "baseball" || sport === "softball") {
-    if (stats["Hits"] == null) return stats;
-    const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
-    return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
-  }
-  if (sport === "football") {
-    // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
-    // All-Purpose Yards = scrimmage + return yards (Rushing + Receiving + Kick Off Return + Punt Return).
-    // Both are DERIVED so they never go stale: a prior static APY backfill drifted after later re-imports
-    // re-summed the career (career APY could fall below a player's own rushing yards). Recomputing here
-    // overrides whatever APY/Total Yards is stored.
-    const rush = Number(stats["Rushing Yards"]) || 0, rec = Number(stats["Receiving Yards"]) || 0;
-    const kr = Number(stats["Kick Off Return Yards"]) || 0, pr = Number(stats["Punt Return Yards"]) || 0;
-    const out = { ...stats };
-    if (stats["Rushing Yards"] != null || stats["Receiving Yards"] != null) out["Total Yards"] = rush + rec;
-    const apy = rush + rec + kr + pr;
-    if (apy > 0) out["All-Purpose Yards"] = apy; else delete out["All-Purpose Yards"]; // >0 only → non-skill players stay blank
-    return out;
-  }
-  return stats;
-}
+// withDerivedStats now lives in the shared scoring module — single source of truth for app + public.
+export { withDerivedStats } from "../shared/scoring.js";
 export function rateDefsFor(sport) {
   if (sport === "baseball" || sport === "softball") return BASEBALL_RATE_DEFS;
   if (sport === "football" || sport === "flag_football_girls") return FOOTBALL_RATE_DEFS;

@@ -163,32 +163,9 @@ export const deleteAthlete = async (athleteId) => {
   return { error };
 };
 
-// Baseball/softball: Singles + Total Bases are COMPUTED from the batting line (never stored, so they
-// always reflect the current Hits/2B/3B/HR). Applied to every stats object as it loads — works on a
-// season line or a career total since the formula is linear. Other sports pass through unchanged.
-export function withDerivedStats(stats, sport) {
-  if (!stats) return {};
-  if (sport === "baseball" || sport === "softball") {
-    if (stats["Hits"] == null) return stats; // no batting line (e.g. a pitcher-only row) → nothing to derive
-    const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
-    return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
-  }
-  if (sport === "football") {
-    // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
-    // All-Purpose Yards = scrimmage + return yards (Rushing + Receiving + Kick Off Return + Punt Return).
-    // Both are DERIVED so they never go stale: a prior static APY backfill drifted after later re-imports
-    // re-summed the career (career APY could fall below a player's own rushing yards). Recomputing here
-    // overrides whatever APY/Total Yards is stored.
-    const rush = Number(stats["Rushing Yards"]) || 0, rec = Number(stats["Receiving Yards"]) || 0;
-    const kr = Number(stats["Kick Off Return Yards"]) || 0, pr = Number(stats["Punt Return Yards"]) || 0;
-    const out = { ...stats };
-    if (stats["Rushing Yards"] != null || stats["Receiving Yards"] != null) out["Total Yards"] = rush + rec;
-    const apy = rush + rec + kr + pr;
-    if (apy > 0) out["All-Purpose Yards"] = apy; else delete out["All-Purpose Yards"]; // >0 only → non-skill players stay blank
-    return out;
-  }
-  return stats;
-}
+// withDerivedStats now lives in the shared scoring module — the single source of truth for app + public
+// (it was hand-copied here and in api/_lib.js). See shared/scoring.js.
+export { withDerivedStats } from "../shared/scoring.js";
 
 // ── All-time roster helpers ───────────────────────────────────────────────────
 export const getAllTimePlayers = async (programId) => {
