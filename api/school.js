@@ -14,8 +14,9 @@ import {
 // schools we feature; a per-program photo-upload feature can replace this later. Images live in /public/moments/.
 const MOMENTS = {
   "denver-christian": [
-    { img: "/moments/dc-baseball-hensley-600.jpg", caption: "Coach Terry Hensley — 600 career wins" },
-    { img: "/moments/dc-girls-basketball-100.jpg", caption: "Girls Basketball — 100 wins" },
+    { img: "/moments/dc-hall-of-fame-2026.jpg", caption: "Athletics Hall of Fame — Class of 2026" },
+    { img: "/moments/dc-baseball-hensley-600.jpg", caption: "Coach Terry Hensley — 600 career wins (Baseball)" },
+    { img: "/moments/dc-girls-basketball-100.jpg", caption: "Coach Chris Fuller — 100 career wins (Girls Basketball)" },
   ],
 };
 
