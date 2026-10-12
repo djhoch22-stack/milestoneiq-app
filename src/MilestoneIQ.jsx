@@ -6795,7 +6795,11 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                     <div style={{ padding:12,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:8 }}>
                       {tiles.map((t) => (
                         <div key={t.isRecord ? "record" : t.target} style={{ background: t.isRecord ? "#fffbeb" : "#f9fafb", border: t.isRecord ? "1px solid #fde68a" : "1px solid transparent", borderRadius:8, padding:12 }}>
-                          <div style={{ fontSize:20,fontWeight:700,color:"#111",marginBottom: t.isRecord ? 2 : 6 }}>{t.target.toLocaleString()}</div>
+                          <div style={{ fontSize:20,fontWeight:700,color:"#111",marginBottom: (t.isRecord || isCoachWins) ? 2 : 6 }}>{t.target.toLocaleString()}</div>
+                          {/* Coach Wins shows two different win counts: threshold tiles track the coach's FULL
+                              career total (every program + prior-school wins); the record tile tracks wins at
+                              THIS school only. Label each so the two numbers are never confused. */}
+                          {isCoachWins && <div style={{ fontSize:11,fontWeight:700,color:"#6b7280",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.3px" }}>{t.isRecord ? "School wins" : "All-time wins"}</div>}
                           {t.isRecord && <div style={{ fontSize:11,fontWeight:700,color:"#b45309",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.3px" }}>🏆 Record · {t.holder}</div>}
                           {t.approaching.length === 0
                             ? <div style={{ fontSize:12,color:"#d1d5db" }}>No {isCoachWins ? "coaches" : "athletes"} in range yet</div>
