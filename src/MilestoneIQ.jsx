@@ -492,6 +492,7 @@ const FOOTBALL_THRESHOLDS = {
   "Rushes":[100,250,500,750], "Rushing Yards":[250,500,1000,2500], "Rushing TDs":[10,25,50],
   "Receptions":[25,50,100,150], "Receiving Yards":[250,500,1000,2000], "Receiving TDs":[5,10,25,50],
   "Total Yards":[500,1000,2500,5000], "Total TDs":[10,25,50,75],
+  "Points":[50,100,200,300], "2 Point Conversions":[3,5,10], "Try Points":[10,25,50],
   "Total Tackles":[50,100,200,300], "Solo Tackles":[25,50,100,150], "Assisted Tackles":[15,30,60,100],
   "Sacks":[5,10,20,30], "Sack Yards Lost":[25,50,100,150], "Hurries":[5,10,20,30],
   "Interceptions":[3,5,10,15], "Interception Return Yards":[25,50,100,200], "Pass Break Ups":[5,10,20,30],
@@ -2763,6 +2764,8 @@ const SEASON_STAT_MAP = {
   // (withDerivedStats), so it is never imported as an input — only this 2-pt input feeds the formula.
   "2 Pt Conversions Made": "2 Point Conversions", "2 Pt Conversions": "2 Point Conversions",
   "Two Point Conversions": "2 Point Conversions", "2-Point Conversions": "2 Point Conversions", "Conv": "2 Point Conversions",
+  // Flag football post-TD conversions: MaxPreps "Try Pts" → canonical "Try Points".
+  "Try Pts": "Try Points",
 };
 // Sport-specific sheet-name overrides (win when present) — resolve cross-sport collisions like
 // volleyball "Points" (= Service Points) vs basketball "Points".
