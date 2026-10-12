@@ -10,6 +10,15 @@ import {
   seasonSuccessScore, activeYears, seasonEndYear, coachPostseason, coachTitleSeasons,
 } from "./_lib.js";
 
+// Milestone photos shown on a school's landing page, keyed by the school slug. A curated showcase for the
+// schools we feature; a per-program photo-upload feature can replace this later. Images live in /public/moments/.
+const MOMENTS = {
+  "denver-christian": [
+    { img: "/moments/dc-baseball-hensley-600.jpg", caption: "Coach Terry Hensley — 600 career wins" },
+    { img: "/moments/dc-girls-basketball-100.jpg", caption: "Girls Basketball — 100 wins" },
+  ],
+};
+
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   const slug = String((req.query && req.query.slug) || "").trim().toLowerCase();
@@ -23,6 +32,7 @@ export default async function handler(req, res) {
   const school = teams[0].school_name || teams[0].name || "School";
   const place = [teams[0].city, teams[0].state].filter(Boolean).join(", ");
   const logo = (teams.find((t) => t.logo_url) || {}).logo_url || "";
+  const moments = MOMENTS[slug] || [];
 
   const ids = teams.map((t) => t.id).filter(Boolean);
   const teamById = {}; teams.forEach((t) => { teamById[t.id] = t; });
@@ -185,6 +195,13 @@ export default async function handler(req, res) {
       <h1>${esc(school)}</h1>
       <p class="sub">${esc(place ? place + " · " : "")}${teams.length} public program${teams.length !== 1 ? "s" : ""} — all-time records, Hall of Fame &amp; season history. Pick a sport.</p>
     </div>
+    ${moments.length ? `
+    <div class="moments">
+      <h2 class="moments-h">Milestone moments</h2>
+      <div class="moments-grid">
+        ${moments.map((m) => `<figure class="moment"><img src="${esc(m.img)}" alt="${esc(m.caption)}" loading="lazy"><figcaption>${esc(m.caption)}</figcaption></figure>`).join("")}
+      </div>
+    </div>` : ""}
     <input type="radio" name="schooltab" id="st-prog" class="stin" checked>
     <input type="radio" name="schooltab" id="st-hof" class="stin">
     <div class="stbar"><label for="st-prog">Programs</label><label for="st-hof">🏛️ Hall of Fame</label></div>
@@ -196,6 +213,12 @@ export default async function handler(req, res) {
     <style>
       .backbtn{display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:7px 14px;border:1px solid #e8e4dd;border-radius:999px;background:#fff;color:#374151;text-decoration:none;font-size:13px;font-weight:600;transition:background .15s,border-color .15s}
       .backbtn:hover{background:#f9fafb;border-color:#d1cdc4}
+      .moments{margin:4px 0 24px}
+      .moments-h{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:0 0 12px}
+      .moments-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;align-items:start}
+      .moment{margin:0;background:#fff;border:1px solid #e8e4dd;border-radius:14px;overflow:hidden}
+      .moment img{display:block;width:100%;height:auto}
+      .moment figcaption{padding:11px 14px;font-size:13px;font-weight:600;color:#374151;text-align:center}
       .schoolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:8px}
       .schoolcard{display:block;background:#fff;border:1px solid #e8e4dd;border-radius:14px;padding:20px 18px;text-decoration:none;color:#111;transition:box-shadow .15s,transform .15s}
       .schoolcard:hover{box-shadow:0 8px 24px rgba(0,0,0,.08);transform:translateY(-2px)}
