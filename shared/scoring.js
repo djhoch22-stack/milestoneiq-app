@@ -16,18 +16,33 @@ export function withDerivedStats(stats, sport) {
     const h = Number(stats["Hits"]) || 0, d = Number(stats["Doubles"]) || 0, t = Number(stats["Triples"]) || 0, hr = Number(stats["Home Runs"]) || 0;
     return { ...stats, "Singles": Math.max(0, h - d - t - hr), "Total Bases": h + d + 2 * t + 3 * hr };
   }
-  if (sport === "football") {
-    // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
-    // All-Purpose Yards = scrimmage + return yards (Rushing + Receiving + Kick Off Return + Punt Return).
-    // Both are DERIVED so they never go stale: a prior static APY backfill drifted after later re-imports
-    // re-summed the career (career APY could fall below a player's own rushing yards). Recomputing here
-    // overrides whatever APY/Total Yards is stored.
-    const rush = Number(stats["Rushing Yards"]) || 0, rec = Number(stats["Receiving Yards"]) || 0;
-    const kr = Number(stats["Kick Off Return Yards"]) || 0, pr = Number(stats["Punt Return Yards"]) || 0;
+  if (sport === "football" || sport === "flag_football_girls") {
+    const n = (k) => Number(stats[k]) || 0;
     const out = { ...stats };
-    if (stats["Rushing Yards"] != null || stats["Receiving Yards"] != null) out["Total Yards"] = rush + rec;
-    const apy = rush + rec + kr + pr;
-    if (apy > 0) out["All-Purpose Yards"] = apy; else delete out["All-Purpose Yards"]; // >0 only → non-skill players stay blank
+    // Points (MaxPreps "Tot Pts"): 6 × scored TDs + conversions + kicking. "Scored TDs" = the stored
+    // Total TDs (the authoritative count — it includes defensive/return TDs and EXCLUDES passing TDs,
+    // since the passer doesn't score), falling back to the component TD sum for rows where Total TDs
+    // wasn't entered. DERIVED so it auto-covers every historical season/career and never goes stale.
+    const compTD = n("Rushing TDs") + n("Receiving TDs") + n("Punt Return TDs") + n("Kick Off Return TDs");
+    const scoredTD = Math.max(n("Total TDs"), compTD);
+    let pts;
+    if (sport === "football") {
+      // 6×TD + 3×FG + 1×PAT + 2×2-pt conversion + 2×safety
+      pts = 6 * scoredTD + 3 * n("Field Goals Made") + n("PAT Mades") + 2 * n("2 Point Conversions") + 2 * n("Safeties");
+      // Total Yards = yards from scrimmage (Rushing + Receiving); passing is tracked separately and excluded.
+      // All-Purpose Yards = scrimmage + return yards (Rushing + Receiving + Kick Off Return + Punt Return).
+      // Both are DERIVED so they never go stale: a prior static APY backfill drifted after later re-imports
+      // re-summed the career (career APY could fall below a player's own rushing yards). Recomputing here
+      // overrides whatever APY/Total Yards is stored.
+      const rush = n("Rushing Yards"), rec = n("Receiving Yards");
+      if (stats["Rushing Yards"] != null || stats["Receiving Yards"] != null) out["Total Yards"] = rush + rec;
+      const apy = rush + rec + n("Kick Off Return Yards") + n("Punt Return Yards");
+      if (apy > 0) out["All-Purpose Yards"] = apy; else delete out["All-Purpose Yards"]; // >0 only → non-skill players stay blank
+    } else {
+      // Flag football: no kicking; the post-TD "try" (1 or 2 pts) is already stored AS POINTS in "Try Points".
+      pts = 6 * scoredTD + n("Try Points");
+    }
+    if (pts > 0) out["Points"] = pts; else delete out["Points"]; // >0 only → non-scorers stay blank (like APY)
     return out;
   }
   return stats;
