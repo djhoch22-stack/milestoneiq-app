@@ -83,7 +83,7 @@ const VBALL_GROUPS = [
 // Girls flag football — tailored to the MaxPreps girls-flag export: football's passing/rushing/receiving
 // + flag pulls + sacks + punts/returns + kicking, but NO kickoffs/kick-returns and NO contact-only
 // defense (interceptions, fumbles, blocked kicks, pass break-ups). "Total Tackles" → "Total Flag Pulls".
-const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assisted Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
+const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total TDs","Total Flag Pulls","Solo Flag Pulls","Assisted Flag Pulls","Flag Pull Yards Lost","Sacks","Try Points","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return"];
 const FLAG_FOOTBALL_GROUPS = [
   { group: "General", stats: [
     { name: "Games Played", variants: ["Career total","Single season"] },
@@ -109,6 +109,7 @@ const FLAG_FOOTBALL_GROUPS = [
     { name: "Longest Reception", variants: ["Longest"] },
   ]},
   { group: "Offense", stats: [
+    { name: "Points", variants: STAT_VARIANTS_WITH_AVG },
     { name: "Total TDs", variants: STAT_VARIANTS_STANDARD },
   ]},
   { group: "Defense", stats: [
@@ -164,8 +165,10 @@ const SPORTS = {
         { name: "Longest Reception", variants: ["Longest"] },
       ]},
       { group: "Offense", stats: [
+        { name: "Points", variants: STAT_VARIANTS_WITH_AVG },
         { name: "Total Yards", variants: STAT_VARIANTS_STANDARD },
         { name: "Total TDs", variants: STAT_VARIANTS_STANDARD },
+        { name: "2 Point Conversions", variants: STAT_VARIANTS_STANDARD },
       ]},
       { group: "Defense", stats: [
         { name: "Total Tackles", variants: STAT_VARIANTS_STANDARD },
@@ -354,7 +357,7 @@ const STAT_ORDER = [
   "Receptions","Receiving Yards","Receiving TDs","Longest Reception",
   "Total Yards","Total TDs",
   "Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties",
-  "Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts",
+  "Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","2 Point Conversions",
   "Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return",
   "Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return",
   "All-Purpose Yards",
@@ -362,7 +365,7 @@ const STAT_ORDER = [
 ];
 
 // Football: the exact stat set + order to surface on every tab (always shown, even with no data).
-const FOOTBALL_DISPLAY = ["Games Played","Wins","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
+const FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","2 Point Conversions","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
 const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
@@ -2756,6 +2759,10 @@ const SEASON_STAT_MAP = {
   "3pFGM": "Three Pointers Made", "3pFGA": "Three Pointers Attempted", "FTM": "Free Throws Made", "FTA": "Free Throws Attempted",
   // Volleyball (sheet short-names → canonical; "Points" is sport-specific, handled below)
   "Matches": "Matches Played", "Sets": "Sets Played", "Attacks": "Attack Attempts", "Serving Aces": "Aces", "Serves": "Total Serves",
+  // Football 2-point conversions (MaxPreps "Scoring" column names → canonical). "Points" is DERIVED
+  // (withDerivedStats), so it is never imported as an input — only this 2-pt input feeds the formula.
+  "2 Pt Conversions Made": "2 Point Conversions", "2 Pt Conversions": "2 Point Conversions",
+  "Two Point Conversions": "2 Point Conversions", "2-Point Conversions": "2 Point Conversions", "Conv": "2 Point Conversions",
 };
 // Sport-specific sheet-name overrides (win when present) — resolve cross-sport collisions like
 // volleyball "Points" (= Service Points) vs basketball "Points".
@@ -4511,7 +4518,7 @@ const SPORT_STAT_OVERRIDES = {
   soccer:     { "Points": 8 },
   baseball:   { "Assists": 4 },
   volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },  // setting / serve-receive passing / solo stuffs
-  football:   { "Field Goals Made": 6 },  // kicker FGs — basketball "Field Goals Made" stays 4
+  football:   { "Field Goals Made": 6, "Points": 0 },  // kicker FGs; Points is a derived composite (6×TD+kicking) — kept out of HOF so it can't double-count Total TDs/FG/PAT
 };
 // Rate-stat records that COUNT toward HOF (importance ÷ 10). Computed per player from rateDefsFor(sport),
 // gated by the def's min-playing-time qualifier; the qualified leader holds the "title" (ERA = lowest-is-best).
@@ -4602,6 +4609,7 @@ function buildHofCtx(school) {
   // holder — so every program gets consistent, current credit without depending on a hand-entered record book.
   for (const stat in HOF_STAT_WEIGHTS) {
     if (TEAM_STATS.has(stat)) continue;
+    if (!weightFor(school && school.sport, stat)) continue; // weight-0 stats (e.g. football "Points", a derived composite) aren't individual HOF achievements
     const t = topByStat[stat]; if (!t || !(t.v1 > 0)) continue;
     const imp = (weightFor(school && school.sport, stat) || 3) / 10;
     let marginMult = 1;
@@ -4640,6 +4648,7 @@ function buildHofCtx(school) {
   for (const rec of (school.records || [])) {
     if ((rec.variant || "").toLowerCase().includes("career")) continue; // career handled above from live data
     if (TEAM_STATS.has(rec.statName)) continue;
+    if (!weightFor(school && school.sport, rec.statName)) continue; // weight-0 stats (e.g. football "Points") earn no record bonus
     add(rec.holderName, recordWeight(rec, school && school.sport, now));
   }
   return { rankByStat, totalByStat, recordBonusByName };
