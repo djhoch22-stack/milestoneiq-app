@@ -559,6 +559,10 @@ const HOF_STAT_WEIGHTS = {
   "Hits": 9, "Home Runs": 9, "RBIs": 9, "Total Bases": 7, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
   "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
+  // Girls volleyball + flag football — were MISSING here, so public volleyball/flag HOF scores drifted
+  // BELOW the app (Kills etc. fell through to the default weight). Synced to the app 2026-10-12.
+  "Kills": 10, "Digs": 7, "Aces": 7, "Total Blocks": 8,
+  "Total Flag Pulls": 8, "Solo Flag Pulls": 4, "Assisted Flag Pulls": 2,
 };
 // Per-sport overrides (mirror of the app) — win over the shared weights above.
 const SPORT_STAT_OVERRIDES = {
