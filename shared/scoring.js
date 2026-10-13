@@ -67,3 +67,71 @@ export function calcCoachHofScore(coach) {
   const postScore = Math.min((coach.stateChamps || 0) * 8 + (coach.stateRunnerUp || 0) * 4 + (coach.finalFours || 0) * 3 + (coach.eliteEights || 0) * 2 + (coach.sweetSixteens || 0) * 1, 18);
   return Math.min(winScore + longScore + lgScore + postScore, 90);
 }
+
+// ── HOF scoring config (single source of truth; imported by src/MilestoneIQ.jsx + api/_lib.js) ──
+// Per-stat importance for the player HOF impact score + record bonus, tuned per sport. TEAM/participation
+// stats (Wins, Coach Wins) are 0 — given to every roster player, never an individual achievement.
+// SPORT_STAT_OVERRIDES win over these when a stat name means something different by sport.
+export const HOF_STAT_WEIGHTS = {
+  // Basketball
+  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 5, "Blocks": 5,
+  "Wins": 0, "Games Played": 3, "Matches Played": 3,
+  "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
+  "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
+  // Football / flag football
+  "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
+  "Total Tackles": 8, "Solo Tackles": 4, "Assisted Tackles": 2,
+  "Total Flag Pulls": 8, "Solo Flag Pulls": 4, "Assisted Flag Pulls": 2,
+  "Sacks": 8, "Sack Yards Lost": 2, "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3,
+  "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
+  "Total Yards": 7, "All-Purpose Yards": 8, "Forced Fumbles": 6, "Fumble Recoveries": 5,
+  "Pass Break Ups": 4, "Punt Return TDs": 6, "Kick Off Return TDs": 6, "Flag Pull Yards Lost": 4,
+  // Soccer ("Points" = goals+assists, discounted below the Goals marquee via the override)
+  "Goals": 10, "Shutouts": 7, "Saves": 6, "Shots on Goal": 5, "Shots": 4,
+  // Baseball / softball
+  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Total Bases": 7, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
+  "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
+  "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
+  // Girls volleyball
+  "Kills": 10, "Digs": 7, "Aces": 7, "Total Blocks": 8,
+  // Generic
+  "Coach Wins": 0,
+};
+// Per-sport overrides — same stat name, different meaning across sports → these WIN over the flat weights.
+export const SPORT_STAT_OVERRIDES = {
+  soccer:     { "Points": 8 },                                        // Points (goals+assists) overlaps Goals
+  baseball:   { "Assists": 4 },                                       // fielding assists (minor), not setting
+  volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },    // setting / serve-receive / solo stuffs
+  football:   { "Field Goals Made": 6, "Points": 0 },                 // kicker FGs; Points is a derived composite — kept out of HOF
+};
+// Rate-stat records that COUNT toward HOF (importance ÷ 10); the qualified leader holds the "title".
+export const HOF_RATE_WEIGHTS = { "Batting Average": 9, "ERA": 9, "Kill Percentage": 8 };
+// TEAM / participation stats — assigned to every roster player, so excluded from impact + record bonus.
+export const TEAM_STATS = new Set(["Wins", "Coach Wins"]);
+export function sportGroup(sport) {
+  const s = String(sport || "");
+  if (s.indexOf("basketball") === 0) return "basketball";
+  if (s.indexOf("soccer") === 0) return "soccer";
+  if (s.indexOf("volleyball") === 0) return "volleyball";
+  if (s === "baseball" || s === "softball") return "baseball";
+  if (s === "football" || s === "flag_football_girls") return "football";
+  return s;
+}
+export function weightFor(sport, stat) {
+  const o = SPORT_STAT_OVERRIDES[sportGroup(sport)];
+  return (o && o[stat] != null) ? o[stat] : HOF_STAT_WEIGHTS[stat];
+}
+// Postseason / team-success weight from a season's notes (used by player teamNorm + displays).
+export function getSeasonSuccessScore(notes) {
+  if (!notes) return 0;
+  const n = notes.toLowerCase();
+  let score = 0;
+  if (/state champ/.test(n))              score += 30;
+  else if (/state runner.?up/.test(n))    score += 22;
+  else if (/final.?four|final 4/.test(n)) score += 16;
+  else if (/elite.?8/.test(n))            score += 12;
+  else if (/sweet.?16/.test(n))           score +=  8;
+  else if (/round of|first round|playoff/.test(n)) score += 4;
+  if (/league champ/.test(n))             score += 10;
+  return score;
+}
