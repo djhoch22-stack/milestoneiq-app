@@ -4,7 +4,7 @@ import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
 import raftersLogo from '../raftersiq-logo.png';
-import { calcCoachHofScore, HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
+import { calcCoachHofScore, buildCoachStats, HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
 
 const STAT_VARIANTS_STANDARD = ["Career total","Single season","Single game"];
 const STAT_VARIANTS_WITH_AVG = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
@@ -4715,53 +4715,9 @@ function hofTier(score) {
 
 // Wins/record a coach earned at a PREVIOUS school, folded into their RaftersIQ
 // profile here ("for now" — there's no per-coach DB field yet). Matched by exact name.
-const COACH_PRIOR_STATS = {
-  "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
-};
-
-function buildCoachStats(seasons, opts = {}) {
-  const { includePrior = true, prior = {} } = opts;
-  const coaches = {};
-  (seasons || []).forEach(s => {
-    const name = (s.coach || s["coach"] || "").trim();
-    if (!name) return;
-    if (!coaches[name]) {
-      coaches[name] = { name, wins:0, losses:0, ties:0, leagueWins:0, leagueLosses:0, leagueTies:0, seasons:0,
-        stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0,
-        playoffs:0, leagueChamps:0, teams: new Set(), byTeam: {} };
-    }
-    const co = coaches[name];
-    if (s._team) co.teams.add(s._team);   // track which program(s)/sport(s) the coach led
-    co.seasons    += 1;
-    co.wins       += (s.wins || s["wins"] || 0);
-    co.losses     += (s.losses || s["losses"] || 0);
-    co.ties       += (s.ties || 0);
-    co.leagueWins += (s.leagueWins || s["leagueWins"] || 0);
-    co.leagueLosses += (s.leagueLosses || s["leagueLosses"] || 0);
-    co.leagueTies += (s.leagueTies || 0);
-    // per-sport/team breakdown (e.g. Boys Basketball vs Girls Soccer)
-    const _tm = s._team || "Team";
-    if (!co.byTeam[_tm]) co.byTeam[_tm] = { wins:0, losses:0, ties:0, seasons:0 };
-    const _bt = co.byTeam[_tm];
-    _bt.wins += (s.wins || 0); _bt.losses += (s.losses || 0); _bt.ties += (s.ties || 0); _bt.seasons += 1;
-    const notes = (s.notes || s["notes"] || "").toLowerCase();
-    if (/state champ/.test(notes))                       co.stateChamps    += 1;
-    if (/runner.?up|runner-up/.test(notes))              co.stateRunnerUp  += 1;
-    if (/final.?four|final 4/.test(notes))               co.finalFours     += 1;
-    if (/elite.?8/.test(notes))                          co.eliteEights    += 1;
-    if (/sweet.?16/.test(notes))                         co.sweetSixteens  += 1;
-    if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
-    if (/league champ/.test(notes))                      co.leagueChamps   += 1;
-  });
-  // Fold in wins/record a coach brought from a PREVIOUS school — only when enabled (toggle), and
-  // only into programs where they actually coached (so a basketball coach doesn't appear on football).
-  if (includePrior) Object.entries({ ...COACH_PRIOR_STATS, ...prior }).forEach(([name, pr]) => {
-    if (!coaches[name] || !pr) return;
-    const co = coaches[name];
-    Object.keys(pr).forEach(k => { if (typeof co[k] === "number" && typeof pr[k] === "number") co[k] += pr[k]; });
-  });
-  return Object.values(coaches);
-}
+// COACH_PRIOR_STATS + buildCoachStats are single-sourced in shared/scoring.js (imported at the top of this
+// file). The returned coach object is a superset used by both runtimes; this app reads coach.teams (Set)
+// + coach.byTeam. "Final 8" now counts as Elite 8 here too (it already did on the public pages).
 
 // calcCoachHofScore now lives in shared/scoring.js (imported at the top) — single source of truth for app + public.
 
