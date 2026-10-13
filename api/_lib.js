@@ -550,94 +550,11 @@ export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
 // HOF config (HOF_STAT_WEIGHTS/overrides/rate-weights/weightFor/sportGroup/TEAM_STATS/getSeasonSuccessScore)
 // is single-sourced in shared/scoring.js — imported here so it can never drift from the app again:
 import { HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
-function playerYears(player) {
-  if (player.firstYear && player.lastYear) {
-    const a = parseInt(String(player.firstYear).split("-")[1]); const b = parseInt(String(player.lastYear).split("-")[1]);
-    const yrs = []; for (let y = a; y <= b; y++) yrs.push(y); return yrs;
-  }
-  if (player.gradYear) { const g = Number(player.gradYear); return [g - 3, g - 2, g - 1, g]; }
-  return [];
-}
-function playerSeasonOverlap(player, season) {
-  const ys = playerYears(player); if (!ys.length) return false;
-  return ys.includes(parseInt(String(season.season || "").split("-")[1]));
-}
-export function calcProgramHofScore(player, school) {
-  if (!player || !school) return 0;
-  const roster = school.allTimeRoster || []; if (!roster.length) return 0;
-  const stats = player.stats || {}; let statScore = 0, totalWeight = 0;
-  Object.entries(stats).forEach(([stat, val]) => {
-    const weight = weightFor(school.sport, stat); if (!weight || !val) return; totalWeight += weight;
-    const sorted = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
-    const rank = sorted.findIndex((p) => p.id === player.id) + 1; const total = sorted.length; if (!rank || !total) return;
-    let rankPct;
-    if (rank === 1) rankPct = 1.00; else if (rank === 2) rankPct = 0.85; else if (rank === 3) rankPct = 0.70;
-    else if (rank / total <= 0.10) rankPct = 0.50; else if (rank / total <= 0.25) rankPct = 0.35;
-    else if (rank / total <= 0.50) rankPct = 0.20; else rankPct = 0.05;
-    statScore += weight * rankPct;
-  });
-  const impact = totalWeight > 0 ? statScore / totalWeight : 0; // individual-impact factor 0–1 (team Wins excluded)
-  const statNorm = impact * 70;
-  let teamScore = 0;
-  (school.seasons || []).forEach((s) => { if (playerSeasonOverlap(player, s)) teamScore += getSeasonSuccessScore(s.notes); });
-  const teamNorm = Math.min(teamScore / 3, 30) * (0.2 + 0.8 * impact); // team success scaled by the player's impact
-  const pn = (player.name || "").toLowerCase().trim(); let recordBonus = 0;
-  const now = new Date().getFullYear();
-  // CAREER records from the LIVE LEADERBOARD: each scored stat where THIS player is the all-time #1.
-  for (const stat in HOF_STAT_WEIGHTS) {
-    if (TEAM_STATS.has(stat)) continue;
-    if (!weightFor(school.sport, stat)) continue; // weight-0 stats (e.g. football "Points", a derived composite) aren't individual HOF achievements
-    const sorted = roster.filter((p) => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
-    const top = sorted[0];
-    if (!top || (top.name || "").toLowerCase().trim() !== pn || !((top.stats[stat] || 0) > 0)) continue;
-    const v1 = top.stats[stat] || 0, v2 = sorted[1] ? (sorted[1].stats[stat] || 0) : 0;
-    const imp = (weightFor(school.sport, stat) || 3) / 10;
-    let marginMult = 1;
-    if (v2 > 0) { const m = (v1 - v2) / v2; marginMult = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; }
-    const ys = playerYears(top); const endYear = ys.length ? ys[ys.length - 1] : 0;
-    const yrs = endYear ? now - endYear : 0;
-    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-    recordBonus += imp * 5 * marginMult * longMult;
-  }
-  // CAREER RATE records (AVG, ERA, …): credit THIS player if they're the qualified rate leader.
-  for (const d of (rateDefsFor(school.sport) || [])) {
-    const impW = HOF_RATE_WEIGHTS[d.name]; if (!impW) continue;
-    const qualed = [];
-    for (const p of roster) {
-      if ((Number((p.stats || {})[d.qualStat]) || 0) < (d.minCareer || 0)) continue;
-      const rv = rateValue(d, p.stats || {});
-      if (rv == null || !(rv > 0)) continue;
-      qualed.push({ p, v: rv });
-    }
-    if (!qualed.length) continue;
-    qualed.sort((a, b) => d.lowerIsBetter ? (a.v - b.v) : (b.v - a.v));
-    const r0 = qualed[0];
-    if ((r0.p.name || "").toLowerCase().trim() !== pn) continue;
-    const r1 = qualed[1];
-    let rMargin = 1;
-    if (r1 && r0.v > 0 && r1.v > 0) { const m = d.lowerIsBetter ? (r1.v - r0.v) / r0.v : (r0.v - r1.v) / r1.v; rMargin = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7; }
-    const rys = playerYears(r0.p); const rey = rys.length ? rys[rys.length - 1] : 0;
-    const ry = rey ? now - rey : 0;
-    const rLong = ry >= 40 ? 1.3 : ry >= 25 ? 1.2 : ry >= 15 ? 1.1 : 1;
-    recordBonus += (impW / 10) * 5 * rMargin * rLong;
-  }
-  // Single-season / single-game / per-game marks still come from the stored record book.
-  (school.records || []).forEach((rec) => {
-    if ((rec.variant || "").toLowerCase().includes("career")) return; // career handled above from live data
-    const h = (rec.holderName || "").toLowerCase().trim();
-    if (!h || h === "multiple players" || h !== pn || TEAM_STATS.has(rec.statName) || !weightFor(school.sport, rec.statName)) return;
-    const v = (rec.variant || "").toLowerCase();
-    const imp = ((HOF_RATE_WEIGHTS[rec.statName] || weightFor(school.sport, rec.statName)) || 3) / 10;
-    const variantBase = v.includes("game") ? 2 : 3;
-    const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
-    const yrs = endYear ? now - endYear : 0;
-    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-    recordBonus += imp * variantBase * longMult;
-  });
-  return Math.min(Math.round(statNorm + teamNorm + Math.min(recordBonus, 20)), 100);
-}
-// Legacy hardcoded prior (predates the DB coach_prior; DB entries override by key). Mirrors the app so
-// public + in-app coach totals match exactly.
+// Player HOF scoring (calcProgramHofScore + its playerYears/playerSeasonOverlap helpers + hofTier) lived
+// here as a PORTED copy but was never wired into any public page (the public SSR shows manually-inducted
+// members, not computed scores) — i.e. dead code duplicating the app's live engine. Removed 2026-10-13;
+// the single source is now shared/scoring.js. If the public ever needs computed player scores, import
+// buildHofCtx + calcProgramHofScore from shared and inject a rate helper { rateDefsFor, rateValue }.
 // COACH_PRIOR_STATS + buildCoachStats are single-sourced in shared/scoring.js. Re-export buildCoachStats
 // so api/team.js + api/school.js keep importing it from here unchanged. The returned coach object is a
 // superset shared with the app; this public runtime reads coach.titles/firstYear/lastYear + coach.byTeam
@@ -645,14 +562,6 @@ export function calcProgramHofScore(player, school) {
 export { buildCoachStats } from "../shared/scoring.js";
 // calcCoachHofScore now lives in the shared scoring module — single source of truth for app + public.
 export { calcCoachHofScore } from "../shared/scoring.js";
-export function hofTier(score) {
-  if (score >= 90) return { label: "Legend", color: "#7c3aed", bg: "#f5f3ff", border: "#c4b5fd" };
-  if (score >= 75) return { label: "Elite", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" };
-  if (score >= 60) return { label: "Strong", color: "#065f46", bg: "#f0fdf4", border: "#6ee7b7" };
-  if (score >= 45) return { label: "Contender", color: "#92400e", bg: "#fffbeb", border: "#fcd34d" };
-  if (score >= 30) return { label: "Honorable", color: "#374151", bg: "#f9fafb", border: "#d1d5db" };
-  return { label: "Developing", color: "#6b7280", bg: "#f9fafb", border: "#e5e7eb" };
-}
 // Awards → HOF bonuses (ported)
 const PLAYER_HONORS = [
   { kind: "team_mvp", label: "Team MVP", points: 5 },
