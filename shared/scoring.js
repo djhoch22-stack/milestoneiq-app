@@ -135,3 +135,55 @@ export function getSeasonSuccessScore(notes) {
   if (/league champ/.test(n))             score += 10;
   return score;
 }
+
+// Legacy prior-school coach record (predates the per-coach DB coach_prior field; DB entries override by key).
+// Folded into buildCoachStats below when includePrior. (Steve Schimpeler's 19 prior seasons, hardcoded.)
+export const COACH_PRIOR_STATS = {
+  "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
+};
+// Coach aggregation across a scope's seasons — SINGLE SOURCE for the app + public (was hand-copied into
+// both and had drifted). The output object is a SUPERSET of what each runtime needs: the app reads `teams`
+// (a Set, for the cross-program "N teams" coach tiles) + `byTeam`; the public reads `titles`/`firstYear`/
+// `lastYear` (Seasons display) + `byTeam`. Each runtime ignores the fields it doesn't use — verified no
+// consumer reads the other's fields, and on the public side the raw object is never JSON-serialized (only
+// hand-built projections are), so the `teams` Set never crosses the SSR JSON boundary. Folds each coach's
+// prior-school record when includePrior. NOTE: "Final 8" counts as Elite 8 (CO's round-of-8) — this was
+// previously missing from the app copy only, so a coach with "Final 8" seasons scored lower in-app than
+// on the public page; the shared version ends that drift.
+export function buildCoachStats(seasons, opts = {}) {
+  const { includePrior = true, prior = {} } = opts;
+  const coaches = {};
+  (seasons || []).forEach((s) => {
+    const name = (s.coach || "").trim(); if (!name) return;
+    if (!coaches[name]) coaches[name] = { name, wins:0, losses:0, ties:0, leagueWins:0, leagueLosses:0, leagueTies:0, seasons:0,
+      stateChamps:0, stateRunnerUp:0, finalFours:0, eliteEights:0, sweetSixteens:0, playoffs:0, leagueChamps:0,
+      titles:0, firstYear: s.season, lastYear: s.season, teams: new Set(), byTeam: {} };
+    const co = coaches[name];
+    if (s._team) co.teams.add(s._team);   // which program(s)/sport(s) the coach led (app cross-program tiles)
+    co.seasons += 1; co.wins += (s.wins || 0); co.losses += (s.losses || 0); co.ties += (s.ties || 0);
+    co.leagueWins += (s.leagueWins || 0); co.leagueLosses += (s.leagueLosses || 0); co.leagueTies += (s.leagueTies || 0);
+    // per-sport/team breakdown (e.g. Boys Basketball vs Girls Soccer)
+    const tm = s._team || "Team";
+    if (!co.byTeam[tm]) co.byTeam[tm] = { wins:0, losses:0, ties:0, seasons:0 };
+    const bt = co.byTeam[tm]; bt.wins += (s.wins || 0); bt.losses += (s.losses || 0); bt.ties += (s.ties || 0); bt.seasons += 1;
+    const notes = (s.notes || "").toLowerCase();
+    if (/state champ/.test(notes))                       co.stateChamps    += 1;
+    if (/runner.?up|runner-up/.test(notes))              co.stateRunnerUp  += 1;
+    if (/final.?four|final 4/.test(notes))               co.finalFours     += 1;
+    if (/elite.?8|final 8\b/.test(notes))                co.eliteEights    += 1;   // "Final 8" == Elite 8
+    if (/sweet.?16/.test(notes))                         co.sweetSixteens  += 1;
+    if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
+    if (/league champ/.test(notes))                      co.leagueChamps   += 1;
+    if (/champion/i.test(s.notes || ""))                 co.titles         += 1;
+    if (String(s.season) < String(co.firstYear))         co.firstYear = s.season;
+    if (String(s.season) > String(co.lastYear))          co.lastYear = s.season;
+  });
+  // Fold in each coach's prior-school record (wins/losses/ties + postseason) — only into coaches who
+  // actually have seasons in this scope (keyed by exact name), so totals match across app + public.
+  if (includePrior) Object.entries({ ...COACH_PRIOR_STATS, ...prior }).forEach(([name, pr]) => {
+    if (!coaches[name] || !pr) return;
+    const co = coaches[name];
+    Object.keys(pr).forEach((k) => { if (typeof co[k] === "number" && typeof pr[k] === "number") co[k] += pr[k]; });
+  });
+  return Object.values(coaches);
+}
