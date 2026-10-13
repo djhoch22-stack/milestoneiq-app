@@ -547,56 +547,9 @@ export function coachWinsRecordsFrom(seasons, sport, prior = {}) {
 }
 
 // ── HOF + coach scoring (ported verbatim from MilestoneIQ.jsx → scores match) ──
-const HOF_STAT_WEIGHTS = {
-  "Points": 10, "Assists": 7, "Total Rebounds": 6, "Steals": 5, "Blocks": 5, "Wins": 0, "Games Played": 3, "Matches Played": 3,
-  "Field Goals Made": 4, "Field Goals Attempted": 2, "Three Pointers Made": 4, "Three Pointers Attempted": 2,
-  "Free Throws Made": 3, "Free Throws Attempted": 2, "Offensive Rebounds": 4, "Defensive Rebounds": 4,
-  "Passing Yards": 10, "Passing TDs": 9, "Rushing Yards": 10, "Rushing TDs": 9, "Receiving Yards": 10, "Receiving TDs": 9,
-  "Total Tackles": 8, "Solo Tackles": 4, "Assisted Tackles": 2, "Sacks": 8, "Sack Yards Lost": 2,
-  "Hurries": 3, "Interceptions": 7, "Interception Return Yards": 3, "Blocked Punts": 5, "Blocked Field Goals": 5, "Safeties": 6, "Total TDs": 9,
-  "Total Yards": 7, "All-Purpose Yards": 8, "Forced Fumbles": 6, "Fumble Recoveries": 5, "Pass Break Ups": 4, "Punt Return TDs": 6, "Kick Off Return TDs": 6, "Flag Pull Yards Lost": 4,
-  "Goals": 10, "Shutouts": 7, "Saves": 6, "Shots on Goal": 5, "Shots": 4, "Coach Wins": 0,
-  "Hits": 9, "Home Runs": 9, "RBIs": 9, "Total Bases": 7, "Runs": 6, "Doubles": 4, "Triples": 4, "Stolen Base": 5, "Walk (BB)": 3,
-  "Pitcher Wins": 9, "Pitcher Strikeouts": 9, "No Hitters": 8, "Perfect Games": 8, "Innings Pitched": 7,
-  "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
-  // Girls volleyball + flag football — were MISSING here, so public volleyball/flag HOF scores drifted
-  // BELOW the app (Kills etc. fell through to the default weight). Synced to the app 2026-10-12.
-  "Kills": 10, "Digs": 7, "Aces": 7, "Total Blocks": 8,
-  "Total Flag Pulls": 8, "Solo Flag Pulls": 4, "Assisted Flag Pulls": 2,
-};
-// Per-sport overrides (mirror of the app) — win over the shared weights above.
-const SPORT_STAT_OVERRIDES = {
-  soccer:     { "Points": 8 },
-  baseball:   { "Assists": 4 },
-  volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },
-  football:   { "Field Goals Made": 6, "Points": 0 },  // Points is a derived composite — kept out of HOF (would double-count Total TDs/FG/PAT)
-};
-const HOF_RATE_WEIGHTS = { "Batting Average": 9, "ERA": 9, "Kill Percentage": 8 };  // rate titles that count toward HOF (mirror of app)
-function sportGroup(sport) {
-  const s = String(sport || "");
-  if (s.indexOf("basketball") === 0) return "basketball";
-  if (s.indexOf("soccer") === 0) return "soccer";
-  if (s.indexOf("volleyball") === 0) return "volleyball";
-  if (s === "baseball" || s === "softball") return "baseball";
-  if (s === "football" || s === "flag_football_girls") return "football";
-  return s;
-}
-function weightFor(sport, stat) {
-  const o = SPORT_STAT_OVERRIDES[sportGroup(sport)];
-  return (o && o[stat] != null) ? o[stat] : HOF_STAT_WEIGHTS[stat];
-}
-// TEAM / participation stats — given to every roster player, so NOT individual achievements
-// (excluded from impact scoring AND the record bonus).
-const TEAM_STATS = new Set(["Wins", "Coach Wins"]);
-function getSeasonSuccessScore(notes) {
-  if (!notes) return 0;
-  const n = notes.toLowerCase(); let score = 0;
-  if (/state champ/.test(n)) score += 30; else if (/state runner.?up/.test(n)) score += 22;
-  else if (/final.?four|final 4/.test(n)) score += 16; else if (/elite.?8/.test(n)) score += 12;
-  else if (/sweet.?16/.test(n)) score += 8; else if (/round of|first round|playoff/.test(n)) score += 4;
-  if (/league champ/.test(n)) score += 10;
-  return score;
-}
+// HOF config (HOF_STAT_WEIGHTS/overrides/rate-weights/weightFor/sportGroup/TEAM_STATS/getSeasonSuccessScore)
+// is single-sourced in shared/scoring.js — imported here so it can never drift from the app again:
+import { HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
 function playerYears(player) {
   if (player.firstYear && player.lastYear) {
     const a = parseInt(String(player.firstYear).split("-")[1]); const b = parseInt(String(player.lastYear).split("-")[1]);
