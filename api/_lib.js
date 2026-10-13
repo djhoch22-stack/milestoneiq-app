@@ -638,47 +638,11 @@ export function calcProgramHofScore(player, school) {
 }
 // Legacy hardcoded prior (predates the DB coach_prior; DB entries override by key). Mirrors the app so
 // public + in-app coach totals match exactly.
-const COACH_PRIOR_STATS = {
-  "Steve Schimpeler": { wins:308, losses:145, seasons:19, leagueChamps:9, eliteEights:3, finalFours:1 },
-};
-// Coach aggregation. Adds firstYear/lastYear/titles like the Seasons tab, and folds in each coach's
-// prior-school record (wins/losses/ties + postseason) from `prior` when includePrior — parity with the app.
-export function buildCoachStats(seasons, opts = {}) {
-  const { includePrior = true, prior = {} } = opts;
-  const coaches = {};
-  (seasons || []).forEach((s) => {
-    const name = (s.coach || "").trim(); if (!name) return;
-    if (!coaches[name]) coaches[name] = { name, wins: 0, losses: 0, ties: 0, leagueWins: 0, leagueLosses: 0, leagueTies: 0, seasons: 0,
-      stateChamps: 0, stateRunnerUp: 0, finalFours: 0, eliteEights: 0, sweetSixteens: 0, playoffs: 0, leagueChamps: 0,
-      titles: 0, firstYear: s.season, lastYear: s.season, byTeam: {} };
-    const co = coaches[name];
-    co.seasons += 1; co.wins += (s.wins || 0); co.losses += (s.losses || 0); co.ties += (s.ties || 0);
-    co.leagueWins += (s.leagueWins || 0); co.leagueLosses += (s.leagueLosses || 0); co.leagueTies += (s.leagueTies || 0);
-    // per-sport/team breakdown (e.g. Boys Basketball vs Girls Soccer)
-    const tm = s._team || "Team";
-    if (!co.byTeam[tm]) co.byTeam[tm] = { wins: 0, losses: 0, ties: 0, seasons: 0 };
-    const bt = co.byTeam[tm]; bt.wins += (s.wins || 0); bt.losses += (s.losses || 0); bt.ties += (s.ties || 0); bt.seasons += 1;
-    const notes = (s.notes || "").toLowerCase();
-    if (/state champ/.test(notes)) co.stateChamps += 1;
-    if (/runner.?up|runner-up/.test(notes)) co.stateRunnerUp += 1;
-    if (/final.?four|final 4/.test(notes)) co.finalFours += 1;
-    if (/elite.?8|final 8\b/.test(notes)) co.eliteEights += 1;
-    if (/sweet.?16/.test(notes)) co.sweetSixteens += 1;
-    if (/round of|first round|playoff|sweet|elite|final four|state/.test(notes)) co.playoffs += 1;
-    if (/league champ/.test(notes)) co.leagueChamps += 1;
-    if (/champion/i.test(s.notes || "")) co.titles += 1;
-    if (String(s.season) < String(co.firstYear)) co.firstYear = s.season;
-    if (String(s.season) > String(co.lastYear)) co.lastYear = s.season;
-  });
-  // Fold in each coach's prior-school record — only into coaches who actually have seasons here
-  // (keyed by exact name), mirroring the in-app buildCoachStats so public + app totals match.
-  if (includePrior) Object.entries({ ...COACH_PRIOR_STATS, ...prior }).forEach(([name, pr]) => {
-    if (!coaches[name] || !pr) return;
-    const co = coaches[name];
-    Object.keys(pr).forEach((k) => { if (typeof co[k] === "number" && typeof pr[k] === "number") co[k] += pr[k]; });
-  });
-  return Object.values(coaches);
-}
+// COACH_PRIOR_STATS + buildCoachStats are single-sourced in shared/scoring.js. Re-export buildCoachStats
+// so api/team.js + api/school.js keep importing it from here unchanged. The returned coach object is a
+// superset shared with the app; this public runtime reads coach.titles/firstYear/lastYear + coach.byTeam
+// (never coach.teams), and never JSON-serializes the raw object — only hand-built projections.
+export { buildCoachStats } from "../shared/scoring.js";
 // calcCoachHofScore now lives in the shared scoring module — single source of truth for app + public.
 export { calcCoachHofScore } from "../shared/scoring.js";
 export function hofTier(score) {
