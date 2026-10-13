@@ -4,7 +4,7 @@ import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
 import raftersLogo from '../raftersiq-logo.png';
-import { calcCoachHofScore, buildCoachStats, HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
+import { calcCoachHofScore, buildCoachStats, buildHofCtx as _sharedBuildHofCtx, calcProgramHofScore as _sharedCalcProgramHofScore, playerSeasonOverlap, HOF_STAT_WEIGHTS, SPORT_STAT_OVERRIDES, HOF_RATE_WEIGHTS, TEAM_STATS, sportGroup, weightFor, getSeasonSuccessScore } from "../shared/scoring.js";
 
 const STAT_VARIANTS_STANDARD = ["Career total","Single season","Single game"];
 const STAT_VARIANTS_WITH_AVG = ["Career total","Single season","Single game","Per game avg (season)","Per game avg (career)"];
@@ -4458,177 +4458,15 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
 // TEAM_STATS, getSeasonSuccessScore) is single-sourced in shared/scoring.js — imported at the top of this file.
 
 // Get the seasons a player was active (from firstYear/lastYear or gradYear)
-function getPlayerSeasons(player) {
-  if (player.firstYear && player.lastYear) {
-    // e.g. "2009-2010" → "2010", "2012-2013" → "2013"
-    const startYr = parseInt(player.firstYear.split('-')[1]);
-    const endYr   = parseInt(player.lastYear.split('-')[1]);
-    const yrs = [];
-    for (let y = startYr; y <= endYr; y++) yrs.push(y);
-    return yrs;
-  }
-  if (player.gradYear) {
-    // Assume 4-year career ending at gradYear
-    return [player.gradYear - 3, player.gradYear - 2, player.gradYear - 1, player.gradYear];
-  }
-  return [];
-}
+// playerYears + playerSeasonOverlap are single-sourced in shared/scoring.js (imported above) — identical
+// logic to the old local getPlayerSeasons/playerSeasonOverlap; used by HOF scoring + season displays.
 
-// Match a school season record to a player's active years
-function playerSeasonOverlap(player, season) {
-  const playerYrs = getPlayerSeasons(player);
-  if (!playerYrs.length) return false;
-  // season string like "2012-2013" → end year = 2013
-  const endYr = parseInt(String(season.season || '').split('-')[1]);
-  return playerYrs.includes(endYr);
-}
-
-// Precompute per-program lookups used by HOF scoring (rank-by-stat + record bonus) ONCE, so scoring 300+
-// players doesn't re-filter/re-sort the whole roster for every player×stat (the HOF tab's O(n²) bottleneck).
-function buildHofCtx(school) {
-  const roster = (school && school.allTimeRoster) || [];
-  const rankByStat = {};   // stat -> Map(playerId -> 1-based rank among roster)
-  const totalByStat = {};  // stat -> # of players with that stat > 0
-  const topByStat = {};    // stat -> { name, year, v1, v2 } #1 holder + #2 value, for live career records
-  for (const stat in HOF_STAT_WEIGHTS) {
-    const sorted = roster
-      .filter(p => (((p.stats && p.stats[stat]) || 0) > 0))
-      .sort((a, b) => (((b.stats && b.stats[stat]) || 0) - ((a.stats && a.stats[stat]) || 0)));
-    if (!sorted.length) continue;
-    const m = new Map();
-    for (let i = 0; i < sorted.length; i++) m.set(sorted[i].id, i + 1);
-    rankByStat[stat] = m;
-    totalByStat[stat] = sorted.length;
-    const p0 = sorted[0];
-    topByStat[stat] = { name: p0.name, year: String(p0.lastYear || p0.firstYear || p0.gradYear || ""),
-      v1: ((p0.stats && p0.stats[stat]) || 0), v2: (sorted[1] ? ((sorted[1].stats && sorted[1].stats[stat]) || 0) : 0) };
-  }
-  const now = new Date().getFullYear();
-  const recordBonusByName = new Map();
-  const add = (name, amt) => { const k = (name || "").toLowerCase().trim(); if (k && k !== "multiple players") recordBonusByName.set(k, (recordBonusByName.get(k) || 0) + amt); };
-  // CAREER records come straight from the LIVE LEADERBOARD — the #1 in each scored stat IS the career record
-  // holder — so every program gets consistent, current credit without depending on a hand-entered record book.
-  for (const stat in HOF_STAT_WEIGHTS) {
-    if (TEAM_STATS.has(stat)) continue;
-    if (!weightFor(school && school.sport, stat)) continue; // weight-0 stats (e.g. football "Points", a derived composite) aren't individual HOF achievements
-    const t = topByStat[stat]; if (!t || !(t.v1 > 0)) continue;
-    const imp = (weightFor(school && school.sport, stat) || 3) / 10;
-    let marginMult = 1;
-    if (t.v2 > 0) { const mm = (t.v1 - t.v2) / t.v2; marginMult = mm < 0.05 ? 1 : mm < 0.15 ? 1.15 : mm < 0.30 ? 1.3 : mm < 0.50 ? 1.5 : 1.7; }
-    const endYear = parseInt(t.year.slice(-4), 10);
-    const yrs = endYear ? now - endYear : 0;
-    const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-    add(t.name, imp * 5 * marginMult * longMult);
-  }
-  // CAREER RATE records (Batting Average, ERA, …) — computed from the roster, qualified by the def's min
-  // playing time, ranked best-first (ERA is lowest-is-best). The qualified leader holds the rate title.
-  for (const d of (rateDefsFor(school && school.sport) || [])) {
-    const impW = HOF_RATE_WEIGHTS[d.name]; if (!impW) continue;
-    const qualed = [];
-    for (const p of roster) {
-      const g = (s) => Number((p.stats || {})[s]) || 0;
-      if (g(d.qualStat) < (d.minCareer || 0)) continue;
-      const rv = d.calc(g, p.stats);
-      if (rv == null || !(rv > 0)) continue;
-      qualed.push({ name: p.name, year: String(p.lastYear || p.firstYear || p.gradYear || ""), v: rv });
-    }
-    if (!qualed.length) continue;
-    qualed.sort((a, b) => d.lowerIsBetter ? (a.v - b.v) : (b.v - a.v));
-    const r0 = qualed[0], r1 = qualed[1];
-    let rMargin = 1;
-    if (r1 && r0.v > 0 && r1.v > 0) {
-      const m = d.lowerIsBetter ? (r1.v - r0.v) / r0.v : (r0.v - r1.v) / r1.v;
-      rMargin = m < 0.05 ? 1 : m < 0.15 ? 1.15 : m < 0.30 ? 1.3 : m < 0.50 ? 1.5 : 1.7;
-    }
-    const rey = parseInt(r0.year.slice(-4), 10);
-    const rys = rey ? now - rey : 0;
-    const rLong = rys >= 40 ? 1.3 : rys >= 25 ? 1.2 : rys >= 15 ? 1.1 : 1;
-    add(r0.name, (impW / 10) * 5 * rMargin * rLong);
-  }
-  // Single-season / single-game / per-game marks still come from the stored record book.
-  for (const rec of (school.records || [])) {
-    if ((rec.variant || "").toLowerCase().includes("career")) continue; // career handled above from live data
-    if (TEAM_STATS.has(rec.statName)) continue;
-    if (!weightFor(school && school.sport, rec.statName)) continue; // weight-0 stats (e.g. football "Points") earn no record bonus
-    add(rec.holderName, recordWeight(rec, school && school.sport, now));
-  }
-  return { rankByStat, totalByStat, recordBonusByName };
-}
-// One single-season / single-game record's HOF bonus: importance × variant (season-or-avg 3, game 2) ×
-// longevity. (CAREER records are credited separately from the live leaderboard, with margin-over-#2.)
-function recordWeight(rec, sport, now) {
-  const v = (rec.variant || "").toLowerCase();
-  const imp = ((HOF_RATE_WEIGHTS[rec.statName] || weightFor(sport, rec.statName)) || 3) / 10;
-  const variantBase = v.includes("game") ? 2 : 3;
-  const endYear = parseInt(String(rec.holderYear || "").slice(-4), 10);
-  const yrs = endYear ? now - endYear : 0;
-  const longMult = yrs >= 40 ? 1.3 : yrs >= 25 ? 1.2 : yrs >= 15 ? 1.1 : 1;
-  return imp * variantBase * longMult;
-}
-
-// Core HOF score for one player in one program (0–100 raw). Hot callers pass a precomputed `ctx`
-// (buildHofCtx); if omitted it's built on the fly so the function still works standalone.
-function calcProgramHofScore(player, school, ctx) {
-  if (!player || !school) return 0;
-  const roster = school.allTimeRoster || [];
-  if (!roster.length) return 0;
-  if (!ctx) ctx = buildHofCtx(school);
-
-  const stats = player.stats || {};
-  let statScore = 0;
-  let totalWeight = 0;
-
-  // For each stat the player has, compute rank-based contribution
-  Object.entries(stats).forEach(([stat, val]) => {
-    const weight = weightFor(school.sport, stat);
-    if (!weight || !val) return;
-    totalWeight += weight;
-
-    // Rank among all roster players with this stat (looked up from the precomputed map)
-    const rankMap = ctx.rankByStat[stat];
-    const total = ctx.totalByStat[stat];
-    if (!rankMap || !total) return;
-    const rank = rankMap.get(player.id);
-    if (!rank) return;
-
-    // Score: #1 = 100%, #2 = 85%, #3 = 70%, top 10% = 50%, top 25% = 30%, else 10%
-    let rankPct;
-    if      (rank === 1)              rankPct = 1.00;
-    else if (rank === 2)              rankPct = 0.85;
-    else if (rank === 3)              rankPct = 0.70;
-    else if (rank / total <= 0.10)    rankPct = 0.50;
-    else if (rank / total <= 0.25)    rankPct = 0.35;
-    else if (rank / total <= 0.50)    rankPct = 0.20;
-    else                              rankPct = 0.05;
-
-    statScore += weight * rankPct;
-  });
-
-  // Individual-impact factor (0–1): the player's weighted-average rank across their OWN stats. Team
-  // stats (Wins) are weight 0, so a bench player on a winning team can't inflate it. Drives statNorm
-  // AND scaffolds the team-success bonus below.
-  const impact = totalWeight > 0 ? statScore / totalWeight : 0;
-  const statNorm = impact * 70;
-
-  // Team success score: sum success of seasons player was active
-  const seasons = school.seasons || [];
-  let teamScore = 0;
-  seasons.forEach(s => {
-    if (playerSeasonOverlap(player, s)) {
-      teamScore += getSeasonSuccessScore(s.notes);
-    }
-  });
-  // Team success counts, but SCALED BY THE PLAYER'S IMPACT — a key contributor on a deep playoff run
-  // earns far more than a benchwarmer on the same team (0.2 baseline keeps role players non-zero).
-  const teamSuccessNorm = Math.min(teamScore / 3, 30);
-  const teamNorm = teamSuccessNorm * (0.2 + 0.8 * impact);
-
-  // Record-holder bonus (precomputed in ctx): +5 per career record, +3 per single-season, capped at 20
-  const recordNorm = Math.min(ctx.recordBonusByName.get((player.name || "").toLowerCase().trim()) || 0, 20);
-
-  const raw = statNorm + teamNorm + recordNorm;
-  return Math.min(Math.round(raw), 100);
-}
+// buildHofCtx + calcProgramHofScore + recordWeight are single-sourced in shared/scoring.js. These thin
+// wrappers inject the app's rate machinery (closure-based rateDefsFor/rateValue), so every existing call
+// site stays unchanged. (The public SSR doesn't score players — it shows manual inductions — so its old
+// duplicate of this engine was dead code and has been removed.)
+function buildHofCtx(school) { return _sharedBuildHofCtx(school, { rateDefsFor, rateValue }); }
+function calcProgramHofScore(player, school, ctx) { return _sharedCalcProgramHofScore(player, school, ctx, { rateDefsFor, rateValue }); }
 
 // Cross-sport compound score for a player name across all schools
 // Conservative "same person" test for linking a player ACROSS programs/sports (render-time only — changes
