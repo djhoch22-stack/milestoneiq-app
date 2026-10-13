@@ -4393,7 +4393,7 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
         <table style={{width:"100%",minWidth:560,borderCollapse:"collapse",fontSize:13}}>
           <thead>
             <tr style={{background:"#f9fafb"}}>
-              {["Season","Coach","Record","League","Win %","Postseason / Notes",""].map(h => (
+              {["Season","Coach","Record","Win %","League","League Win %","Postseason / Notes",""].map(h => (
                 <th key={h} style={{padding:"9px 16px",textAlign:"left",fontSize:11,fontWeight:700,color:"#6b7280",borderBottom:"1px solid #e5e7eb"}}>
                   {h}
                 </th>
@@ -4406,12 +4406,14 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
               const pct = _wp != null ? `${_wp}%` : "—";
               const record = s.wins != null ? `${s.wins}-${s.losses ?? "?"}${s.ties ? `-${s.ties}` : ""}` : "—";
               const leagueRecord = s.leagueWins != null ? `${s.leagueWins}-${s.leagueLosses ?? "?"}${s.leagueTies ? `-${s.leagueTies}` : ""}` : "—";
+              const _lwp = (s.leagueWins != null && s.leagueLosses != null) ? winPctOf(s.leagueWins, s.leagueLosses, s.leagueTies) : null; // league win % (ties = ½)
+              const leaguePct = _lwp != null ? `${_lwp}%` : "—";
               const isChamp = s.leagueChampion || (s.notes && /league champion/i.test(s.notes));
               const isEditing = editingId === s.season;
 
               if (isEditing) return (
                 <tr key={s.season} style={{borderBottom:"1px solid #e5e7eb",background:"#fffbeb"}}>
-                  <td colSpan={7} style={{padding:"12px 16px"}}>
+                  <td colSpan={8} style={{padding:"12px 16px"}}>
                     <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleSaveEdit} submitLabel="Save changes" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />
                   </td>
                 </tr>
@@ -4422,8 +4424,9 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
                   <td style={{padding:"9px 16px",fontWeight:700,color:"#111"}}>{s.season}</td>
                   <td style={{padding:"9px 16px",color:"#374151"}}>{s.coach || "—"}</td>
                   <td style={{padding:"9px 16px",fontWeight:600,color: s.wins && s.wins > (s.losses||0) ? "#166534":"#991b1b"}}>{record}</td>
-                  <td style={{padding:"9px 16px",color:"#6b7280"}}>{leagueRecord}</td>
                   <td style={{padding:"9px 16px",color:"#374151"}}>{pct}</td>
+                  <td style={{padding:"9px 16px",color:"#6b7280"}}>{leagueRecord}</td>
+                  <td style={{padding:"9px 16px",color:"#374151"}}>{leaguePct}</td>
                   <td style={{padding:"9px 16px"}}>{notesBadge(s.notes)}</td>
                   <td style={{padding:"9px 16px",whiteSpace:"nowrap"}}>
                     <div style={{display:"flex",gap:6}}>
