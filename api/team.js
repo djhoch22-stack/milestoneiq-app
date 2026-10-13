@@ -337,11 +337,13 @@ export default async function handler(req, res) {
       // Recompute from W/L/T (tie = ½ win) so a season stored with the old tie-as-loss win_pct self-corrects.
       const _sg = (s.wins || 0) + (s.losses || 0) + (s.ties || 0);
       const wp = (s.wins != null && s.losses != null && _sg > 0) ? (Math.round(((s.wins + (s.ties || 0) / 2) / _sg) * 1000) / 10) + "%" : "—";
+      const _lsg = (s.leagueWins || 0) + (s.leagueLosses || 0) + (s.leagueTies || 0);
+      const lwp = (s.leagueWins != null && s.leagueLosses != null && _lsg > 0) ? (Math.round(((s.leagueWins + (s.leagueTies || 0) / 2) / _lsg) * 1000) / 10) + "%" : "—";
       const isSt = s.notes && /state champ/i.test(s.notes);
       const isLg = s.notes && /league champ/i.test(s.notes);
       const isChamp = isSt || isLg;
       const note = s.notes ? `<span style="background:${isChamp ? "#fef3c7" : "#eff6ff"};color:${isChamp ? "#92400e" : "#1e40af"};border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${isSt ? "🏅 " : isLg ? "🏆 " : ""}${esc(s.notes)}</span>` : "";
-      return `<tr style="background:${isChamp ? "#fffbeb" : i % 2 ? "#fafaf8" : "#fff"}"><td style="font-weight:700">${esc(s.season || "")}</td><td>${esc(s.coach || "—")}</td><td class="num" style="font-weight:600">${rec}</td><td class="num" style="color:#6b7280">${lrec}</td><td class="num">${wp}</td><td>${note}</td></tr>`;
+      return `<tr style="background:${isChamp ? "#fffbeb" : i % 2 ? "#fafaf8" : "#fff"}"><td style="font-weight:700">${esc(s.season || "")}</td><td>${esc(s.coach || "—")}</td><td class="num" style="font-weight:600">${rec}</td><td class="num">${wp}</td><td class="num" style="color:#6b7280">${lrec}</td><td class="num">${lwp}</td><td>${note}</td></tr>`;
     }).join("");
 
     seasonsSection =
@@ -350,7 +352,7 @@ export default async function handler(req, res) {
        <h3>Head coaches</h3>
        <div style="background:#fff;border:1px solid #e8e4dd;border-radius:12px;overflow:hidden"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${coachCards}</div></div>
        <h3>Season by season</h3>
-       <div class="gridwrap"><table><thead><tr><th>Season</th><th>Coach</th><th class="num">Record</th><th class="num">League</th><th class="num">Win %</th><th>Postseason / Notes</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
+       <div class="gridwrap"><table><thead><tr><th>Season</th><th>Coach</th><th class="num">Record</th><th class="num">Win %</th><th class="num">League</th><th class="num">League Win %</th><th>Postseason / Notes</th></tr></thead><tbody>${tableRows}</tbody></table></div>`;
   }
 
   // ── HALL OF FAME — INDUCTED ONLY (athletes ⇄ coaches) ───────────────────────
