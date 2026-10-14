@@ -4285,18 +4285,19 @@ function SeasonsTab({ seasons = [], onSave, coachPrior = {}, onSaveCoachPrior, p
       {showAddForm && <SeasonForm form={form} setForm={setForm} noteSuggestions={NOTE_SUGGESTIONS} onSubmit={handleAdd} submitLabel="Add season" onCancel={()=>{setShowAddForm(false);setEditingId(null);setForm(blankForm);}} />}
 
       {/* Summary stats — top row */}
-      <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gap:12,marginBottom:12}}>
+      <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(6,1fr)",gridAutoFlow:"dense",gap:12,marginBottom:12}}>
         {[
-          ["Program record",    `${totalWins}-${totalLosses}${totalTies?`-${totalTies}`:""}`,             "📊"],
+          // `wide` = span 2 cols + nowrap value, so a 3-part W-L-T record (e.g. 496-242-61) fits on one line
+          ["Program record",    `${totalWins}-${totalLosses}${totalTies?`-${totalTies}`:""}`,             "📊", true],
           ["Win percentage",    `${totalPct}%`,                            "📈"],
-          ["League record",     `${totalLeagueWins}-${totalLeagueLosses}${totalLeagueTies?`-${totalLeagueTies}`:""}`, "🏅"],
+          ["League record",     `${totalLeagueWins}-${totalLeagueLosses}${totalLeagueTies?`-${totalLeagueTies}`:""}`, "🏅", true],
           ["League win %",      `${leaguePct}%`,                           "📉"],
           ["Seasons tracked",   seasonsWithRecord.length,                  "📅"],
           ["League titles",     champSeasons,                              "🏆"],
-        ].map(([label, val, icon]) => (
-          <div key={label} style={{background:"#fff",borderRadius:12,padding:"14px 16px",border:"1px solid #e8e4dd"}}>
+        ].map(([label, val, icon, wide]) => (
+          <div key={label} style={{background:"#fff",borderRadius:12,padding:"14px 16px",border:"1px solid #e8e4dd",...(wide?{gridColumn:"span 2"}:{})}}>
             <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
-            <div style={{fontSize:20,fontWeight:700,color:"#111"}}>{val}</div>
+            <div style={{fontSize:20,fontWeight:700,color:"#111",...(wide?{whiteSpace:"nowrap"}:{})}}>{val}</div>
             <div style={{fontSize:11,color:"#6b7280"}}>{label}</div>
           </div>
         ))}
