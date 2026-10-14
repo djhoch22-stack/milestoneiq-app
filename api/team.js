@@ -293,8 +293,9 @@ export default async function handler(req, res) {
     const po0 = seasonsList.filter((s) => rx(s, /playoff|round of|first round|state first/i)).length;
     const finalFours = ff0 + stChamp + stRU + third;
     const eliteE = ee0 + finalFours; const sweet16 = ss0 + eliteE; const playoffs = po0 + sweet16;
-    const card = (ic, v, l, bg, tc, bd) => `<div class="ovcard" style="${bg ? `background:${bg};border-color:${bd}` : ""}"><div class="ic">${ic}</div><div class="v"${tc ? ` style="color:${tc}"` : ""}>${v}</div><div class="l"${tc ? ` style="color:${tc};opacity:.85"` : ""}>${l}</div></div>`;
-    const row1 = [["📊", `${tW}-${tL}${tT ? `-${tT}` : ""}`, "Program record"], ["📈", `${tPct}%`, "Win %"], ["🏅", `${lW}-${lL}${lT ? `-${lT}` : ""}`, "League record"], ["📉", `${lPct}%`, "League win %"], ["📅", swr.length, "Seasons"], ["🏆", champ, "League titles"]].map(([i, v, l]) => card(i, v, l)).join("");
+    const card = (ic, v, l, bg, tc, bd, wide) => `<div class="ovcard" style="${bg ? `background:${bg};border-color:${bd};` : ""}${wide ? "grid-column:span 2" : ""}"><div class="ic">${ic}</div><div class="v"${tc || wide ? ` style="${tc ? `color:${tc};` : ""}${wide ? "white-space:nowrap" : ""}"` : ""}>${v}</div><div class="l"${tc ? ` style="color:${tc};opacity:.85"` : ""}>${l}</div></div>`;
+    // `wide` = span 2 cols + nowrap value: W-L-T records (esp. 3-part w/ ties, e.g. 496-242-61) don't fit a 1-wide tile at 26px.
+    const row1 = [["📊", `${tW}-${tL}${tT ? `-${tT}` : ""}`, "Program record", true], ["📈", `${tPct}%`, "Win %"], ["🏅", `${lW}-${lL}${lT ? `-${lT}` : ""}`, "League record", true], ["📉", `${lPct}%`, "League win %"], ["📅", swr.length, "Seasons"], ["🏆", champ, "League titles"]].map(([i, v, l, wide]) => card(i, v, l, undefined, undefined, undefined, wide)).join("");
     const row2 = [["🏟️", playoffs, "Playoff apps", "#eff6ff", "#1e40af", "#bfdbfe"], ["⭐", sweet16, "Sweet 16s", "#fdf4ff", "#7e22ce", "#e9d5ff"], ["🎖️", eliteE, "Elite 8s", "#f5f3ff", "#5b21b6", "#ddd6fe"], ["🎯", finalFours, "Final Fours", "#f0fdf4", "#166534", "#86efac"], ["🥈", stRU, "Runner-up", "#f8fafc", "#374151", "#e2e8f0"], ["🏅", stChamp, "State titles", "#fef3c7", "#92400e", "#fde68a"]].map(([i, v, l, bg, tc, bd]) => card(i, v, l, bg, tc, bd)).join("");
 
     const mostRecent = seasonsList.filter((s) => s.coach).slice().sort((a, b) => String(b.season).localeCompare(String(a.season)))[0]?.coach || null;
@@ -347,7 +348,7 @@ export default async function handler(req, res) {
     }).join("");
 
     seasonsSection =
-      `<div class="ovcards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${row1}</div>
+      `<div class="ovcards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));grid-auto-flow:dense">${row1}</div>
        <div class="ovcards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${row2}</div>
        <h3>Head coaches</h3>
        <div style="background:#fff;border:1px solid #e8e4dd;border-radius:12px;overflow:hidden"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${coachCards}</div></div>
