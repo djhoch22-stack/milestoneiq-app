@@ -818,6 +818,9 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script
     </div>
     <div class="foot">Powered by <a href="/">RaftersIQ</a> · the record book for high-school athletic programs${onDir ? "" : ` · <a href="/teams">Browse all programs</a>`}</div>
   </div>
+  <script>
+  (function(){try{var p=new URLSearchParams(location.search),v=null;try{v=localStorage.getItem('riq_vid');if(!v){v=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2);localStorage.setItem('riq_vid',v);}}catch(e){}fetch('${SUPABASE_URL}/rest/v1/rpc/log_pageview',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json','apikey':'${SUPABASE_ANON}','Authorization':'Bearer ${SUPABASE_ANON}'},body:JSON.stringify({p_path:location.pathname,p_referrer:document.referrer||null,p_utm_source:p.get('utm_source'),p_utm_medium:p.get('utm_medium'),p_utm_campaign:p.get('utm_campaign'),p_visitor_id:v,p_user_agent:navigator.userAgent,p_surface:'public'})});}catch(e){}})();
+  </script>
 </body>
 </html>`;
 }
