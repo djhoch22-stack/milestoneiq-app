@@ -869,7 +869,8 @@ function LandingPage({ onStartTrial, onSignIn }) {
       <div style={{ maxWidth:760, margin:"0 auto", padding: isMobile ? "0 16px 8px" : "0 24px 12px" }}>
         <video
           controls
-          preload="metadata"
+          preload="none"
+          poster="/raftersiq-promo-poster.jpg"
           playsInline
           style={{ width:"100%", borderRadius:14, border:"1px solid #e8e4dd", boxShadow:"0 12px 32px rgba(17,24,39,0.13)", background:"#000", display:"block" }}
         >
