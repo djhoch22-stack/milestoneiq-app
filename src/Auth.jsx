@@ -865,6 +865,19 @@ function LandingPage({ onStartTrial, onSignIn }) {
         <div style={{ fontSize:13, color:"#9ca3af", marginTop:14 }}>No credit card required · Cancel anytime</div>
       </div>
 
+      {/* Promo video */}
+      <div style={{ maxWidth:760, margin:"0 auto", padding: isMobile ? "0 16px 8px" : "0 24px 12px" }}>
+        <video
+          controls
+          preload="metadata"
+          playsInline
+          style={{ width:"100%", borderRadius:14, border:"1px solid #e8e4dd", boxShadow:"0 12px 32px rgba(17,24,39,0.13)", background:"#000", display:"block" }}
+        >
+          <source src="/raftersiq-promo.mp4" type="video/mp4" />
+          <a href="/raftersiq-promo.mp4">Watch the RaftersIQ demo</a>
+        </video>
+      </div>
+
       {/* How it works */}
       <div style={{ padding: wrapPad, maxWidth:1120, margin:"0 auto" }}>
         <h2 style={{ textAlign:"center", fontSize: isMobile ? 26 : 34, fontWeight:800, margin:"0 0 8px" }}>From a stat sheet to your record book in minutes</h2>
