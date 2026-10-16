@@ -446,12 +446,15 @@ function makeEffectiveIsActive(athletes = []) {
   };
 }
 // rankFor(player, stat) → 1-based rank across the roster; rankFor(null, stat) → count with that stat > 0.
+// Competition ranking: tied values share the best rank (two tied for 1st → both #1, next #3) — matches
+// the public page's rankOf. Computed as 1 + (how many players have a strictly better value).
 function makeRankFor(roster) {
   return (player, stat) => {
     const sorted = roster.filter(p => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
     if (player === null) return sorted.length;
-    const idx = sorted.findIndex(p => p.id === player.id);
-    return idx === -1 ? sorted.length + 1 : idx + 1;
+    const pv = player.stats[stat] || 0;
+    if (!(pv > 0)) return sorted.length + 1; // no value → below the ranked field (preserves prior sentinel)
+    return 1 + sorted.filter(p => (p.stats[stat] || 0) > pv).length;
   };
 }
 
@@ -3773,6 +3776,12 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
     .sort((a,b) => lowerBetter ? (valOf(a) ?? Infinity) - (valOf(b) ?? Infinity) : (valOf(b)||0) - (valOf(a)||0));
 
   const maxVal = filtered.length ? (valOf(filtered[0]) ?? 1) : 1; // guard empty results — valOf(undefined) would crash the tab
+  // Competition ranking for the # column: tied values share the best rank, then the next value skips
+  // (two tied for 1st → 1, 1, 3). filtered is already sorted, so equal-adjacent values are a tie.
+  const leaderRanks = [];
+  for (let j = 0; j < filtered.length; j++) {
+    leaderRanks[j] = (j > 0 && (valOf(filtered[j]) ?? 0) === (valOf(filtered[j - 1]) ?? 0)) ? leaderRanks[j - 1] : j + 1;
+  }
 
   return (
     <div>
@@ -3842,7 +3851,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
           </thead>
           <tbody>
             {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((p,i)=>{
-              const rank = page * PAGE_SIZE + i;
+              const rank = leaderRanks[page * PAGE_SIZE + i]; // competition rank (ties share, then skip)
               const val = valOf(p) ?? 0;
               // Bar = closeness to the leader. Ascending stats (ERA) invert: leader's (lowest) value over yours.
               const barPct = lowerBetter ? (val > 0 ? Math.round((maxVal / val) * 100) : 100) : Math.round((val/maxVal)*100);
@@ -3853,7 +3862,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
                   style={{borderBottom:"1px solid #f9f7f4",background:i%2===0?"#fff":"#fafaf8",cursor:"pointer",transition:"background 0.1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f7ff"}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafaf8"}>
-                  <td style={{padding:"9px 16px",color:"#9ca3af",fontWeight:700,fontSize:12}}>{rank+1}</td>
+                  <td style={{padding:"9px 16px",color:"#9ca3af",fontWeight:700,fontSize:12}}>{rank}</td>
                   <td style={{padding:"9px 16px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <span style={{fontWeight:600,color:"#111"}}>{p.name}</span>
@@ -4809,14 +4818,17 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
   const notableSeasons = seasons.filter(s=>getSeasonSuccessScore(s.notes||s["notes"]||"")>0)
     .sort((a,b)=>String(b.season||b["season"]||"").localeCompare(String(a.season||a["season"]||""))); // chronological (newest-first)
 
+  // [label, display value, value-getter]. The getter drives competition ranking so tied coaches share
+  // a rank (two tied for 1st → both #1, next #3), consistent with the player all-time rankings.
+  const winPctVal = (c) => (c.wins+(c.ties||0)/2)/((c.wins+c.losses+(c.ties||0))||1);
   const statRows = [
-    ["Total wins",      coach.wins,         [...allCoaches].sort((a,b)=>b.wins-a.wins)],
-    ["Win %",           winPct+"%",         [...allCoaches].sort((a,b)=>((b.wins+(b.ties||0)/2)/((b.wins+b.losses+(b.ties||0))||1))-((a.wins+(a.ties||0)/2)/((a.wins+a.losses+(a.ties||0))||1)))],
-    ["Seasons coached", coach.seasons,      [...allCoaches].sort((a,b)=>b.seasons-a.seasons)],
-    ["State titles",    coach.stateChamps,  [...allCoaches].sort((a,b)=>b.stateChamps-a.stateChamps)],
-    ["League titles",   coach.leagueChamps, [...allCoaches].sort((a,b)=>b.leagueChamps-a.leagueChamps)],
-    ["Final Fours",     coach.finalFours,   [...allCoaches].sort((a,b)=>b.finalFours-a.finalFours)],
-    ["Postseason apps", coach.playoffs,     [...allCoaches].sort((a,b)=>b.playoffs-a.playoffs)],
+    ["Total wins",      coach.wins,         c=>c.wins],
+    ["Win %",           winPct+"%",         winPctVal],
+    ["Seasons coached", coach.seasons,      c=>c.seasons],
+    ["State titles",    coach.stateChamps,  c=>c.stateChamps],
+    ["League titles",   coach.leagueChamps, c=>c.leagueChamps],
+    ["Final Fours",     coach.finalFours,   c=>c.finalFours],
+    ["Postseason apps", coach.playoffs,     c=>c.playoffs],
   ];
 
   return (
@@ -4866,8 +4878,9 @@ function CoachHofModal({ coach, school, allCoaches, awards = [], awardsBySport =
           {/* Stat breakdown */}
           <div style={{ fontSize:13,fontWeight:700,color:"#374151",marginBottom:10 }}>Program rankings</div>
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:18 }}>
-            {statRows.map(([label, val, sorted]) => {
-              const rank = sorted.findIndex(co=>co.name===coach.name)+1;
+            {statRows.map(([label, val, valOf]) => {
+              const cv = valOf(coach);
+              const rank = 1 + allCoaches.filter(co => valOf(co) > cv).length; // competition rank (ties share)
               const hasVal = typeof val==="number" ? val>0 : true;
               if (!hasVal && rank>1) return null;
               return (
@@ -5394,7 +5407,9 @@ function HofDetailModal({ player, programScore, crossSport, allScores, finalScor
     .filter(([stat]) => !TEAM_STATS.has(stat))
     .map(([stat, val]) => {
       const sorted = rost.filter(p => (p.stats[stat] || 0) > 0).sort((a, b) => (b.stats[stat] || 0) - (a.stats[stat] || 0));
-      const rank = sorted.findIndex(p => p.id === pl.id) + 1;
+      const pv = Number(pl.stats[stat]) || 0;
+      // Competition rank: tied values share the best rank (ties → 1, 1, 3). 0 = not ranked (filtered out below).
+      const rank = pv > 0 ? 1 + sorted.filter(p => (p.stats[stat] || 0) > pv).length : 0;
       return { stat, val, rank, total: sorted.length };
     })
     .filter(r => r.rank > 0)
