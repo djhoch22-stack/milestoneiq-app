@@ -235,7 +235,13 @@ export function buildHofCtx(school, rate) {
       .sort((a, b) => (((b.stats && b.stats[stat]) || 0) - ((a.stats && a.stats[stat]) || 0)));
     if (!sorted.length) continue;
     const m = new Map();
-    for (let i = 0; i < sorted.length; i++) m.set(sorted[i].id, i + 1);
+    // Competition ranking: players tied on a stat share the best rank (two tied for 1st → both #1, next
+    // #3), so tied record-holders earn equal HOF credit for that stat. Mirrors the all-time leaderboard.
+    for (let i = 0; i < sorted.length; i++) {
+      const v = (sorted[i].stats && sorted[i].stats[stat]) || 0;
+      const r = (i > 0 && v === ((sorted[i - 1].stats && sorted[i - 1].stats[stat]) || 0)) ? m.get(sorted[i - 1].id) : i + 1;
+      m.set(sorted[i].id, r);
+    }
     rankByStat[stat] = m;
     totalByStat[stat] = sorted.length;
     const p0 = sorted[0];
