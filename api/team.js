@@ -4,7 +4,7 @@
 // click-to-open player profile modal (career stats + all-time rank + seasons + records).
 import {
   sb, esc, prettySport, fmtNum, htmlShell, SITE, STAT_ORDER, SPORT_ORDER,
-  byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, pctRecordsFrom,
+  byStatOrder, allStatsFor, statsToDisplay, DISPLAY_STATS, SEASON_ONLY_STATS, pctRecordsFrom,
   RATE_FMT, fmtRateVal, rateDefsFor, rateValue, minsFor, groupsFor, withDerivedStats,
   PERGAME_DEFS, perGame, pergameRecordsFrom, longestRecordsFrom, autoStatRecords, coachWinsRecordsFrom, lowCountingRecordsFrom, mergeStoredAuto, holderYears,
   buildCoachStats, awardsForHolder, awardLabel, normName, sportsLinkable, SPORT_ICON, slugify,
@@ -527,6 +527,13 @@ export default async function handler(req, res) {
   }
 
   // Embedded data + JS (leaderboard sort + click-to-open profile modal)
+  // Penalty Time is app-internal (a mm:ss clock) — strip it from the public payload so the inline
+  // profile tiles + season table never render raw seconds (SSR tables already exclude it).
+  for (const k in profiles) {
+    const pf = profiles[k];
+    if (pf.s) { const c = { ...pf.s }; for (const t of SEASON_ONLY_STATS) delete c[t]; pf.s = c; }
+    if (Array.isArray(pf.ss)) pf.ss = pf.ss.map((r) => { const c = { ...(r.s || {}) }; for (const t of SEASON_ONLY_STATS) delete c[t]; return { ...r, s: c }; });
+  }
   const profJson = JSON.stringify(profiles).replace(/</g, "\\u003c");
   // Sport-canonical order FIRST, then the global order — mirrors byStatOrder (football/baseball).
   const soJson = JSON.stringify((SPORT_ORDER[team.sport] || []).concat(STAT_ORDER));
@@ -535,7 +542,7 @@ export default async function handler(req, res) {
   // `mc` carries the program's effective CAREER minimum (override or default) so the in-browser
   // leaderboard qualifies players with the same cutoff the records use.
   const rdJson = JSON.stringify(rateDefsFor(team.sport).map((d) => ({ n: d.name, s: d.short, after: d.after, fmt: d.fmt, q: d.qualStat, mc: minsFor(d, team.record_minimums).career, ab: d.noteAbbr, lo: !!d.lowerIsBetter, spec: d.spec })));
-  const dsJson = JSON.stringify(DISPLAY_STATS[team.sport] || []);
+  const dsJson = JSON.stringify((DISPLAY_STATS[team.sport] || []).filter((s) => !SEASON_ONLY_STATS.has(s)));
   const pColor = JSON.stringify(logoColor);
   const script =
     `var PROF=${profJson};var PCOLOR=${pColor};var SO=${soJson};var PG=${pgJson};var RD=${rdJson};var DS=${dsJson};var SE=${JSON.stringify(SPORT_ICON[team.sport] || "🏅")};var CURMETA={ic:${JSON.stringify(SPORT_ICON[team.sport] || "•")},lbl:${JSON.stringify(prettySport(team.sport))}};var COACH=${JSON.stringify(coachProfiles).replace(/</g, "\\u003c")};` +
