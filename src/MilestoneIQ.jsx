@@ -3500,6 +3500,72 @@ function MergePlayersModal({ school, roster = [], onClose }) {
     </div>
   );
 }
+// Bulk roster manager — pick players and mark them ACTIVE (returning / current roster) or ALUMNI in one
+// action. Active status drives the Milestones & Alerts tabs. Persists the same way as the per-player
+// toggle: an isActive override written into school.athletes, which effectiveIsActive() reads.
+function ManageRosterModal({ school, roster = [], onClose, onUpdate }) {
+  const athletes = school.athletes || [];
+  const eff = makeEffectiveIsActive(athletes);
+  const [selected, setSelected] = useState(() => new Set());
+  const [q, setQ] = useState("");
+  // Union of all-time roster + active roster, de-duped by name, so every player is listed.
+  const byName = new Map();
+  for (const p of [...(roster || []), ...athletes]) { const k = (p.name || "").toLowerCase().trim(); if (p.name && !byName.has(k)) byName.set(k, p); }
+  const players = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const ql = q.toLowerCase().trim();
+  const shown = ql ? players.filter(p => p.name.toLowerCase().includes(ql)) : players;
+  const activeCount = players.filter(p => eff(p)).length;
+  const toggle = (name) => setSelected(s => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n; });
+  const apply = (makeActive) => {
+    if (!selected.size) return;
+    const names = new Set([...selected].map(n => n.toLowerCase().trim()));
+    const next = [...athletes];
+    for (const p of players) {
+      if (!names.has(p.name.toLowerCase().trim())) continue;
+      const i = next.findIndex(a => (a.name || "").toLowerCase().trim() === p.name.toLowerCase().trim());
+      if (i >= 0) next[i] = { ...next[i], isActive: makeActive };
+      else next.push({ ...p, isActive: makeActive });
+    }
+    onUpdate({ ...school, athletes: next });
+    onClose();
+  };
+  const rowSt = { display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderBottom: "1px solid #f3f0ea", cursor: "pointer" };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, boxSizing: "border-box", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111" }}>Manage active roster</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6b7280" }}>Active players appear on the <strong>Milestones</strong> &amp; <strong>Alerts</strong> tabs. Select your returning/current players → <strong>Mark active</strong>; mark graduated players as alumni. <strong>{activeCount}</strong> currently active.</p>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search players…" style={{ width: "100%", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 12px", fontSize: 14, boxSizing: "border-box", marginBottom: 8 }} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <button onClick={() => setSelected(new Set(shown.map(p => p.name)))} style={{ background: "#eff6ff", color: "#1a56db", border: "1px solid #bfdbfe", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Select all{ql ? " shown" : ""}</button>
+          <button onClick={() => setSelected(new Set())} style={{ background: "#fff", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Clear</button>
+          <span style={{ color: "#9ca3af", marginLeft: "auto", fontSize: 12 }}>{selected.size} selected</span>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", border: "1px solid #f0eeea", borderRadius: 10, marginBottom: 12 }}>
+          {shown.map(p => {
+            const on = selected.has(p.name); const active = eff(p);
+            return (
+              <div key={p.name} onClick={() => toggle(p.name)} style={rowSt}>
+                <input type="checkbox" checked={on} onChange={() => toggle(p.name)} onClick={e => e.stopPropagation()} />
+                <span style={{ fontWeight: 600, color: "#111", flex: 1 }}>{p.name}</span>
+                {p.gradYear && <span style={{ fontSize: 11, color: "#9ca3af" }}>Class of {p.gradYear}</span>}
+                <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "1px 8px", background: active ? "#dcfce7" : "#f3f4f6", color: active ? "#166534" : "#6b7280" }}>{active ? "Active" : "Alumni"}</span>
+              </div>
+            );
+          })}
+          {!shown.length && <div style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>No players match.</div>}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => apply(true)} disabled={!selected.size} style={{ flex: 1, background: selected.size ? "#16a34a" : "#d1d5db", color: "#fff", border: "none", borderRadius: 8, padding: "10px", fontWeight: 700, fontSize: 14, cursor: selected.size ? "pointer" : "default" }}>✓ Mark {selected.size || ""} active</button>
+          <button onClick={() => apply(false)} disabled={!selected.size} style={{ flex: 1, background: "#fff", color: selected.size ? "#991b1b" : "#9ca3af", border: `1px solid ${selected.size ? "#fca5a5" : "#e5e7eb"}`, borderRadius: 8, padding: "10px", fontWeight: 700, fontSize: 14, cursor: selected.size ? "pointer" : "default" }}>Mark {selected.size || ""} alumni</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 // Coach-facing "How to import" guide — opened from the import toolbar. SPORT-AWARE: shows the exact
 // export steps for the program's sport (MaxPreps PDF / Hudl CSV / GameChanger CSV) plus the universal
 // rules — one season at a time, roster+stats together so initials resolve, team wins from the Seasons tab.
@@ -3866,6 +3932,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   const [page, setPage] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showManage, setShowManage] = useState(false);
   const [season, setSeason] = useState("all"); // "all" = career totals; or a specific season label
   const PAGE_SIZE = 25;
   const addPlayerModal = (showAdd && school && onUpdate) ? (
@@ -3875,6 +3942,12 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
   ) : null;
   const addPlayerBtn = (school && onUpdate) ? (
     <button onClick={() => setShowAdd(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>+ Add player</button>
+  ) : null;
+  const manageBtn = (school && school.id && onUpdate) ? (
+    <button onClick={() => setShowManage(true)} style={{ background:"#fff",color:"#374151",border:"1px solid #d1d5db",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap" }}>👥 Manage roster</button>
+  ) : null;
+  const manageModal = (showManage && school && onUpdate) ? (
+    <ManageRosterModal school={school} roster={roster} onClose={() => setShowManage(false)} onUpdate={onUpdate} />
   ) : null;
 
   if (!roster.length) return (
@@ -3967,6 +4040,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
         />
       )}
       {addPlayerModal}
+      {manageModal}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16,gap:12}}>
         <div>
           <h2 style={{margin:0,fontSize:18,fontWeight:700,color:"#111"}}>All-time program history</h2>
@@ -3976,7 +4050,7 @@ function AllTimeTab({ roster, athletes = [], school, onUpdate, allSeasonRows = [
               : `${roster.length} players · ${roster.filter(p=>effectiveIsActive(p)).length} currently active · records since 1977`}
           </p>
         </div>
-        {addPlayerBtn}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{manageBtn}{addPlayerBtn}</div>
       </div>
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
         <select value={sortStat} onChange={e=>{setSortStat(e.target.value);setPage(0);}}
