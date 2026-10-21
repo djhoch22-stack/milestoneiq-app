@@ -580,21 +580,18 @@ export default async function handler(req, res) {
   const body = `
     <div class="phead">${logoBox}<div><a href="/school/${esc(slugify(school))}" style="font-size:12px;color:#6b7280;text-decoration:none">← All ${esc(school)} programs</a><h1 style="margin:0;font-size:26px">${esc(school)}</h1><div class="meta">${counts}</div></div></div>
     <div class="tabs">
-      <input type="radio" name="tab" id="t-overview" class="tabin" checked>
       <input type="radio" name="tab" id="t-athletes" class="tabin">
       <input type="radio" name="tab" id="t-records" class="tabin">
-      <input type="radio" name="tab" id="t-alltime" class="tabin">
+      <input type="radio" name="tab" id="t-alltime" class="tabin" checked>
       <input type="radio" name="tab" id="t-seasons" class="tabin">
       <input type="radio" name="tab" id="t-hof" class="tabin">
       <nav class="tabbar">
-        <label for="t-overview">Overview</label>
         <label for="t-athletes">Athletes</label>
         <label for="t-records">Records</label>
         <label for="t-alltime">All-Time</label>
         <label for="t-seasons">Seasons</label>
         <label for="t-hof">🏛️ HOF</label>
       </nav>
-      <section class="panel p-overview"><h2>${esc(school)} ${esc(sport)}</h2><p class="sub">Program at a glance.</p>${overviewSection}</section>
       <section class="panel p-athletes"><h2>Athletes</h2>${athletesSection}</section>
       <section class="panel p-records"><h2>School Records</h2><p class="sub">Every record by stat, variant, holder &amp; year.</p>${recordsSection}</section>
       <section class="panel p-alltime"><h2>All-Time Program History</h2><p class="sub">Pick a stat to rank every player — tap a name for their full profile.</p>${alltimeSection}</section>
