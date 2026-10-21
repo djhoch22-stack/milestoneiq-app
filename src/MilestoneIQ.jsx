@@ -521,6 +521,9 @@ const ALL_DISPLAY_STATS = new Set(Object.values(DISPLAY_STATS).flat());
 // Stats stored + imported ONLY to feed a derived rate — never shown as a column or record. Volleyball's
 // "Serve Errors" powers Serve % but isn't a displayed stat (keeps the "no error leaderboards" rule).
 const HIDDEN_INPUT_STATS = new Set(["Serve Errors"]);
+// Shown ONLY in the season-by-season table (where it sums), never as a leaderboard / profile-tile /
+// overview column — Penalty Time is a mm:ss clock, meaningful per season but not a stat you rank by.
+const SEASON_ONLY_STATS = new Set(["Penalty Time"]);
 // Column/stat list for a roster: the sport's canonical display stats UNION any stat that has
 // data, in canonical order. So soccer always shows all 8 (Shots & Shutouts included) at 0.
 function statsToDisplay(roster, sport) {
@@ -529,7 +532,7 @@ function statsToDisplay(roster, sport) {
     .filter(s => (roster || []).some(p => (p.stats?.[s] || 0) > 0));
   // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
   // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
-  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
+  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s) && !SEASON_ONLY_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 // effectiveIsActive(player): an active-roster name override wins; otherwise the player's own isCurrent.
 function makeEffectiveIsActive(athletes = []) {
@@ -1880,7 +1883,8 @@ function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
     const nm = form.name.trim();
     if (!nm) { setErr("Enter a name."); return; }
     if (taken.has(norm(nm))) { setErr(`"${nm}" is already in this program — open them to edit instead.`); return; }
-    onAdd({ id:`a${Date.now()}`, ...form, name: nm, gradYear: Number(form.gradYear), isActive: isCurrentGradYear(form.gradYear), stats });
+    const outStats = { ...stats }; for (const k in outStats) if (TIME_STATS.has(k)) { const s = parseClock(outStats[k]); if (s != null) outStats[k] = s; else delete outStats[k]; }
+    onAdd({ id:`a${Date.now()}`, ...form, name: nm, gradYear: Number(form.gradYear), isActive: isCurrentGradYear(form.gradYear), stats: outStats });
     onClose();
   };
   return (
@@ -1904,8 +1908,11 @@ function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
           {statNames.map(cat=>(
             <div key={cat}>
               <label style={{ display:"block",fontSize:11,color:"#6b7280",marginBottom:3 }}>{cat}</label>
-              <input type="number" value={stats[cat]||""} onChange={e=>setStats(s=>({...s,[cat]:Number(e.target.value)}))} placeholder="0"
-                style={{ width:"100%",border:"1px solid #e5e7eb",borderRadius:6,padding:"6px 10px",fontSize:13,boxSizing:"border-box" }} />
+              {TIME_STATS.has(cat)
+                ? <input type="text" inputMode="numeric" value={stats[cat]||""} onChange={e=>setStats(s=>({...s,[cat]:e.target.value}))} placeholder="mm:ss"
+                    style={{ width:"100%",border:"1px solid #e5e7eb",borderRadius:6,padding:"6px 10px",fontSize:13,boxSizing:"border-box" }} />
+                : <input type="number" value={stats[cat]||""} onChange={e=>setStats(s=>({...s,[cat]:Number(e.target.value)}))} placeholder="0"
+                    style={{ width:"100%",border:"1px solid #e5e7eb",borderRadius:6,padding:"6px 10px",fontSize:13,boxSizing:"border-box" }} />}
             </div>
           ))}
         </div>
@@ -2368,7 +2375,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
     for (const row of draft) {
       if (!String(row.season || "").trim()) continue;
       const stats = {};
-      for (const k in (row.stats || {})) { const v = row.stats[k]; if (v !== "" && v != null && !isNaN(Number(v))) stats[k] = Number(v); }
+      for (const k in (row.stats || {})) { const v = row.stats[k]; if (v === "" || v == null) continue; if (TIME_STATS.has(k)) { const secs = parseClock(v); if (secs != null) stats[k] = secs; continue; } if (!isNaN(Number(v))) stats[k] = Number(v); }
       // Auto-assign the team's wins for this season — a player on a season's roster shares that season's
       // team win total (same rule the season import + Seasons editor use). Overrides Wins so it can't
       // drift from the team's record when a matching program season exists.
@@ -2444,7 +2451,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                       ? <td key={"pg-" + e.pg.stat} style={td}>{(() => { const v = perGame(r.stats, e.pg.stat); return v != null ? v : "—"; })()}</td>
                       : e.pct
                       ? <td key={"pct-" + e.pct.name} style={td}>{fmtRateVal(e.pct.fmt, rateValue(e.pct, r.stats))}</td>
-                      : <td key={e.col} style={td}>{r.stats?.[e.col] != null ? Number(r.stats[e.col]).toLocaleString() : "—"}</td>)}
+                      : <td key={e.col} style={td}>{r.stats?.[e.col] != null && r.stats?.[e.col] !== "" ? fmtStat(e.col, r.stats[e.col]) : "—"}</td>)}
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid #e5e7eb", background: "#f9fafb" }}>
@@ -2453,7 +2460,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                     ? <td key={"pg-" + e.pg.stat} style={{ ...td, fontWeight: 700 }}>{(() => { const v = perGame({ [e.pg.stat]: careerOf(e.pg.stat), "Games Played": careerOf("Games Played") }, e.pg.stat); return v != null ? v : "—"; })()}</td>
                     : e.pct
                     ? <td key={"pct-" + e.pct.name} style={{ ...td, fontWeight: 700 }}>{fmtRateVal(e.pct.fmt, e.pct.calc(careerOf, careerStats))}</td>
-                    : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{careerOf(e.col).toLocaleString()}</td>)}
+                    : <td key={e.col} style={{ ...td, fontWeight: 700 }}>{fmtStat(e.col, careerOf(e.col))}</td>)}
                 </tr>
               </tbody>
             </table>
@@ -2472,7 +2479,9 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
                 {draft.map((r, i) => (
                   <tr key={r.id || r._key} style={{ borderTop: "1px solid #f6f4f0" }}>
                     <td style={{ padding: "4px 8px" }}><input list="ps-seasons" value={r.season} onChange={e => setField(i, "season", e.target.value)} placeholder="2024-25" style={{ ...inp, width: 82, textAlign: "left" }} /></td>
-                    {editCols.map(c => <td key={c} style={{ padding: "4px 8px" }}><input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} /></td>)}
+                    {editCols.map(c => <td key={c} style={{ padding: "4px 8px" }}>{TIME_STATS.has(c)
+                      ? <input type="text" inputMode="numeric" placeholder="mm:ss" value={r.stats?.[c] == null || r.stats?.[c] === "" ? "" : (typeof r.stats[c] === "number" ? fmtClock(r.stats[c]) : r.stats[c])} onChange={e => setStat(i, c, e.target.value)} style={inp} />
+                      : <input type="number" value={r.stats?.[c] ?? ""} onChange={e => setStat(i, c, e.target.value)} style={inp} />}</td>)}
                     <td style={{ padding: "4px 8px", textAlign: "center" }}><button onClick={() => removeRow(i)} title="Remove season" style={{ background: "none", border: "none", cursor: "pointer", color: "#991b1b", fontSize: 15, lineHeight: 1 }}>✕</button></td>
                   </tr>
                 ))}
@@ -3110,8 +3119,7 @@ const STAT_ALIASES_BY_SPORT = {
     "sv": "Saves", "svs": "Saves", "save": "Saves", "saves": "Saves",          // "SVs"
     "so": "Shutouts", "sho": "Shutouts", "shutout": "Shutouts", "shutouts": "Shutouts", // "SO"
     "p": "Penalties", "pen": "Penalties", "pens": "Penalties", "penalties": "Penalties", // Penalties "P"
-    // NOTE: "PT"/Penalty Time (mm:ss) is intentionally NOT mapped yet — it needs the mm:ss→seconds
-    // conversion (next commit) before import, else the raw "19:42" string renders as "NaN". Added there.
+    "pt": "Penalty Time", "pim": "Penalty Time", "pen time": "Penalty Time", "penalty time": "Penalty Time", "ptime": "Penalty Time", // "PT" = mm:ss → seconds in remapSeasonStats
   },
 };
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.
@@ -3152,6 +3160,7 @@ function remapSeasonStats(stats, valid, sport) {
   for (const k in (stats || {})) {
     const mapped = resolveStatAlias(k, sport);
     if (useFilter && !valid.has(mapped)) continue; // ONLY stats that exist in our structure — drop source extras
+    if (TIME_STATS.has(mapped)) { const secs = parseClock(stats[k]); if (secs != null) out[mapped] = secs; continue; } // mm:ss clock (Penalty Time) → seconds
     out[mapped] = stats[k];
   }
   return out;
@@ -3705,7 +3714,7 @@ function ImportSeasons({ school, roster = [] }) {
             hdr.forEach((h, i) => {
               if (i === nameIdx || i === numIdx || !h) return;
               const v = vals[i]; if (v === "" || v == null) return;
-              const n = Number(String(v).replace(/,/g, "")); if (!isNaN(n)) raw[(hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : h] = n; // strip thousand-separators ("1,198")
+              const vs = String(v).trim(); const n = Number(vs.replace(/,/g, "")); if (!isNaN(n)) raw[(hudlPF && /^pf$/i.test(String(h).trim())) ? "Points" : h] = n; else if (/^\d{1,3}:\d{2}$/.test(vs)) raw[h] = vs; // numbers strip "1,198"; keep mm:ss (Penalty Time) for the alias→parseClock step
             });
             arr.push({ name, number, stats: remapSeasonStats(raw, seasonValid, school.sport) });
           }
