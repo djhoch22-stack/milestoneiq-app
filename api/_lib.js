@@ -146,6 +146,8 @@ export function sportsLinkable(a, b) {
 }
 // Stats imported only to feed a derived rate (e.g. Serve Errors → Serve %); never shown as a column.
 const HIDDEN_INPUT_STATS = new Set(["Serve Errors"]);
+// Shown only in the app's season-by-season table (where it sums); kept off public leaderboards/profiles.
+export const SEASON_ONLY_STATS = new Set(["Penalty Time"]);
 // Canonical display stats UNION any stat with data, in canonical order.
 export function statsToDisplay(roster, sport) {
   const base = DISPLAY_STATS[sport] || [];
@@ -153,7 +155,7 @@ export function statsToDisplay(roster, sport) {
     .filter((s) => (roster || []).some((p) => (p.stats?.[s] || 0) > 0));
   // "Longest …": show only the ones we add to DISPLAY_STATS (career = max via the SQL rollup); any
   // other "Longest …" merely present in the data stays records-only and is dropped from the columns.
-  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
+  return [...new Set([...base, ...present])].filter((s) => (!/^Longest /.test(s) || base.includes(s)) && !HIDDEN_INPUT_STATS.has(s) && !SEASON_ONLY_STATS.has(s)).sort((a, b) => byStatOrder(a, b, sport));
 }
 
 // ── Shooting % (ported) ───────────────────────────────────────────────────────
