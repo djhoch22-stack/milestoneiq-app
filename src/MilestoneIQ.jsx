@@ -3047,6 +3047,37 @@ const STAT_ALIASES_BY_SPORT = {
     "b assist": "Assisted Blocks", "block assist": "Assisted Blocks", "ba": "Assisted Blocks", "assisted blocks": "Assisted Blocks", "block assists": "Assisted Blocks",
     "b total": "Total Blocks", "total blocks": "Total Blocks", "tot blks": "Total Blocks", "tb": "Total Blocks", "blocks": "Total Blocks",
   },
+  // Lacrosse (boys + girls share this ONE map — keyed "lacrosse" since resolveStatAlias strips the
+  // _boys/_girls suffix). MaxPreps headers verified against Colorado Academy + Valor printable stat
+  // sheets. Boys-only (TA, TS, FW/FA, PT) and girls-only (CT, DC/DA/DW) keys coexist safely: the
+  // remapSeasonStats valid-set filter drops whichever gender doesn't track that stat. "G" = GOALS in
+  // lacrosse (this entry OVERRIDES the common "g"→Games Played, which was importing goals as games).
+  // Per-game (G/G, A/G, GB/G, P/G), % (SHT%, FO%, D%, SV%, GAA) and Pts are DERIVED → left unmapped → dropped.
+  lacrosse: {
+    "gp": "Games Played", "games": "Games Played", "games played": "Games Played", "gms": "Games Played", "gp.": "Games Played",
+    "w": "Wins", "wins": "Wins",
+    "g": "Goals", "gls": "Goals", "goal": "Goals", "goals": "Goals",           // MaxPreps Scoring: "G"
+    "a": "Assists", "ast": "Assists", "asst": "Assists", "assist": "Assists", "assists": "Assists", // "Asst"
+    "ts": "Total Shots", "sh": "Total Shots", "sht": "Total Shots", "shts": "Total Shots", "shots": "Total Shots", "total shots": "Total Shots", // BOYS "TS"
+    "sog": "Shots on Goal", "shots on goal": "Shots on Goal", "sot": "Shots on Goal",  // shooter SOG (goalie shots-faced shares this header → not separable in a flat import; Save% uses Saves+GA so it's unaffected)
+    "gb": "Ground Balls", "ground balls": "Ground Balls", "grd balls": "Ground Balls",
+    "to": "Turnovers", "tos": "Turnovers", "turnovers": "Turnovers",
+    "ta": "Takeaways", "takeaway": "Takeaways", "takeaways": "Takeaways",      // BOYS "TA"
+    "ct": "Caused Turnovers", "cto": "Caused Turnovers", "caused turnovers": "Caused Turnovers", // GIRLS "CT"
+    "ue": "Unforced Errors", "unforced errors": "Unforced Errors",
+    "fw": "Faceoff Wins", "fow": "Faceoff Wins", "fo w": "Faceoff Wins", "faceoff wins": "Faceoff Wins", // BOYS "FW"
+    "fa": "Faceoff Attempts", "foa": "Faceoff Attempts", "fo a": "Faceoff Attempts", "faceoffs": "Faceoff Attempts", "faceoff attempts": "Faceoff Attempts", // BOYS "FA"
+    "dc": "Draw Controls", "draw controls": "Draw Controls", "draws": "Draw Controls", // GIRLS "DC"
+    "da": "Draw Attempts", "draw attempts": "Draw Attempts",                   // GIRLS "DA"
+    "dw": "Draws Won", "draws won": "Draws Won",                               // GIRLS "DW"
+    "min": "Goalie Minutes", "mins": "Goalie Minutes", "minutes": "Goalie Minutes", "goalie minutes": "Goalie Minutes", // Goaltending "MIN"
+    "ga": "Goals Against", "goals against": "Goals Against",                   // "GA"
+    "sv": "Saves", "svs": "Saves", "save": "Saves", "saves": "Saves",          // "SVs"
+    "so": "Shutouts", "sho": "Shutouts", "shutout": "Shutouts", "shutouts": "Shutouts", // "SO"
+    "p": "Penalties", "pen": "Penalties", "pens": "Penalties", "penalties": "Penalties", // Penalties "P"
+    // NOTE: "PT"/Penalty Time (mm:ss) is intentionally NOT mapped yet — it needs the mm:ss→seconds
+    // conversion (next commit) before import, else the raw "19:42" string renders as "NaN". Added there.
+  },
 };
 // Softball columns (MaxPreps/GameChanger) are identical to baseball — reuse the same alias map.
 STAT_ALIASES_BY_SPORT.softball = STAT_ALIASES_BY_SPORT.baseball;
