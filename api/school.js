@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   if (!slug) { res.statusCode = 404; return res.end(notFound()); }
 
   // No school_slug column yet, so match on slugified school_name (same transform the links use).
-  const all = await sb(`public_teams?select=id,slug,name,school_name,sport,city,state,primary_color,logo_url,coach_hof,coach_prior,record_minimums&limit=5000`);
+  const all = await sb(`public_teams?select=id,slug,name,school_name,sport,city,state,primary_color,logo_url,coach_hof,coach_prior,record_minimums,sort_order&limit=5000`);
   const teams = all.filter((t) => slugify(t.school_name || t.name || "") === slug);
   if (!teams.length) { res.statusCode = 404; return res.end(notFound()); }
 
@@ -176,7 +176,16 @@ export default async function handler(req, res) {
     ? inductees.map((m) => `<div class="hofrow" data-hk="${esc(m.key)}" style="cursor:pointer"><span class="hofyr">${m.year ? esc(String(m.year)) : "—"}</span><span class="hofnm">${esc(m.name)}</span><span class="hofmeta">${esc(m.kind)} · ${esc(m.sport)}</span></div>`).join("")
     : `<div class="empty">No one has been inducted into the Hall of Fame yet.</div>`;
 
-  const cards = teams.slice().sort((a, b) => prettySport(a.sport).localeCompare(prettySport(b.sport))).map((t) => {
+  // Program order mirrors the AD's dashboard arrangement: programs the AD placed (sort_order, synced from
+  // profiles.program_order) come first in that order; any not yet placed — or schools with no AD order at
+  // all — fall back to alphabetical by sport label.
+  const cards = teams.slice().sort((a, b) => {
+    const ao = a.sort_order, bo = b.sort_order;
+    if (ao != null && bo != null && ao !== bo) return ao - bo;
+    if (ao != null && bo == null) return -1;
+    if (ao == null && bo != null) return 1;
+    return prettySport(a.sport).localeCompare(prettySport(b.sport));
+  }).map((t) => {
     const ic = SPORT_ICON[t.sport] || "🏅"; const col = t.primary_color || "#1a3a6b";
     return `<a class="schoolcard" href="/teams/${esc(t.slug)}" style="border-top:4px solid ${esc(col)}"><div class="sc-ic">${ic}</div><div class="sc-name">${esc(prettySport(t.sport))}</div><div class="sc-cta">View records →</div></a>`;
   }).join("");
