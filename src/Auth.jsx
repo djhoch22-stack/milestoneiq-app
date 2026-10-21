@@ -850,7 +850,10 @@ function LandingPage({ onStartTrial, onSignIn }) {
           <img src={raftersLogo} alt="RaftersIQ" style={{ width:36, height:36, objectFit:"contain" }} />
           <span style={{ fontWeight:700, fontSize:20, color:"#1a3a6b" }}>RaftersIQ</span>
         </div>
-        <button onClick={onSignIn} style={{ background:"none", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 18px", fontSize:14, fontWeight:600, cursor:"pointer", color:"#374151" }}>Sign in</button>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 12 : 20 }}>
+          <a href="/teams" style={{ fontSize:14, fontWeight:600, color:"#374151", textDecoration:"none" }}>Directory</a>
+          <button onClick={onSignIn} style={{ background:"none", border:"1px solid #d1d5db", borderRadius:8, padding:"8px 18px", fontSize:14, fontWeight:600, cursor:"pointer", color:"#374151" }}>Sign in</button>
+        </div>
       </div>
 
       {/* Hero */}
