@@ -513,6 +513,7 @@ const DISPLAY_STATS = {
   basketball: BBALL_DISPLAY, basketball_boys: BBALL_DISPLAY, basketball_girls: BBALL_DISPLAY,
   football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY,
   volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY,
+  lacrosse: LACROSSE_DISPLAY, lacrosse_girls: LACROSSE_GIRLS_DISPLAY,
 };
 // Every canonical display stat across all sports — lets the season importer accept a tab named with
 // the full category name (e.g. "Rushing Yards"), which is how the football template names its tabs.
@@ -623,12 +624,24 @@ const VBALL_THRESHOLDS = {
   "Kills":[250,500,1000,1500], "Assists":[250,500,1000,2000], "Digs":[250,500,1000,1500],
   "Aces":[50,100,200,300], "Total Blocks":[25,50,100,200],
 };
+// Lacrosse career milestone thresholds (HS-scaled) — boys + girls share ONE map; defaultMilestonesFor
+// filters each gender's display set, so boys pick up Total Shots / Takeaways / Faceoff Wins and girls
+// pick up Draw Controls / Caused Turnovers. "Bad"/lower-is-better stats (Turnovers, Unforced Errors,
+// Penalties, Penalty Time, Goals Against) are intentionally omitted — milestones celebrate accumulation.
+const LACROSSE_THRESHOLDS = {
+  "Games Played":[25,50,75,100], "Wins":[25,50,75,100],
+  "Goals":[25,50,100,150,200], "Assists":[10,25,50,100,150], "Points":[50,100,200,300],
+  "Total Shots":[100,250,500,750], "Shots on Goal":[50,100,250,500],
+  "Ground Balls":[50,100,200,400], "Takeaways":[25,50,100,150], "Caused Turnovers":[25,50,100,150],
+  "Faceoff Wins":[100,250,500,1000], "Draw Controls":[50,100,250,500],
+  "Saves":[100,250,500,750], "Shutouts":[5,10,15,25],
+};
 // Default milestones for a sport: sports with a canonical display set (e.g. soccer) build from
 // those stats; everything else keeps the football-oriented DEFAULT_MILESTONES.
 function defaultMilestonesFor(sport) {
   const base = DISPLAY_STATS[sport];
   if (!base) return DEFAULT_MILESTONES;
-  const TH = (sport === "football" || sport === "flag_football_girls") ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : (sport === "volleyball_girls" || sport === "volleyball") ? VBALL_THRESHOLDS : MILESTONE_THRESHOLDS;
+  const TH = (sport === "football" || sport === "flag_football_girls") ? FOOTBALL_THRESHOLDS : (sport === "baseball" || sport === "softball") ? BASEBALL_THRESHOLDS : (sport === "volleyball_girls" || sport === "volleyball") ? VBALL_THRESHOLDS : (sport === "lacrosse" || sport === "lacrosse_girls") ? LACROSSE_THRESHOLDS : MILESTONE_THRESHOLDS;
   const ms = base.filter(s => TH[s]).map((s, i) => ({ id: `dm-${sport}-${i}`, statName: s, values: TH[s], alertPct: 90 }));
   return ms.length ? ms : DEFAULT_MILESTONES;
 }
@@ -777,6 +790,28 @@ function ipInnings(v) {
 }
 const statGetter = (stats) => (k) => { const v = Number(stats?.[k]); return isNaN(v) ? 0 : v; };
 function rateValue(def, stats) { return def.calc(statGetter(stats), stats); }
+// ── Clock stats (lacrosse Penalty Time) — stored as INTEGER SECONDS so they SUM like any numeric stat
+// (a career 41:52 = 19:42 + 22:10) yet display back as mm:ss. parseClock accepts "mm:ss"/"h:mm:ss", a bare
+// number of minutes ("19" → 19:00, coach shorthand), or an already-stored seconds number. fmtClock renders
+// seconds → "m:ss" with minutes allowed past 60 ("92:30"), matching how penalty time is tracked.
+const TIME_STATS = new Set(["Penalty Time"]);
+function parseClock(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return Number.isFinite(v) ? Math.max(0, Math.round(v)) : null; // already seconds
+  const s = String(v).trim();
+  if (!s) return null;
+  const m = s.match(/^(?:(\d+):)?(\d{1,3}):(\d{1,2})$/);                 // [h:]mm:ss or mm:ss
+  if (m) { const ss = parseInt(m[3], 10); if (ss > 59) return null; return (m[1] ? +m[1] : 0) * 3600 + (+m[2]) * 60 + ss; }
+  if (/^\d+$/.test(s)) return parseInt(s, 10) * 60;                      // bare number = whole minutes
+  if (/^\d+\.\d+$/.test(s)) return Math.round(parseFloat(s) * 60);       // "19.5" = 19.5 minutes
+  return null;
+}
+function fmtClock(secs) {
+  const n = Math.max(0, Math.round(Number(secs) || 0));
+  return Math.floor(n / 60) + ":" + String(n % 60).padStart(2, "0");
+}
+// Display a stat value: clock stats (Penalty Time) as mm:ss, everything else as a localized number.
+const fmtStat = (stat, v) => TIME_STATS.has(stat) ? fmtClock(v) : Number(v).toLocaleString();
 // Career "years played" label for a record holder: START year of the first season → END year of the last,
 // so 2021-2022 through 2024-2025 shows as "2021-2025". Mirrors the public record book (api/_lib.js) — keep in sync.
 function holderYears(firstYear, lastYear, gradYear) {
