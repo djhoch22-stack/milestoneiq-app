@@ -46,7 +46,7 @@ export function prettySport(s) {
   if (!s) return "Athletics";
   // Suffix-less legacy keys that have a gendered counterpart → spell out the boys side (matches the app's
   // labels). "soccer" = Boys Soccer (its girls program is "soccer_girls"); same for the legacy "basketball".
-  const OVERRIDE = { soccer: "Boys Soccer", basketball: "Boys Basketball", volleyball: "Boys Volleyball" };
+  const OVERRIDE = { soccer: "Boys Soccer", basketball: "Boys Basketball", volleyball: "Boys Volleyball", lacrosse: "Boys Lacrosse" };
   if (OVERRIDE[String(s).toLowerCase()]) return OVERRIDE[String(s).toLowerCase()];
   const parts = String(s).toLowerCase().split(/[_\s-]+/).filter(Boolean);
   let gender = "";
@@ -93,7 +93,9 @@ const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Pas
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
 const VBALL_GIRLS_DISPLAY = ["Matches Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
-export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Turnovers", "Takeaways", "Unforced Errors", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Unforced Errors", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties"];
+export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY, lacrosse: LACROSSE_DISPLAY, lacrosse_girls: LACROSSE_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
   if (so) {
@@ -348,11 +350,53 @@ const G_VBALL = [
   { g: "Defense", s: ["Receptions","Digs","Solo Blocks","Assisted Blocks","Total Blocks"] },
   { g: "Coaching", s: ["Coach Wins"] },
 ];
+// Lacrosse rates as serializable specs (the public side evals specs, not functions). GAA = GA×48÷min
+// expressed as a scaled ratio, lower-is-better (like ERA). Save % = Saves ÷ (Saves + Goals Against).
+const LACROSSE_RATE_DEFS = [
+  { name: "Shooting %", short: "SHT%", after: "Total Shots", fmt: "avg3", qualStat: "Total Shots", minSeason: 25, minCareer: 75, noteAbbr: "shots",
+    spec: { kind: "ratio", num: [["Goals", 1]], den: [["Total Shots", 1]] } },
+  { name: "Faceoff %", short: "FO%", after: "Faceoff Attempts", fmt: "avg3", qualStat: "Faceoff Attempts", minSeason: 25, minCareer: 75, noteAbbr: "FO",
+    spec: { kind: "ratio", num: [["Faceoff Wins", 1]], den: [["Faceoff Attempts", 1]] } },
+  { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, noteAbbr: "SOG",
+    spec: { kind: "ratio", num: [["Saves", 1]], den: [["Saves", 1], ["Goals Against", 1]] } },
+  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
+    spec: { kind: "ratio", num: [["Goals Against", 48]], den: [["Goalie Minutes", 1]] } },
+];
+const LACROSSE_GIRLS_RATE_DEFS = [
+  { name: "Shooting %", short: "SHT%", after: "Shots on Goal", fmt: "avg3", qualStat: "Shots on Goal", minSeason: 25, minCareer: 75, noteAbbr: "SOG",
+    spec: { kind: "ratio", num: [["Goals", 1]], den: [["Shots on Goal", 1]] } },
+  { name: "Draw %", short: "DRAW%", after: "Draw Attempts", fmt: "avg3", qualStat: "Draw Attempts", minSeason: 25, minCareer: 75, noteAbbr: "draws",
+    spec: { kind: "ratio", num: [["Draws Won", 1]], den: [["Draw Attempts", 1]] } },
+  { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, noteAbbr: "SOG",
+    spec: { kind: "ratio", num: [["Saves", 1]], den: [["Saves", 1], ["Goals Against", 1]] } },
+  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
+    spec: { kind: "ratio", num: [["Goals Against", 48]], den: [["Goalie Minutes", 1]] } },
+];
+const G_LACROSSE = [
+  { group: "General", names: ["Games Played", "Wins"] },
+  { group: "Scoring", names: ["Goals", "Assists", "Points", "Total Shots", "Shots on Goal"] },
+  { group: "Fielding", names: ["Ground Balls", "Takeaways", "Turnovers", "Unforced Errors"] },
+  { group: "Faceoffs", names: ["Faceoff Wins", "Faceoff Attempts"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties"] },
+  { group: "Penalties", names: ["Penalties", "Penalty Time"] },
+  { group: "Coaching", names: ["Coach Wins"] },
+];
+const G_LACROSSE_GIRLS = [
+  { group: "General", names: ["Games Played", "Wins"] },
+  { group: "Scoring", names: ["Goals", "Assists", "Points", "Shots on Goal"] },
+  { group: "Fielding", names: ["Ground Balls", "Caused Turnovers", "Unforced Errors"] },
+  { group: "Draws", names: ["Draw Controls", "Draw Attempts", "Draws Won"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties"] },
+  { group: "Penalties", names: ["Penalties"] },
+  { group: "Coaching", names: ["Coach Wins"] },
+];
 export function groupsFor(sport) {
   if (sport === "football") return G_FOOTBALL;
   if (sport === "flag_football_girls") return G_FLAG_FOOTBALL;
   if (sport === "baseball" || sport === "softball") return G_BASEBALL;
   if (sport === "volleyball_girls" || sport === "volleyball") return G_VBALL;
+  if (sport === "lacrosse") return G_LACROSSE;
+  if (sport === "lacrosse_girls") return G_LACROSSE_GIRLS;
   return null; // no groups → everything falls under "Other" (matches the in-app)
 }
 // withDerivedStats now lives in the shared scoring module — single source of truth for app + public.
@@ -363,6 +407,8 @@ export function rateDefsFor(sport) {
   if (sport === "volleyball_girls" || sport === "volleyball") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
+  if (sport === "lacrosse") return LACROSSE_RATE_DEFS;
+  if (sport === "lacrosse_girls") return LACROSSE_GIRLS_RATE_DEFS;
   return [];
 }
 export function rateValue(d, stats) { return evalRateSpec(d.spec, stats); }
