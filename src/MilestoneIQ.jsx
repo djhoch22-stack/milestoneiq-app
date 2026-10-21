@@ -139,13 +139,13 @@ const FLAG_FOOTBALL_GROUPS = [
 ];
 // ── Lacrosse (boys + girls) — stat sets match MaxPreps (verified vs Colorado Academy + Valor Christian).
 // Display arrays (LACROSSE_DISPLAY / *_GIRLS) = the columns shown everywhere. The groups below drive
-// RECORDS + sectioning: a stat with variants is record-trackable; variants:[] = column only (Turnovers,
-// Unforced Errors, Penalties, goalie W-L-T, Shutouts). Per-game records use LAX_WITH_AVG. Derived rates
+// RECORDS + sectioning: a stat with variants is record-trackable; variants:[] = column only (Penalties,
+// Goalie Wins, Shutouts). Per-game records use LAX_WITH_AVG. Derived rates
 // (Shooting %, Faceoff %/Draw %, Save %, GAA) live in LACROSSE_RATE_DEFS. Points = Goals + Assists,
 // auto-computed in the DB (NOT entered) — same mechanism as soccer, different formula.
 const LAX_WITH_AVG = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)"];
-const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Turnovers", "Takeaways", "Unforced Errors", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties", "Penalty Time"];
-const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Unforced Errors", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties"];
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
 const LACROSSE_GROUPS = [
   { group: "General", stats: [
     { name: "Games Played", variants: ["Career total", "Single season"] },
@@ -161,8 +161,6 @@ const LACROSSE_GROUPS = [
   { group: "Fielding", stats: [
     { name: "Ground Balls", variants: LAX_WITH_AVG },
     { name: "Takeaways", variants: LAX_WITH_AVG },
-    { name: "Turnovers", variants: [] },
-    { name: "Unforced Errors", variants: [] },
   ]},
   { group: "Faceoffs", stats: [
     { name: "Faceoff Wins", variants: LAX_WITH_AVG },
@@ -175,8 +173,6 @@ const LACROSSE_GROUPS = [
     { name: "Saves", variants: LAX_WITH_AVG },
     { name: "Shutouts", variants: [] },
     { name: "Goalie Wins", variants: [] },
-    { name: "Goalie Losses", variants: [] },
-    { name: "Goalie Ties", variants: [] },
   ]},
   { group: "Penalties", stats: [
     { name: "Penalties", variants: [] },
@@ -200,7 +196,6 @@ const LACROSSE_GIRLS_GROUPS = [
   { group: "Fielding", stats: [
     { name: "Ground Balls", variants: LAX_WITH_AVG },
     { name: "Caused Turnovers", variants: LAX_WITH_AVG },
-    { name: "Unforced Errors", variants: [] },
   ]},
   { group: "Draws", stats: [
     { name: "Draw Controls", variants: LAX_WITH_AVG },
@@ -214,8 +209,6 @@ const LACROSSE_GIRLS_GROUPS = [
     { name: "Saves", variants: LAX_WITH_AVG },
     { name: "Shutouts", variants: [] },
     { name: "Goalie Wins", variants: [] },
-    { name: "Goalie Losses", variants: [] },
-    { name: "Goalie Ties", variants: [] },
   ]},
   { group: "Penalties", stats: [
     { name: "Penalties", variants: [] },
@@ -3105,10 +3098,8 @@ const STAT_ALIASES_BY_SPORT = {
     "ts": "Total Shots", "sh": "Total Shots", "sht": "Total Shots", "shts": "Total Shots", "shots": "Total Shots", "total shots": "Total Shots", // BOYS "TS"
     "sog": "Shots on Goal", "shots on goal": "Shots on Goal", "sot": "Shots on Goal",  // shooter SOG (goalie shots-faced shares this header → not separable in a flat import; Save% uses Saves+GA so it's unaffected)
     "gb": "Ground Balls", "ground balls": "Ground Balls", "grd balls": "Ground Balls",
-    "to": "Turnovers", "tos": "Turnovers", "turnovers": "Turnovers",
     "ta": "Takeaways", "takeaway": "Takeaways", "takeaways": "Takeaways",      // BOYS "TA"
     "ct": "Caused Turnovers", "cto": "Caused Turnovers", "caused turnovers": "Caused Turnovers", // GIRLS "CT"
-    "ue": "Unforced Errors", "unforced errors": "Unforced Errors",
     "fw": "Faceoff Wins", "fow": "Faceoff Wins", "fo w": "Faceoff Wins", "faceoff wins": "Faceoff Wins", // BOYS "FW"
     "fa": "Faceoff Attempts", "foa": "Faceoff Attempts", "fo a": "Faceoff Attempts", "faceoffs": "Faceoff Attempts", "faceoff attempts": "Faceoff Attempts", // BOYS "FA"
     "dc": "Draw Controls", "draw controls": "Draw Controls", "draws": "Draw Controls", // GIRLS "DC"
