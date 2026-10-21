@@ -436,7 +436,7 @@ export default async function handler(req, res) {
     : `<div class="empty">No one has been inducted into the Hall of Fame yet.</div>`;
 
   // ── Header + tabs ───────────────────────────────────────────────────────────
-  const SPORT_EMOJI = /basket/i.test(team.sport) ? "🏀" : /foot/i.test(team.sport) ? "🏈" : /soccer/i.test(team.sport) ? "⚽" : /base/i.test(team.sport) ? "⚾" : /volley/i.test(team.sport) ? "🏐" : /track|cross/i.test(team.sport) ? "🏃" : "🏆";
+  const SPORT_EMOJI = SPORT_ICON[team.sport] || "🏆"; // canonical map (🥍 lacrosse, etc.) — a regex here wrongly matched "la·cross·e" → 🏃
   const logoColor = team.primary_color || "#1a3a6b";
   const logoBox = team.logo_url
     ? `<img class="logo" src="${esc(team.logo_url)}" alt="" style="object-fit:contain;background:${esc(logoColor)};padding:4px"/>`
