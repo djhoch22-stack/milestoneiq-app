@@ -494,6 +494,8 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Kills" }, { stat: "Attack Attempts" }, { stat: "Aces" }, { stat: "Total Serves" }, { stat: "Service Points" }, { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
   // Flag football
   { stat: "Total Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assisted Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
+  // Lacrosse (Goals / Assists / Points / Saves already above)
+  { stat: "Total Shots" }, { stat: "Shots on Goal" }, { stat: "Ground Balls" }, { stat: "Takeaways" }, { stat: "Caused Turnovers" }, { stat: "Faceoff Wins" }, { stat: "Faceoff Attempts" }, { stat: "Draw Controls" }, { stat: "Draw Attempts" }, { stat: "Shots on Goal Faced" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;
 const PERGAME_MIN_CAREER_GP = 20;
