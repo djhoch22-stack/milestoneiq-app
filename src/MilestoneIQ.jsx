@@ -7121,15 +7121,24 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
   useEffect(() => {
     try { if (activeSchool) sessionStorage.setItem("mq_school", String(activeSchool.id)); } catch (e) {}
   }, [activeSchool]);
-  // On (re)load, reopen the last program once schools are available.
+  // On (re)load, reopen the last program once schools are available. And a single-program coach
+  // (NOT an org admin / AD) skips the "Your programs" picker and lands straight in their program's
+  // dashboard (Overview). ADs and multi-program coaches still see the grid. Fires once per load, so
+  // a single-program coach can still use "← All programs" to view the picker afterward.
+  const didAutoOpenRef = useRef(false);
   useEffect(() => {
     if (activeSchool || !schools.length) return;
     let savedId = null;
     try { savedId = sessionStorage.getItem("mq_school"); } catch (e) {}
-    if (!savedId) return;
-    const sc = schools.find(s => String(s.id) === savedId);
-    if (sc) setActiveSchool(sc);
-  }, [schools, activeSchool]);
+    if (savedId) {
+      const sc = schools.find(s => String(s.id) === savedId);
+      if (sc) { setActiveSchool(sc); return; }
+    }
+    if (!didAutoOpenRef.current && schools.length === 1 && role !== "admin") {
+      didAutoOpenRef.current = true;
+      setActiveSchool(schools[0]);
+    }
+  }, [schools, activeSchool, role]);
 
   // Accurate "records" count for the home tiles = the FULL Records-tab total (auto + stored). The home
   // page doesn't carry season rows, so fetch them per program once and compute the count; until the fetch
