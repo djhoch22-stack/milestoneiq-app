@@ -994,6 +994,9 @@ const PERGAME_RECORD_DEFS = [
   { stat: "Ball Handling Attempts" }, { stat: "Digs" }, { stat: "Solo Blocks" }, { stat: "Assisted Blocks" }, { stat: "Total Blocks" },
   // Flag football (shared football stats above already covered)
   { stat: "Total Flag Pulls" }, { stat: "Solo Flag Pulls" }, { stat: "Assisted Flag Pulls" }, { stat: "Flag Pull Yards Lost" }, { stat: "Try Points" },
+  // Lacrosse — per-game over a season AND a career (Goals / Assists / Points / Saves already above)
+  { stat: "Total Shots" }, { stat: "Shots on Goal" }, { stat: "Ground Balls" }, { stat: "Takeaways" }, { stat: "Caused Turnovers" },
+  { stat: "Faceoff Wins" }, { stat: "Faceoff Attempts" }, { stat: "Draw Controls" }, { stat: "Draw Attempts" }, { stat: "Shots on Goal Faced" },
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
