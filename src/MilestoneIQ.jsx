@@ -137,6 +137,116 @@ const FLAG_FOOTBALL_GROUPS = [
     { name: "Coach Wins", variants: ["Career total","Single season"] },
   ]},
 ];
+// ── Lacrosse (boys + girls) — stat sets match MaxPreps (verified vs Colorado Academy + Valor Christian).
+// Display arrays (LACROSSE_DISPLAY / *_GIRLS) = the columns shown everywhere. The groups below drive
+// RECORDS + sectioning: a stat with variants is record-trackable; variants:[] = column only (Turnovers,
+// Unforced Errors, Penalties, goalie W-L-T, Shutouts). Per-game records use LAX_WITH_AVG. Derived rates
+// (Shooting %, Faceoff %/Draw %, Save %, GAA) live in LACROSSE_RATE_DEFS. Points = Goals + Assists,
+// auto-computed in the DB (NOT entered) — same mechanism as soccer, different formula.
+const LAX_WITH_AVG = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)"];
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Turnovers", "Takeaways", "Unforced Errors", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Unforced Errors", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties"];
+const LACROSSE_GROUPS = [
+  { group: "General", stats: [
+    { name: "Games Played", variants: ["Career total", "Single season"] },
+    { name: "Wins", variants: ["Career total", "Single season"] },
+  ]},
+  { group: "Scoring", stats: [
+    { name: "Goals", variants: LAX_WITH_AVG },
+    { name: "Assists", variants: LAX_WITH_AVG },
+    { name: "Points", variants: LAX_WITH_AVG },
+    { name: "Total Shots", variants: LAX_WITH_AVG },
+    { name: "Shots on Goal", variants: LAX_WITH_AVG },
+  ]},
+  { group: "Fielding", stats: [
+    { name: "Ground Balls", variants: LAX_WITH_AVG },
+    { name: "Takeaways", variants: LAX_WITH_AVG },
+    { name: "Turnovers", variants: [] },
+    { name: "Unforced Errors", variants: [] },
+  ]},
+  { group: "Faceoffs", stats: [
+    { name: "Faceoff Wins", variants: LAX_WITH_AVG },
+    { name: "Faceoff Attempts", variants: LAX_WITH_AVG },
+  ]},
+  { group: "Goaltending", stats: [
+    { name: "Goalie Minutes", variants: ["Career total", "Single season"] },
+    { name: "Goals Against", variants: ["Career total", "Single season"] },
+    { name: "Shots on Goal Faced", variants: LAX_WITH_AVG },
+    { name: "Saves", variants: LAX_WITH_AVG },
+    { name: "Shutouts", variants: [] },
+    { name: "Goalie Wins", variants: [] },
+    { name: "Goalie Losses", variants: [] },
+    { name: "Goalie Ties", variants: [] },
+  ]},
+  { group: "Penalties", stats: [
+    { name: "Penalties", variants: [] },
+    { name: "Penalty Time", variants: [] },
+  ]},
+  { group: "Coaching", stats: [
+    { name: "Coach Wins", variants: ["Career total", "Single season"] },
+  ]},
+];
+const LACROSSE_GIRLS_GROUPS = [
+  { group: "General", stats: [
+    { name: "Games Played", variants: ["Career total", "Single season"] },
+    { name: "Wins", variants: ["Career total", "Single season"] },
+  ]},
+  { group: "Scoring", stats: [
+    { name: "Goals", variants: LAX_WITH_AVG },
+    { name: "Assists", variants: LAX_WITH_AVG },
+    { name: "Points", variants: LAX_WITH_AVG },
+    { name: "Shots on Goal", variants: LAX_WITH_AVG },
+  ]},
+  { group: "Fielding", stats: [
+    { name: "Ground Balls", variants: LAX_WITH_AVG },
+    { name: "Caused Turnovers", variants: LAX_WITH_AVG },
+    { name: "Unforced Errors", variants: [] },
+  ]},
+  { group: "Draws", stats: [
+    { name: "Draw Controls", variants: LAX_WITH_AVG },
+    { name: "Draw Attempts", variants: LAX_WITH_AVG },
+    { name: "Draws Won", variants: [] },
+  ]},
+  { group: "Goaltending", stats: [
+    { name: "Goalie Minutes", variants: ["Career total", "Single season"] },
+    { name: "Goals Against", variants: ["Career total", "Single season"] },
+    { name: "Shots on Goal Faced", variants: LAX_WITH_AVG },
+    { name: "Saves", variants: LAX_WITH_AVG },
+    { name: "Shutouts", variants: [] },
+    { name: "Goalie Wins", variants: [] },
+    { name: "Goalie Losses", variants: [] },
+    { name: "Goalie Ties", variants: [] },
+  ]},
+  { group: "Penalties", stats: [
+    { name: "Penalties", variants: [] },
+  ]},
+  { group: "Coaching", stats: [
+    { name: "Coach Wins", variants: ["Career total", "Single season"] },
+  ]},
+];
+// Derived rates. fmt "avg3" → .XXX (shooting/faceoff/draw/save %, as MaxPreps shows them); GAA = GA×48÷min
+// (48-min regulation), lower-is-better. qualStat gates small samples out of the auto season/career records.
+const LACROSSE_RATE_DEFS = [
+  { name: "Shooting %", short: "SHT%", after: "Total Shots", fmt: "avg3", qualStat: "Total Shots", minSeason: 25, minCareer: 75,
+    calc: (g) => { const ts = g("Total Shots"); return ts > 0 ? g("Goals") / ts : null; }, note: (g) => `${g("Total Shots").toLocaleString()} shots` },
+  { name: "Faceoff %", short: "FO%", after: "Faceoff Attempts", fmt: "avg3", qualStat: "Faceoff Attempts", minSeason: 25, minCareer: 75,
+    calc: (g) => { const fa = g("Faceoff Attempts"); return fa > 0 ? g("Faceoff Wins") / fa : null; }, note: (g) => `${g("Faceoff Attempts").toLocaleString()} FO` },
+  { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400,
+    calc: (g) => { const sf = g("Saves") + g("Goals Against"); return sf > 0 ? g("Saves") / sf : null; }, note: (g) => `${(g("Saves") + g("Goals Against")).toLocaleString()} SOG` },
+  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
+    calc: (g) => { const m = g("Goalie Minutes"); return m > 0 ? (g("Goals Against") * 48) / m : null; }, note: (g) => `${g("Goalie Minutes").toLocaleString()} min` },
+];
+const LACROSSE_GIRLS_RATE_DEFS = [
+  { name: "Shooting %", short: "SHT%", after: "Shots on Goal", fmt: "avg3", qualStat: "Shots on Goal", minSeason: 25, minCareer: 75,
+    calc: (g) => { const s = g("Shots on Goal"); return s > 0 ? g("Goals") / s : null; }, note: (g) => `${g("Shots on Goal").toLocaleString()} SOG` },
+  { name: "Draw %", short: "DRAW%", after: "Draw Attempts", fmt: "avg3", qualStat: "Draw Attempts", minSeason: 25, minCareer: 75,
+    calc: (g) => { const da = g("Draw Attempts"); return da > 0 ? g("Draws Won") / da : null; }, note: (g) => `${g("Draw Attempts").toLocaleString()} draws` },
+  { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400,
+    calc: (g) => { const sf = g("Saves") + g("Goals Against"); return sf > 0 ? g("Saves") / sf : null; }, note: (g) => `${(g("Saves") + g("Goals Against")).toLocaleString()} SOG` },
+  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
+    calc: (g) => { const m = g("Goalie Minutes"); return m > 0 ? (g("Goals Against") * 48) / m : null; }, note: (g) => `${g("Goalie Minutes").toLocaleString()} min` },
+];
+
 const SPORTS = {
   football: {
     label: "Football", icon: "🏈",
@@ -275,27 +385,13 @@ const SPORTS = {
   // Stat sets are starter placeholders; they get fleshed out (display/groups/rates) when a sport goes live.
   lacrosse: {
     label: "Boys Lacrosse", icon: "🥍",
-    statCategories: [
-      { name: "Goals", variants: ["Career total","Single season"] },
-      { name: "Assists", variants: ["Career total","Single season"] },
-      { name: "Points", variants: ["Career total","Single season"] },
-      { name: "Ground Balls", variants: ["Career total","Single season"] },
-      { name: "Saves", variants: ["Career total","Single season"] },
-      { name: "Caused Turnovers", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    groups: LACROSSE_GROUPS,
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   lacrosse_girls: {
     label: "Girls Lacrosse", icon: "🥍",
-    statCategories: [
-      { name: "Goals", variants: ["Career total","Single season"] },
-      { name: "Assists", variants: ["Career total","Single season"] },
-      { name: "Points", variants: ["Career total","Single season"] },
-      { name: "Ground Balls", variants: ["Career total","Single season"] },
-      { name: "Saves", variants: ["Career total","Single season"] },
-      { name: "Caused Turnovers", variants: ["Career total","Single season"] },
-      { name: "Coach Wins", variants: ["Career total","Single season"] },
-    ]
+    groups: LACROSSE_GIRLS_GROUPS,
+    get statCategories() { return this.groups.flatMap(g => g.stats); },
   },
   hockey: {
     label: "Boys Ice Hockey", icon: "🏒",
@@ -368,7 +464,7 @@ const STAT_ORDER = [
 const FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Passing Attempts","Passing Yards","Passing TDs","Longest Completion","Rushes","Rushing Yards","Rushing TDs","Longest Rush","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Total Yards","Total TDs","Total Tackles","Solo Tackles","Assisted Tackles","Sacks","Sack Yards Lost","Hurries","Interceptions","Interception Return Yards","Pass Break Ups","Forced Fumbles","Fumble Recoveries","Blocked Punts","Blocked Field Goals","Safeties","Field Goals Made","Field Goals Attempts","Longest Field Goal","PAT Mades","PAT Attempts","2 Point Conversions","Punts","Punt Yards","Longest Punt","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Kick Offs","Kick Off Yards","Longest Kick Off","Kick Off Returns","Kick Off Return Yards","Kick Off Return TDs","Longest Kick Off Return","All-Purpose Yards"];
 // Sports whose canonical order differs from the global STAT_ORDER (football's "Field Goals Made" sits
 // at #21, not the basketball position). byStatOrder/recStatIdx consult this first when given a sport.
-const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY };
+const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY, lacrosse: LACROSSE_DISPLAY, lacrosse_girls: LACROSSE_GIRLS_DISPLAY };
 // Legacy football stat names → the coach's names. Stored milestones (and any old records) seeded with
 // the previous names are normalized on read so they sort + match the renamed data.
 const FB_STAT_RENAME = {
@@ -777,6 +873,8 @@ function rateDefsFor(sport) {
   if (sport === "volleyball_girls" || sport === "volleyball") return VBALL_RATE_DEFS;
   if (sport === "basketball" || sport === "basketball_boys" || sport === "basketball_girls") return BBALL_RATE_DEFS;
   if (sport === "soccer" || sport === "soccer_girls") return SOCCER_RATE_DEFS;
+  if (sport === "lacrosse") return LACROSSE_RATE_DEFS;
+  if (sport === "lacrosse_girls") return LACROSSE_GIRLS_RATE_DEFS;
   return [];
 }
 // Per-program qualifying minimums: the program's saved overrides (programs.record_minimums,
@@ -808,6 +906,7 @@ const GROUP_STYLE = {
   Passing: { bg: "#dbeafe", fg: "#1e40af" }, Rushing: { bg: "#dcfce7", fg: "#166534" }, Receiving: { bg: "#fef3c7", fg: "#92400e" },
   Offense: { bg: "#f3e8ff", fg: "#6b21a8" }, Defense: { bg: "#fee2e2", fg: "#991b1b" }, "Special Teams": { bg: "#ffedd5", fg: "#c2410c" },
   Attacking: { bg: "#dbeafe", fg: "#1e40af" }, Setting: { bg: "#fef3c7", fg: "#92400e" }, Serving: { bg: "#dcfce7", fg: "#166534" },
+  Scoring: { bg: "#dbeafe", fg: "#1e40af" }, Faceoffs: { bg: "#fef3c7", fg: "#92400e" }, Draws: { bg: "#fef3c7", fg: "#92400e" }, Goaltending: { bg: "#f3e8ff", fg: "#6b21a8" }, Penalties: { bg: "#fee2e2", fg: "#991b1b" },
 };
 // Auto record-holders for the rate stats: single-season (from player_seasons rows) and career
 // (from the career-totals pool), gated by a minimum volume (att / AB / chances) so small samples
@@ -1720,6 +1819,9 @@ function EmailPreviewModal({ allAlerts, school, onClose }) {
 // ── Add Athlete Modal ──────────────────────────────────────────────────────────
 // Soccer "Points" is auto-computed in the DB (Goals×2 + Assists), so it's NOT enterable in the forms below.
 const SOCCER_SPORTS = new Set(["soccer", "soccer_girls"]);
+// Sports whose "Points" is auto-derived and must NOT be manually entered: soccer (Goals×2 + Assists,
+// in the DB) and lacrosse (Goals + Assists, via withDerivedStats).
+const POINTS_AUTO_SPORTS = new Set(["soccer", "soccer_girls", "lacrosse", "lacrosse_girls"]);
 // Whether a graduation year is a CURRENT student, so a manually-added player is only auto-marked
 // active when actually enrolled (an alumnus stays inactive). The senior class rolls over in July
 // (matches the rest of the app); blank/unknown year → not current (don't auto-activate).
@@ -1733,7 +1835,7 @@ function isCurrentGradYear(gradYear) {
 function AddAthleteModal({ onClose, onAdd, sport, existingNames = [] }) {
   const sportDef = SPORTS[sport] || SPORTS.football;
   // Coach Wins is a COACHING stat (auto-computed from the Seasons tab) — never an enterable player stat.
-  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n) && n !== "Coach Wins" && !(SOCCER_SPORTS.has(sport) && n === "Points")))];
+  const statNames = [...new Set(sportDef.statCategories.map(s => s.name).filter(n => !/^Longest /.test(n) && n !== "Coach Wins" && !(POINTS_AUTO_SPORTS.has(sport) && n === "Points")))];
   const [form, setForm] = useState({ name:"", position:"", gradYear: new Date().getFullYear()+2 });
   const [stats, setStats] = useState({});
   const [err, setErr] = useState("");
@@ -2152,7 +2254,7 @@ function ProgramCoaches({ programId, orgId, tierLimits }) {
 }
 
 // Sports a NEW program can currently be created for; everything else shows "Coming soon".
-const AVAILABLE_SPORTS = ["football", "flag_football_girls", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls", "volleyball"];
+const AVAILABLE_SPORTS = ["football", "flag_football_girls", "basketball_boys", "basketball_girls", "soccer", "soccer_girls", "baseball", "softball", "volleyball_girls", "volleyball", "lacrosse", "lacrosse_girls"];
 
 function AddSchoolModal({ onClose, onAdd, existingSports = [] }) {
   const openSports = AVAILABLE_SPORTS.filter(sp => !existingSports.includes(sp));
@@ -2209,7 +2311,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   // Edit grid shows EVERY stat for the sport (so any stat is enterable); the view
   // table shows only stats that actually have values (career or any season).
   const sportCols = (SPORTS[sport]?.groups || []).filter(g => g.group !== "Coaching").flatMap(g => (g.stats || []).map(s => s.name));
-  const editCols = (sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []))).filter(c => !(SOCCER_SPORTS.has(sport) && c === "Points"));
+  const editCols = (sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []))).filter(c => !(POINTS_AUTO_SPORTS.has(sport) && c === "Points"));
   const hasVal = (c) => Number(careerStats?.[c]) > 0 || (rows || []).some(r => Number(r.stats?.[c]) > 0);
   const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c));
   const viewCols = [...editCols, ...extraKeys].filter(hasVal);
