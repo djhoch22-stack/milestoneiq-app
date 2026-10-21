@@ -93,8 +93,8 @@ const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Pas
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
 const VBALL_GIRLS_DISPLAY = ["Matches Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
-const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Turnovers", "Takeaways", "Unforced Errors", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties", "Penalty Time"];
-const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Unforced Errors", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties", "Penalties"];
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY, lacrosse: LACROSSE_DISPLAY, lacrosse_girls: LACROSSE_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -378,18 +378,18 @@ const LACROSSE_GIRLS_RATE_DEFS = [
 const G_LACROSSE = [
   { group: "General", names: ["Games Played", "Wins"] },
   { group: "Scoring", names: ["Goals", "Assists", "Points", "Total Shots", "Shots on Goal"] },
-  { group: "Fielding", names: ["Ground Balls", "Takeaways", "Turnovers", "Unforced Errors"] },
+  { group: "Fielding", names: ["Ground Balls", "Takeaways"] },
   { group: "Faceoffs", names: ["Faceoff Wins", "Faceoff Attempts"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
   { group: "Penalties", names: ["Penalties", "Penalty Time"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
 const G_LACROSSE_GIRLS = [
   { group: "General", names: ["Games Played", "Wins"] },
   { group: "Scoring", names: ["Goals", "Assists", "Points", "Shots on Goal"] },
-  { group: "Fielding", names: ["Ground Balls", "Caused Turnovers", "Unforced Errors"] },
+  { group: "Fielding", names: ["Ground Balls", "Caused Turnovers"] },
   { group: "Draws", names: ["Draw Controls", "Draw Attempts", "Draws Won"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Goalie Losses", "Goalie Ties"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
   { group: "Penalties", names: ["Penalties"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
