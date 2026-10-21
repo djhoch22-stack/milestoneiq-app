@@ -93,8 +93,8 @@ const FLAG_FOOTBALL_DISPLAY = ["Games Played","Wins","Points","Completions","Pas
 const BASEBALL_DISPLAY = ["Games Played", "Wins", "Plate Appearances", "At Bats", "Hits", "Singles", "Doubles", "Triples", "Home Runs", "Total Bases", "Runs", "RBIs", "Stolen Base", "Sacrifice Fly", "Sacrifice Bunt", "Walk (BB)", "Hit By Pitch", "Reached on Error", "Total Chances", "Put Outs", "Assists", "Double Plays", "Triple Plays", "Pitcher Wins", "Pitcher Appearances", "Pitcher Games Started", "Pitcher Complete Games", "Pitcher Shut Outs", "Pitcher Saves", "No Hitters", "Perfect Games", "Innings Pitched", "Earned Runs", "Pitcher Strikeouts", "Batters Faced", "At Bats Pitcher", "# of Pitches"];
 // Girls Volleyball: raw counting stats in canonical order (mirrors MilestoneIQ.jsx VBALL_GIRLS_DISPLAY).
 const VBALL_GIRLS_DISPLAY = ["Matches Played", "Sets Played", "Wins", "Kills", "Attack Attempts", "Assists", "Ball Handling Attempts", "Aces", "Total Serves", "Service Points", "Receptions", "Digs", "Solo Blocks", "Assisted Blocks", "Total Blocks"];
-const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
-const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
 export const SPORT_ORDER = { football: FOOTBALL_DISPLAY, flag_football_girls: FLAG_FOOTBALL_DISPLAY, baseball: BASEBALL_DISPLAY, softball: BASEBALL_DISPLAY, volleyball_girls: VBALL_GIRLS_DISPLAY, volleyball: VBALL_GIRLS_DISPLAY, lacrosse: LACROSSE_DISPLAY, lacrosse_girls: LACROSSE_GIRLS_DISPLAY };
 export function byStatOrder(a, b, sport) {
   const so = SPORT_ORDER[sport];
@@ -145,7 +145,7 @@ export function sportsLinkable(a, b) {
   return ga === "X" || gb === "X" || ga === gb;
 }
 // Stats imported only to feed a derived rate (e.g. Serve Errors → Serve %); never shown as a column.
-const HIDDEN_INPUT_STATS = new Set(["Serve Errors"]);
+export const HIDDEN_INPUT_STATS = new Set(["Serve Errors", "Goals Against", "Turnovers"]);
 // Shown only in the app's season-by-season table (where it sums); kept off public leaderboards/profiles.
 export const SEASON_ONLY_STATS = new Set(["Penalty Time"]);
 // Canonical display stats UNION any stat with data, in canonical order.
@@ -362,7 +362,7 @@ const LACROSSE_RATE_DEFS = [
     spec: { kind: "ratio", num: [["Faceoff Wins", 1]], den: [["Faceoff Attempts", 1]] } },
   { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, noteAbbr: "SOG",
     spec: { kind: "ratio", num: [["Saves", 1]], den: [["Saves", 1], ["Goals Against", 1]] } },
-  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
+  { name: "Goals Against Average", short: "GAA", after: "Saves", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
     spec: { kind: "ratio", num: [["Goals Against", 48]], den: [["Goalie Minutes", 1]] } },
 ];
 const LACROSSE_GIRLS_RATE_DEFS = [
@@ -372,7 +372,7 @@ const LACROSSE_GIRLS_RATE_DEFS = [
     spec: { kind: "ratio", num: [["Draws Won", 1]], den: [["Draw Attempts", 1]] } },
   { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, noteAbbr: "SOG",
     spec: { kind: "ratio", num: [["Saves", 1]], den: [["Saves", 1], ["Goals Against", 1]] } },
-  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
+  { name: "Goals Against Average", short: "GAA", after: "Saves", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true, noteAbbr: "min",
     spec: { kind: "ratio", num: [["Goals Against", 48]], den: [["Goalie Minutes", 1]] } },
 ];
 const G_LACROSSE = [
@@ -380,7 +380,7 @@ const G_LACROSSE = [
   { group: "Scoring", names: ["Goals", "Assists", "Points", "Total Shots", "Shots on Goal"] },
   { group: "Fielding", names: ["Ground Balls", "Takeaways"] },
   { group: "Faceoffs", names: ["Faceoff Wins", "Faceoff Attempts"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
   { group: "Penalties", names: ["Penalties", "Penalty Time"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
@@ -389,7 +389,7 @@ const G_LACROSSE_GIRLS = [
   { group: "Scoring", names: ["Goals", "Assists", "Points", "Shots on Goal"] },
   { group: "Fielding", names: ["Ground Balls", "Caused Turnovers"] },
   { group: "Draws", names: ["Draw Controls", "Draw Attempts", "Draws Won"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
+  { group: "Goaltending", names: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
   { group: "Penalties", names: ["Penalties"] },
   { group: "Coaching", names: ["Coach Wins"] },
 ];
