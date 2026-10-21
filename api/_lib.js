@@ -376,22 +376,22 @@ const LACROSSE_GIRLS_RATE_DEFS = [
     spec: { kind: "ratio", num: [["Goals Against", 48]], den: [["Goalie Minutes", 1]] } },
 ];
 const G_LACROSSE = [
-  { group: "General", names: ["Games Played", "Wins"] },
-  { group: "Scoring", names: ["Goals", "Assists", "Points", "Total Shots", "Shots on Goal"] },
-  { group: "Fielding", names: ["Ground Balls", "Takeaways"] },
-  { group: "Faceoffs", names: ["Faceoff Wins", "Faceoff Attempts"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
-  { group: "Penalties", names: ["Penalties", "Penalty Time"] },
-  { group: "Coaching", names: ["Coach Wins"] },
+  { g: "General", s: ["Games Played", "Wins"] },
+  { g: "Scoring", s: ["Goals", "Assists", "Points", "Total Shots", "Shots on Goal"] },
+  { g: "Fielding", s: ["Ground Balls", "Takeaways"] },
+  { g: "Faceoffs", s: ["Faceoff Wins", "Faceoff Attempts"] },
+  { g: "Goaltending", s: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
+  { g: "Penalties", s: ["Penalties", "Penalty Time"] },
+  { g: "Coaching", s: ["Coach Wins"] },
 ];
 const G_LACROSSE_GIRLS = [
-  { group: "General", names: ["Games Played", "Wins"] },
-  { group: "Scoring", names: ["Goals", "Assists", "Points", "Shots on Goal"] },
-  { group: "Fielding", names: ["Ground Balls", "Caused Turnovers"] },
-  { group: "Draws", names: ["Draw Controls", "Draw Attempts", "Draws Won"] },
-  { group: "Goaltending", names: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
-  { group: "Penalties", names: ["Penalties"] },
-  { group: "Coaching", names: ["Coach Wins"] },
+  { g: "General", s: ["Games Played", "Wins"] },
+  { g: "Scoring", s: ["Goals", "Assists", "Points", "Shots on Goal"] },
+  { g: "Fielding", s: ["Ground Balls", "Caused Turnovers"] },
+  { g: "Draws", s: ["Draw Controls", "Draw Attempts", "Draws Won"] },
+  { g: "Goaltending", s: ["Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins"] },
+  { g: "Penalties", s: ["Penalties"] },
+  { g: "Coaching", s: ["Coach Wins"] },
 ];
 export function groupsFor(sport) {
   if (sport === "football") return G_FOOTBALL;
