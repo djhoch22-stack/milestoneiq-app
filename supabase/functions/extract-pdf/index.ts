@@ -27,7 +27,7 @@ CRITICAL:
 - A document may contain MANY stat tables (especially football: Passing, Rushing, Receiving, Total Yards, Tackles, Sacks, Defensive, Returns, Kicking). The SAME column header ("Yds","TD","Att","Int","Yards") means DIFFERENT stats in different tables — you MUST qualify each value by the section it came from. Never merge two different "Yds" columns into one stat.
 - ONE object per athlete. A player appears in several tables; COMBINE all of their stats into that single object, matching the same athlete across tables by jersey number AND last name (e.g. "3 T. Steeves" in every table is the same player).
 - SKIP "Season Totals"/team-total rows. SKIP every rate/average/percentage column (Y/G, C/G, Avg, C%, T/G, S/G, Int/G, TD/G, QB Rate, "100+", "In 20", "TB", "FC") — keep cumulative counting totals, PLUS the eight "Lng" (longest) values mapped below as "Longest …" (single-game records, not totals; keep ONLY those eight "Longest …" values).
-- Numeric values only. "number" = jersey number (integer) if shown, else null. Unknown grad year → ${new Date().getFullYear() + 2}.
+- Numeric values only, with ONE exception: lacrosse "Penalty Time" is a mm:ss clock STRING like "19:42" (see the LACROSSE section). "number" = jersey number (integer) if shown, else null. Unknown grad year → ${new Date().getFullYear() + 2}.
 - ROSTER pages: some files are a team ROSTER (jersey #, FULL name, position, grade — NO game stats). Still return EVERY player on it: their FULL name exactly as written, their "number", "position", and an empty "stats":{}. The app uses these full names to replace abbreviated names ("T. Steeves") on the stat sheets — so ALWAYS extract a roster even though it has no stats.
 
 FOOTBALL — use these EXACT stat names (the coach's set), mapping the column within each section:
@@ -73,6 +73,16 @@ SOCCER — a MaxPreps printout usually has a "Field Stats" table, a Shooting tab
 - "Field Stats" table (# Athlete GP Min Goals G/G Asst Asst/G Pts P/G Stls CK): Goals→"Goals", Asst→"Assists". IGNORE Min, Pts (Points is auto-computed as Goals×2+Assists — never extract it), Stls, CK.
 - Shooting table (# Athlete GP G Shots SOG PKG PKA GWG YC RC): Shots→"Shots", SOG→"Shots on Goal". IGNORE the "G" column here (it repeats Goals), and PKG, PKA, GWG, YC, RC.
 - Goaltending tables (keepers only): Saves→"Saves", the "SO" (shutouts) column→"Shutouts". IGNORE G. Min, OT Min, Opp SOG, GA, PK Saves, PKA, Win, Loss, Tie.
+
+LACROSSE (boys and girls) — a MaxPreps printout has SEVERAL SEPARATE tables, usually across multiple pages: "Scoring", "Fielding", "Faceoffs" (boys) or "Draws" (girls), "Goaltending Stats", and "Penalties". The SAME player (match by jersey # + last name, e.g. "16 J. Shpiz" in every table) appears in several tables — you MUST read EVERY table and COMBINE all of a player's values into ONE object. Do NOT stop after the first (Scoring) table. Use these EXACT stat names; IGNORE every per-game/percentage column (G/G, A/G, P/G, GB/G, SHT%, FO%, D%, GAA, SV%):
+- Games Played (GP). Wins: read the team's OVERALL win total from the "Overall" W-L line near the top (e.g. "Overall 9-8" → 9) and set "Wins" to that number for EVERY athlete — there is no per-player wins column.
+- "Scoring" table (GP G G/G Asst A/G Pts P/G TS SOG SHT%): G→"Goals", Asst→"Assists", TS→"Total Shots", SOG→"Shots on Goal". IGNORE Pts (Points is auto-computed as Goals+Assists — never extract it) and every /G and % column.
+- "Fielding" table (boys: GP GB GB/G TO TA UE; girls: GP GB GB/G CT UE): GB→"Ground Balls", TA→"Takeaways" (boys only), CT→"Caused Turnovers" (girls only). IGNORE the TO and UE columns entirely.
+- "Faceoffs" table (BOYS only; GP FW FA FO%): FW→"Faceoff Wins", FA→"Faceoff Attempts". IGNORE FO%.
+- "Draws" table (GIRLS only; GP DC DA DW D%): DC→"Draw Controls", DA→"Draw Attempts", DW→"Draws Won". IGNORE D%.
+- "Goaltending Stats" table (MIN GA GAA SOG SVs SV% SO): MIN→"Goalie Minutes", GA→"Goals Against", SVs→"Saves", SO→"Shutouts", and the SOG column HERE→"Shots on Goal Faced" (in the goaltending table "SOG" is shots the GOALIE faced — DIFFERENT from the shooter's "Shots on Goal" in the Scoring table; keep them as two separate stats). IGNORE GAA and SV%.
+- "Penalties" table (GP P PT): P→"Penalties". PT→"Penalty Time" — this is a CLOCK value like "19:42" (minutes:seconds), so return it EXACTLY as the string "19:42" (this is the ONE stat that is a STRING, not a number; do NOT convert it to a plain number).
+- A name may carry a grade like "C. Shpiz (So)" — use the name WITHOUT the grade; if a season year is shown set gradYear from the grade (Sr = season's ending year, Jr +1, So +2, Fr +3).
 
 For other sports (volleyball, etc.) there is usually one table — use the exact stat names shown.
 Include every athlete and every stat you find. Omit zero/blank stats.`;
