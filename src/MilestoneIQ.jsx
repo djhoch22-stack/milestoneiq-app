@@ -5908,57 +5908,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 </div>
               ))}
             </div>
-            {(() => {
-              // Career stats for ACTIVE players — all stats, same order as the all-time tab /
-              // athlete profile (byStatOrder + each % right after its "Attempted" column).
-              // Name column is frozen (sticky-left); the rest scrolls horizontally.
-              const activeAthletes = careerAthletes.filter(a => a.isActive !== false);
-              const baseCols = statsToDisplay(activeAthletes, school.sport);
-              const ovCols = [];
-              for (const c of baseCols) { ovCols.push({ stat: c }); for (const d of rateDefsFor(school.sport).filter(p => p.after === c)) ovCols.push({ pct: d }); }
-              const rows = [...activeAthletes].sort((a, b) => a.name.localeCompare(b.name));
-              const cellBg = (i) => i % 2 === 0 ? "#fff" : "#fafaf8";
-              return (
-                <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden" }}>
-                  <div style={{ padding:"14px 20px",borderBottom:"1px solid #f3f0ea",fontWeight:700,fontSize:15,color:"#111",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                    <span>Career stats · active roster</span>
-                    {ovCols.length > 4 && <span style={{ fontSize:12,fontWeight:400,color:"#9ca3af" }}>scroll for more →</span>}
-                  </div>
-                  {(!rows.length || !ovCols.length) ? (
-                    <div style={{ padding:"24px 20px",color:"#9ca3af",fontSize:13 }}>No active athletes with stats yet.</div>
-                  ) : (
-                    <div style={{ overflowX:"auto" }}>
-                      <table style={{ borderCollapse:"separate", borderSpacing:0, fontSize:13, minWidth:"100%" }}>
-                        <thead><tr>
-                          <th style={{ position:"sticky", left:0, zIndex:2, background:"#fafaf8", padding:"10px 16px", textAlign:"left", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", borderRight:"1px solid #f0eeea", minWidth:170 }}>Athlete</th>
-                          {ovCols.map(col => (
-                            <th key={col.pct ? "p-"+col.pct.name : col.stat} title={col.pct ? col.pct.name : col.stat}
-                              style={{ background:"#fafaf8", padding:"10px 12px", textAlign:"center", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", whiteSpace:"nowrap" }}>
-                              {col.pct ? col.pct.short : col.stat}
-                            </th>
-                          ))}
-                        </tr></thead>
-                        <tbody>
-                          {rows.map((a, i) => (
-                            <tr key={a.id} onClick={()=>{ openAthlete(a); setActiveTab("athletes"); }} style={{ cursor:"pointer" }}>
-                              <td style={{ position:"sticky", left:0, zIndex:1, background:cellBg(i), padding:"10px 16px", borderBottom:"1px solid #f9f7f4", borderRight:"1px solid #f0eeea", minWidth:170 }}>
-                                <div style={{ fontWeight:600, color:"#111", whiteSpace:"nowrap" }}>{a.name}</div>
-                                <div style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>{a.position}{a.gradYear ? ` · Class of ${a.gradYear}` : ""}</div>
-                              </td>
-                              {ovCols.map(col => {
-                                const v = col.pct ? rateValue(col.pct, a.stats) : a.stats[col.stat];
-                                const display = col.pct ? fmtRateVal(col.pct.fmt, v) : (v != null ? Number(v).toLocaleString() : "—");
-                                return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"center", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            {/* Career-stats table moved to the Athletes tab (one home for roster stats). */}
           </div>
         )}
 
@@ -5989,123 +5939,75 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                 <button onClick={()=>setShowAddAthlete(true)} style={{ background:"#1a56db",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer" }}>+ Add player</button>
               </div>
             </div>
-            <div style={{ display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px,1fr))",gap:12 }}>
-              {careerAthletes
-                .filter(a => {
-                  const f = school._rosterFilter || "active";
-                  if (f==="active") return a.isActive !== false;
-                  if (f==="inactive") return a.isActive === false;
-                  return true;
-                })
-                .map(athlete=>{
-                const ats = getMilestoneAlerts(athlete, alertRecords, school.milestones||[], school.sport, seasonBests, notifyOpts)
-                  .filter(a => !isAlertDismissed(athlete.id, a.statName, a.target));
-                const isSelected = selectedAthlete?.id===athlete.id;
-                const isActive = athlete.isActive !== false;
-
-                const toggleActive = (e) => {
-                  e.stopPropagation();
-                  const updated = school.athletes.map(a =>
-                    a.id===athlete.id ? {...a, isActive: !isActive} : a
-                  );
-                  onUpdate({...school, athletes: updated});
-                };
-
-                // Bucket stats by group using sport definition
-                const isFootball = school.sport === "football";
-                const OFFENSE_STATS = new Set(["Pass Completions","Pass Attempts","Passing Yards","Passing TDs","Longest Pass","Passing Yards Per Game","Completions Per Game","Completion %","Passing TD %","Rushing Attempts","Rushing Yards","Rushing TDs","Longest Rush","Rushing Yards Per Game","Yards Per Rush Attempt","Receptions","Receiving Yards","Receiving TDs","Longest Reception","Targets","Receiving Yards Per Game","Yards Per Reception","Total TDs","2 Pt Conversions Made","Yards From Scrimmage","All-Purpose Yards","Total Offense","Touches","Yards Per Touch"]);
-                const DEFENSE_STATS = new Set(["Solo Tackles","Combined Tackles","Tackles For Loss","Sacks","Interceptions","Interception Return Yards","Interception Return TDs","Longest Interception Return","Passes Defended","Fumbles Forced","Fumbles Recovered","Fumble Return Yards","Fumble Return TDs","Safeties"]);
-                const SPECIAL_STATS = new Set(["Extra Points Made","Extra Points Attempted","Extra Point %","Field Goals Made","Field Goals Attempted","Field Goal %","Longest Field Goal Made","Punts","Punting Yards","Longest Punt","Yards Per Punt","Kick Returns","Kick Return Yards","Kick Return TDs","Longest Kick Return","Yards Per Kick Return","Punt Returns","Punt Return Yards","Punt Return TDs","Longest Punt Return","Yards Per Punt Return","Kick & Punt Returns","Kick & Punt Return Yards","Kick & Punt Return TDs"]);
-
-                const offStats = isFootball ? Object.entries(athlete.stats).filter(([k]) => OFFENSE_STATS.has(k) && k !== "Games Played") : [];
-                const defStats = isFootball ? Object.entries(athlete.stats).filter(([k]) => DEFENSE_STATS.has(k)) : [];
-                const stStats  = isFootball ? Object.entries(athlete.stats).filter(([k]) => SPECIAL_STATS.has(k)) : [];
-                const hasMultipleSides = false; // football now uses the canonical statsToDisplay order (all stats, in the coach's order) like every other sport
-
-                const StatGroup = ({ label, color, textColor, entries }) => entries.length === 0 ? null : (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",
-                      color:textColor, background:color, borderRadius:4, padding:"2px 6px",
-                      display:"inline-block", marginBottom:5 }}>{label}</div>
-                    <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:4 }}>
-                      {entries.map(([k,v])=>(
-                        <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                          <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
-                          <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{typeof v==="number"?v.toLocaleString():v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-
-                return (
-                  <div key={athlete.id} onClick={()=>openAthlete(athlete)}
-                    style={{ background:"#fff",borderRadius:12,
-                      border:`1px solid ${isSelected?"#1a56db":isActive?"#e8e4dd":"#e5e7eb"}`,
-                      padding:16,cursor:"pointer",opacity:isActive?1:0.6 }}>
-                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10 }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:2 }}>
-                          <div style={{ fontWeight:700,fontSize:15,color:isActive?"#111":"#6b7280" }}>{athlete.name}</div>
-                          {!isActive && <span style={{ background:"#f3f4f6",color:"#9ca3af",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:600 }}>Inactive</span>}
-                        </div>
-                        <div style={{ fontSize:12,color:"#6b7280" }}>
-                          {athlete.position} · Class of {athlete.gradYear}
-                          {isFootball && hasMultipleSides && <span style={{ marginLeft:6,background:"#eff6ff",color:"#1e40af",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:600 }}>2-way</span>}
-                        </div>
-                      </div>
-                      <div style={{ display:"flex",gap:6,alignItems:"center",flexShrink:0,marginLeft:8 }}>
-                        {ats.length>0&&isActive&&<span style={{ background:"#fef3c7",color:"#92400e",borderRadius:12,padding:"3px 10px",fontSize:12,fontWeight:700 }}>{ats.length} 🔔</span>}
-                        <button onClick={toggleActive}
-                          style={{ background:isActive?"#f0fdf4":"#f3f4f6",
-                            border:`1px solid ${isActive?"#86efac":"#e5e7eb"}`,
-                            borderRadius:6,padding:"3px 10px",fontSize:11,cursor:"pointer",
-                            color:isActive?"#14532d":"#6b7280",fontWeight:600,whiteSpace:"nowrap" }}>
-                          {isActive?"✓ Active":"Set active"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {hasMultipleSides ? (
-                      <div>
-                        <StatGroup label="Offense" color="#dbeafe" textColor="#1e40af" entries={offStats} />
-                        <StatGroup label="Defense" color="#fee2e2" textColor="#991b1b" entries={defStats} />
-                        <StatGroup label="Special Teams" color="#ffedd5" textColor="#c2410c" entries={stStats} />
-                      </div>
-                    ) : (
-                      <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:5 }}>
-                        {(() => {
-                          const grouped = groupOrderFor(school.sport).length > 0; let lastG = null;
-                          return statsToDisplay([athlete], school.sport)
-                          .flatMap((k)=>{
-                            const out = [];
-                            if (grouped) { const gp = groupOfStat(school.sport, k); if (gp && gp !== lastG) { out.push(<div key={"h-"+gp} style={{gridColumn:"1 / -1",marginTop:2}}><span style={{fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:(GROUP_STYLE[gp]||{}).fg||"#334155",background:(GROUP_STYLE[gp]||{}).bg||"#f1f5f9",borderRadius:4,padding:"1px 6px"}}>{gp}</span></div>); lastG = gp; } }
-                            const v = athlete.stats?.[k];
-                            out.push(
-                              <div key={k} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                                <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{k}</div>
-                                <div style={{ fontSize:13,fontWeight:600,color: v==null?"#d1d5db":"#111" }}>{v==null?"—":(typeof v==="number"?v.toLocaleString():v)}</div>
-                              </div>
-                            );
-                            // After its anchor column, each derived rate (FG%/3P%/FT% · AVG/OBP/SLG/OPS/Fielding %).
-                            for (const d of rateDefsFor(school.sport).filter(p => p.after === k)) {
-                              const rv = rateValue(d, athlete.stats);
-                              if (rv != null) out.push(
-                                <div key={d.name} style={{ background:"#f9fafb",borderRadius:6,padding:"5px 8px" }}>
-                                  <div style={{ fontSize:10,color:"#9ca3af",lineHeight:1.2 }}>{d.name}</div>
-                                  <div style={{ fontSize:13,fontWeight:600,color:"#111" }}>{fmtRateVal(d.fmt, rv)}</div>
+            {(() => {
+              const f = school._rosterFilter || "active";
+              const filtered = careerAthletes.filter(a => {
+                if (f === "active") return a.isActive !== false;
+                if (f === "inactive") return a.isActive === false;
+                return true;
+              });
+              const baseCols = statsToDisplay(filtered, school.sport);
+              const ovCols = [];
+              for (const c of baseCols) { ovCols.push({ stat: c }); for (const d of rateDefsFor(school.sport).filter(p => p.after === c)) ovCols.push({ pct: d }); }
+              const rows = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+              const cellBg = (i) => i % 2 === 0 ? "#fff" : "#fafaf8";
+              if (!rows.length) return (
+                <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",padding:"24px 20px",color:"#9ca3af",fontSize:13 }}>
+                  No {f==="inactive" ? "inactive " : f==="active" ? "active " : ""}athletes yet — use <strong>Import season stats</strong> above, or <strong>+ Add player</strong>.
+                </div>
+              );
+              return (
+                <div style={{ background:"#fff",borderRadius:12,border:"1px solid #e8e4dd",overflow:"hidden" }}>
+                  <div style={{ overflowX:"auto" }}>
+                    <table style={{ borderCollapse:"separate", borderSpacing:0, fontSize:13, minWidth:"100%" }}>
+                      <thead><tr>
+                        <th style={{ position:"sticky", left:0, zIndex:2, background:"#fafaf8", padding:"10px 16px", textAlign:"left", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", borderRight:"1px solid #f0eeea", minWidth:200 }}>Athlete</th>
+                        {ovCols.map(col => (
+                          <th key={col.pct ? "p-"+col.pct.name : col.stat} title={col.pct ? col.pct.name : col.stat}
+                            style={{ background:"#fafaf8", padding:"10px 12px", textAlign:"center", fontSize:12, color:"#6b7280", fontWeight:600, borderBottom:"1px solid #f3f0ea", whiteSpace:"nowrap" }}>
+                            {col.pct ? col.pct.short : col.stat}
+                          </th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {rows.map((a, i) => {
+                          const isActive = a.isActive !== false;
+                          const ats = getMilestoneAlerts(a, alertRecords, school.milestones||[], school.sport, seasonBests, notifyOpts)
+                            .filter(al => !isAlertDismissed(a.id, al.statName, al.target));
+                          const toggleActive = (e) => {
+                            e.stopPropagation();
+                            onUpdate({ ...school, athletes: school.athletes.map(x => x.id===a.id ? { ...x, isActive: !isActive } : x) });
+                          };
+                          return (
+                            <tr key={a.id} onClick={()=>openAthlete(a)} style={{ cursor:"pointer", opacity: isActive ? 1 : 0.55 }}>
+                              <td style={{ position:"sticky", left:0, zIndex:1, background:cellBg(i), padding:"10px 16px", borderBottom:"1px solid #f9f7f4", borderRight:"1px solid #f0eeea", minWidth:200 }}>
+                                <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                                  <span style={{ fontWeight:600, color:"#111", whiteSpace:"nowrap" }}>{a.name}</span>
+                                  {!isActive && <span style={{ background:"#f3f4f6",color:"#9ca3af",borderRadius:4,padding:"1px 6px",fontSize:10,fontWeight:600 }}>Inactive</span>}
+                                  {ats.length>0 && isActive && <span style={{ background:"#fef3c7",color:"#92400e",borderRadius:10,padding:"1px 7px",fontSize:11,fontWeight:700 }}>{ats.length} 🔔</span>}
                                 </div>
-                              );
-                            }
-                            return out;
-                          });
-                          })()}
-                      </div>
-                    )}
+                                <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:3 }}>
+                                  <span style={{ fontSize:11, color:"#9ca3af", whiteSpace:"nowrap" }}>{a.position}{a.gradYear ? ` · Class of ${a.gradYear}` : ""}</span>
+                                  <button onClick={toggleActive}
+                                    style={{ background:isActive?"#f0fdf4":"#f3f4f6", border:`1px solid ${isActive?"#86efac":"#e5e7eb"}`, borderRadius:6, padding:"1px 8px", fontSize:10, cursor:"pointer", color:isActive?"#14532d":"#6b7280", fontWeight:600, whiteSpace:"nowrap" }}>
+                                    {isActive ? "✓ Active" : "Set active"}
+                                  </button>
+                                </div>
+                              </td>
+                              {ovCols.map(col => {
+                                const v = col.pct ? rateValue(col.pct, a.stats) : a.stats[col.stat];
+                                const display = col.pct ? fmtRateVal(col.pct.fmt, v) : (v != null ? Number(v).toLocaleString() : "—");
+                                return <td key={col.pct ? "p-"+col.pct.name : col.stat} style={{ padding:"10px 12px", textAlign:"center", color: v != null ? "#111" : "#d1d5db", background:cellBg(i), borderBottom:"1px solid #f9f7f4", whiteSpace:"nowrap" }}>{display}</td>;
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })()}
             {selectedAthlete && (
               <PlayerProfileModal
                 player={selectedAthlete}
