@@ -144,8 +144,8 @@ const FLAG_FOOTBALL_GROUPS = [
 // (Shooting %, Faceoff %/Draw %, Save %, GAA) live in LACROSSE_RATE_DEFS. Points = Goals + Assists,
 // auto-computed in the DB (NOT entered) — same mechanism as soccer, different formula.
 const LAX_WITH_AVG = ["Career total", "Single season", "Single game", "Per game avg (season)", "Per game avg (career)"];
-const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
-const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Goals Against", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
+const LACROSSE_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Total Shots", "Shots on Goal", "Ground Balls", "Takeaways", "Faceoff Wins", "Faceoff Attempts", "Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties", "Penalty Time"];
+const LACROSSE_GIRLS_DISPLAY = ["Games Played", "Wins", "Goals", "Assists", "Points", "Shots on Goal", "Ground Balls", "Caused Turnovers", "Draw Controls", "Draw Attempts", "Draws Won", "Goalie Minutes", "Shots on Goal Faced", "Saves", "Shutouts", "Goalie Wins", "Penalties"];
 const LACROSSE_GROUPS = [
   { group: "General", stats: [
     { name: "Games Played", variants: ["Career total", "Single season"] },
@@ -168,7 +168,6 @@ const LACROSSE_GROUPS = [
   ]},
   { group: "Goaltending", stats: [
     { name: "Goalie Minutes", variants: ["Career total", "Single season"] },
-    { name: "Goals Against", variants: ["Career total", "Single season"] },
     { name: "Shots on Goal Faced", variants: LAX_WITH_AVG },
     { name: "Saves", variants: LAX_WITH_AVG },
     { name: "Shutouts", variants: [] },
@@ -204,7 +203,6 @@ const LACROSSE_GIRLS_GROUPS = [
   ]},
   { group: "Goaltending", stats: [
     { name: "Goalie Minutes", variants: ["Career total", "Single season"] },
-    { name: "Goals Against", variants: ["Career total", "Single season"] },
     { name: "Shots on Goal Faced", variants: LAX_WITH_AVG },
     { name: "Saves", variants: LAX_WITH_AVG },
     { name: "Shutouts", variants: [] },
@@ -226,7 +224,7 @@ const LACROSSE_RATE_DEFS = [
     calc: (g) => { const fa = g("Faceoff Attempts"); return fa > 0 ? g("Faceoff Wins") / fa : null; }, note: (g) => `${g("Faceoff Attempts").toLocaleString()} FO` },
   { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400,
     calc: (g) => { const sf = g("Saves") + g("Goals Against"); return sf > 0 ? g("Saves") / sf : null; }, note: (g) => `${(g("Saves") + g("Goals Against")).toLocaleString()} SOG` },
-  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
+  { name: "Goals Against Average", short: "GAA", after: "Saves", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
     calc: (g) => { const m = g("Goalie Minutes"); return m > 0 ? (g("Goals Against") * 48) / m : null; }, note: (g) => `${g("Goalie Minutes").toLocaleString()} min` },
 ];
 const LACROSSE_GIRLS_RATE_DEFS = [
@@ -236,7 +234,7 @@ const LACROSSE_GIRLS_RATE_DEFS = [
     calc: (g) => { const da = g("Draw Attempts"); return da > 0 ? g("Draws Won") / da : null; }, note: (g) => `${g("Draw Attempts").toLocaleString()} draws` },
   { name: "Save %", short: "SV%", after: "Saves", fmt: "avg3", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400,
     calc: (g) => { const sf = g("Saves") + g("Goals Against"); return sf > 0 ? g("Saves") / sf : null; }, note: (g) => `${(g("Saves") + g("Goals Against")).toLocaleString()} SOG` },
-  { name: "Goals Against Average", short: "GAA", after: "Goals Against", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
+  { name: "Goals Against Average", short: "GAA", after: "Saves", fmt: "era2", qualStat: "Goalie Minutes", minSeason: 150, minCareer: 400, lowerIsBetter: true,
     calc: (g) => { const m = g("Goalie Minutes"); return m > 0 ? (g("Goals Against") * 48) / m : null; }, note: (g) => `${g("Goalie Minutes").toLocaleString()} min` },
 ];
 
@@ -513,7 +511,7 @@ const DISPLAY_STATS = {
 const ALL_DISPLAY_STATS = new Set(Object.values(DISPLAY_STATS).flat());
 // Stats stored + imported ONLY to feed a derived rate — never shown as a column or record. Volleyball's
 // "Serve Errors" powers Serve % but isn't a displayed stat (keeps the "no error leaderboards" rule).
-const HIDDEN_INPUT_STATS = new Set(["Serve Errors"]);
+const HIDDEN_INPUT_STATS = new Set(["Serve Errors", "Goals Against", "Turnovers"]);
 // Shown ONLY in the season-by-season table (where it sums), never as a leaderboard / profile-tile /
 // overview column — Penalty Time is a mm:ss clock, meaningful per season but not a stat you rank by.
 const SEASON_ONLY_STATS = new Set(["Penalty Time"]);
@@ -2348,7 +2346,7 @@ function PlayerSeasons({ programId, playerName, sport, columns = [], allStats = 
   const sportCols = (SPORTS[sport]?.groups || []).filter(g => g.group !== "Coaching").flatMap(g => (g.stats || []).map(s => s.name));
   const editCols = (sportCols.length ? sportCols : (allStats.length ? allStats : (columns || []))).filter(c => !(POINTS_AUTO_SPORTS.has(sport) && c === "Points"));
   const hasVal = (c) => Number(careerStats?.[c]) > 0 || (rows || []).some(r => Number(r.stats?.[c]) > 0);
-  const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c));
+  const extraKeys = [...new Set((rows || []).flatMap(r => Object.keys(r.stats || {})))].filter(c => !editCols.includes(c) && !HIDDEN_INPUT_STATS.has(c));
   const viewCols = [...editCols, ...extraKeys].filter(hasVal);
   const startEdit = () => { setDraft((rows || []).map(r => ({ ...r, stats: { ...(r.stats || {}) } }))); setErr(""); setEditing(true); };
   const cancel = () => { setEditing(false); setErr(""); };
