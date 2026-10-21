@@ -45,6 +45,14 @@ export function withDerivedStats(stats, sport) {
     if (pts > 0) out["Points"] = pts; else delete out["Points"]; // >0 only → non-scorers stay blank (like APY)
     return out;
   }
+  if (sport === "lacrosse" || sport === "lacrosse_girls") {
+    // Lacrosse Points = Goals + Assists (1 each). DERIVED on read (never entered) so it covers every
+    // historical season/career and never drifts — same mechanism as football Points, different formula.
+    const g = Number(stats["Goals"]) || 0, a = Number(stats["Assists"]) || 0, pts = g + a;
+    const out = { ...stats };
+    if (pts > 0) out["Points"] = pts; else delete out["Points"]; // >0 only → non-scorers stay blank
+    return out;
+  }
   return stats;
 }
 
@@ -94,6 +102,8 @@ export const HOF_STAT_WEIGHTS = {
   "Pitcher Saves": 6, "Pitcher Shut Outs": 6, "Pitcher Complete Games": 4, "Put Outs": 3,
   // Girls volleyball
   "Kills": 10, "Digs": 7, "Aces": 7, "Total Blocks": 8,
+  // Lacrosse (Goals / Assists / Saves / Shots on Goal / Shutouts reuse the flat weights above)
+  "Ground Balls": 5, "Takeaways": 5, "Caused Turnovers": 5, "Faceoff Wins": 5, "Draw Controls": 6, "Total Shots": 3,
   // Generic
   "Coach Wins": 0,
 };
@@ -103,6 +113,7 @@ export const SPORT_STAT_OVERRIDES = {
   baseball:   { "Assists": 4 },                                       // fielding assists (minor), not setting
   volleyball: { "Assists": 9, "Receptions": 5, "Solo Blocks": 5 },    // setting / serve-receive / solo stuffs
   football:   { "Field Goals Made": 6, "Points": 0 },                 // kicker FGs; Points is a derived composite — kept out of HOF
+  lacrosse:   { "Points": 8 },                                        // Points (goals+assists) overlaps Goals, like soccer
 };
 // Rate-stat records that COUNT toward HOF (importance ÷ 10); the qualified leader holds the "title".
 export const HOF_RATE_WEIGHTS = { "Batting Average": 9, "ERA": 9, "Kill Percentage": 8 };
@@ -113,6 +124,7 @@ export function sportGroup(sport) {
   if (s.indexOf("basketball") === 0) return "basketball";
   if (s.indexOf("soccer") === 0) return "soccer";
   if (s.indexOf("volleyball") === 0) return "volleyball";
+  if (s.indexOf("lacrosse") === 0) return "lacrosse";
   if (s === "baseball" || s === "softball") return "baseball";
   if (s === "football" || s === "flag_football_girls") return "football";
   return s;
