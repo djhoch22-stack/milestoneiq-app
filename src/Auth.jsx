@@ -1,5 +1,5 @@
 // ── Auth.jsx ──────────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import raftersLogo from '../raftersiq-logo.png';
 import useIsMobile from './useIsMobile';
 import {
@@ -9,6 +9,102 @@ import {
   createOrg,
   seedDCPrograms,
 } from './supabase_client';
+
+// Self-playing product tour that replaces the old promo video. Pure CSS/React
+// animation (no video file). Uses the fictional Cedar Hollow demo — no real data.
+function ProductTour({ isMobile }) {
+  const [i, setI] = useState(0);
+  const scenes = [
+    { step: 1, label: "Import your stats", caption: "Upload a MaxPreps PDF — the AI reads every player and stat for you." },
+    { step: 2, label: "We build your record book", caption: "Career totals, school records, and leaderboards — computed automatically." },
+    { step: 3, label: "Auto-built Hall of Fame", caption: "Every program gets an auto-scored Hall of Fame for athletes and coaches." },
+    { step: 4, label: "Share your public page", caption: "A clean, shareable record book for banquets, recruiting, and alumni." },
+  ];
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % 4), 3800);
+    return () => clearInterval(t);
+  }, []);
+  const pad = isMobile ? "16px" : "24px 30px";
+  let body;
+  if (i === 0) {
+    body = (
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, height:"100%", minHeight: isMobile?200:250 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ width:84, height:104, borderRadius:10, border:"1px solid #e5e7eb", background:"#fff", boxShadow:"0 4px 14px rgba(0,0,0,.08)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6 }}>
+            <div style={{ fontSize:26 }}>📄</div>
+            <div style={{ fontSize:10, fontWeight:700, color:"#ef4444" }}>PDF</div>
+          </div>
+          <div style={{ fontSize:26, color:"#1a56db" }}>→</div>
+          <div style={{ background:"#eff6ff", color:"#1e40af", borderRadius:10, padding:"12px 16px", fontSize:14, fontWeight:600 }}>Reading 14 players…</div>
+        </div>
+        <div style={{ fontSize:13, color:"#6b7280" }}>MaxPreps_Boys_Basketball.pdf</div>
+      </div>
+    );
+  } else if (i === 1) {
+    const rows = [["🥇","Garrett Mercer","2,004"],["🥈","Nathan Esposito","1,557"],["🥉","Cooper Rhodes","1,432"],["4","Hunter Bequette","953"]];
+    body = (
+      <div>
+        <div style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:".06em", color:"#6b7280", marginBottom:10 }}>Boys Basketball · Career Points</div>
+        {rows.map((r, idx) => (
+          <div key={idx} style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 12px", borderRadius:8, background: idx % 2 ? "#faf9f6" : "#fff", borderBottom:"1px solid #f0eeea" }}>
+            <span style={{ width:24, textAlign:"center" }}>{r[0]}</span>
+            <span style={{ flex:1, fontWeight:600 }}>{r[1]}</span>
+            <span style={{ fontWeight:700, fontVariantNumeric:"tabular-nums" }}>{r[2]}</span>
+          </div>
+        ))}
+      </div>
+    );
+  } else if (i === 2) {
+    const hof = [["Garrett Mercer","Boys Basketball · 2017"],["Hadley Stroud","Girls Volleyball · 2015"],["Drew Vaughn","Football · 2013"],["Teagan Pemberton","Girls Soccer · 2020"]];
+    body = (
+      <div>
+        <div style={{ fontSize:16, fontWeight:800, marginBottom:12 }}>🏛️ Hall of Fame</div>
+        <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:10 }}>
+          {hof.map((h, idx) => (
+            <div key={idx} style={{ display:"flex", alignItems:"center", gap:10, border:"1px solid #f0eeea", borderRadius:10, padding:"10px 12px" }}>
+              <div style={{ width:34, height:34, borderRadius:"50%", background:"#1a7a4c", color:"#f5c542", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:13 }}>{h[0].split(" ").map((w) => w[0]).join("")}</div>
+              <div><div style={{ fontWeight:600, fontSize:14 }}>{h[0]}</div><div style={{ fontSize:12, color:"#9ca3af" }}>{h[1]}</div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  } else {
+    const chips = ["🏈 Football","🏀 Boys Basketball","🏀 Girls Basketball","⚾ Baseball","🥎 Softball","⚽ Boys Soccer","⚽ Girls Soccer","🏐 Girls Volleyball","🏐 Boys Volleyball","🥍 Boys Lacrosse","🥍 Girls Lacrosse","🏈 Girls Flag Football"];
+    body = (
+      <div>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+          <div style={{ width:40, height:40, borderRadius:8, background:"#1a7a4c", color:"#f5c542", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 }}>CH</div>
+          <div><div style={{ fontWeight:800, fontSize:16 }}>Cedar Hollow High School</div><div style={{ fontSize:12, color:"#9ca3af" }}>12 programs · all-time records & Hall of Fame</div></div>
+        </div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
+          {chips.map((c, idx) => (<span key={idx} style={{ fontSize:12, fontWeight:600, background:"#f1efe8", borderRadius:999, padding:"5px 11px" }}>{c}</span>))}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ maxWidth:760, margin:"0 auto", padding: isMobile ? "0 16px 8px" : "0 24px 12px" }}>
+      <style>{"@keyframes chFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}"}</style>
+      <div style={{ border:"1px solid #e8e4dd", borderRadius:14, boxShadow:"0 12px 32px rgba(17,24,39,0.13)", overflow:"hidden", background:"#fff" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:7, padding:"9px 14px", background:"#f7f6f2", borderBottom:"1px solid #ececec" }}>
+          <span style={{ width:10, height:10, borderRadius:"50%", background:"#f87171" }}></span>
+          <span style={{ width:10, height:10, borderRadius:"50%", background:"#fbbf24" }}></span>
+          <span style={{ width:10, height:10, borderRadius:"50%", background:"#34d399" }}></span>
+          <span style={{ marginLeft:10, fontSize:12, color:"#9ca3af", fontFamily:"ui-monospace,monospace" }}>raftersiq.com/school/cedar-hollow-high-school</span>
+        </div>
+        <div key={i} style={{ padding: pad, minHeight: isMobile ? 230 : 290, animation:"chFade .5s ease" }}>{body}</div>
+      </div>
+      <div style={{ textAlign:"center", marginTop:14 }}>
+        <div style={{ fontWeight:700, fontSize:15 }}>{scenes[i].step}. {scenes[i].label}</div>
+        <div style={{ fontSize:13, color:"#6b7280", marginTop:2 }}>{scenes[i].caption}</div>
+        <div style={{ display:"flex", justifyContent:"center", gap:6, marginTop:10 }}>
+          {scenes.map((_, idx) => (<span key={idx} onClick={() => setI(idx)} style={{ width: idx === i ? 20 : 8, height:8, borderRadius:999, background: idx === i ? "#1a56db" : "#d1d5db", cursor:"pointer", transition:"all .3s" }}></span>))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const STRIPE_KEY =
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
@@ -868,19 +964,8 @@ function LandingPage({ onStartTrial, onSignIn }) {
         <div style={{ fontSize:13, color:"#9ca3af", marginTop:14 }}>No credit card required · Cancel anytime</div>
       </div>
 
-      {/* Promo video */}
-      <div style={{ maxWidth:760, margin:"0 auto", padding: isMobile ? "0 16px 8px" : "0 24px 12px" }}>
-        <video
-          controls
-          preload="none"
-          poster="/raftersiq-promo-poster.jpg"
-          playsInline
-          style={{ width:"100%", borderRadius:14, border:"1px solid #e8e4dd", boxShadow:"0 12px 32px rgba(17,24,39,0.13)", background:"#000", display:"block" }}
-        >
-          <source src="/raftersiq-promo.mp4" type="video/mp4" />
-          <a href="/raftersiq-promo.mp4">Watch the RaftersIQ demo</a>
-        </video>
-      </div>
+      {/* Promo product tour — animated, self-playing (replaces the old DC video) */}
+      <ProductTour isMobile={isMobile} />
 
       {/* How it works */}
       <div style={{ padding: wrapPad, maxWidth:1120, margin:"0 auto" }}>
