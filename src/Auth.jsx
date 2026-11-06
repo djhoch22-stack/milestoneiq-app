@@ -863,7 +863,7 @@ function LandingPage({ onStartTrial, onSignIn }) {
         <p style={{ fontSize: isMobile ? 16 : 20, color:"#4b5563", lineHeight:1.5, margin:"0 0 28px" }}>RaftersIQ tracks careers, seasons, records, and milestones — and auto-builds your Hall of Fame for athletes and coaches across every sport.</p>
         <div style={{ display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap" }}>
           <button onClick={onStartTrial} style={{ background:"#1a56db", color:"#fff", border:"none", borderRadius:10, padding:"14px 28px", fontSize:16, fontWeight:700, cursor:"pointer" }}>Start your 7-day free trial →</button>
-          <a href="/teams/denver-christian-basketball-boys" target="_blank" rel="noreferrer" style={{ background:"#fff", color:"#1a56db", border:"1px solid #bfdbfe", borderRadius:10, padding:"14px 24px", fontSize:16, fontWeight:600, cursor:"pointer", textDecoration:"none", display:"inline-block" }}>▶ See a live example</a>
+          <a href="/school/cedar-hollow-high-school" target="_blank" rel="noreferrer" style={{ background:"#fff", color:"#1a56db", border:"1px solid #bfdbfe", borderRadius:10, padding:"14px 24px", fontSize:16, fontWeight:600, cursor:"pointer", textDecoration:"none", display:"inline-block" }}>▶ See a live example</a>
         </div>
         <div style={{ fontSize:13, color:"#9ca3af", marginTop:14 }}>No credit card required · Cancel anytime</div>
       </div>
@@ -900,7 +900,7 @@ function LandingPage({ onStartTrial, onSignIn }) {
           ))}
         </div>
         <div style={{ textAlign:"center", marginTop:28 }}>
-          <a href="/teams/denver-christian-basketball-boys" target="_blank" rel="noreferrer" style={{ color:"#1a56db", fontWeight:700, fontSize:15, textDecoration:"none" }}>▶ Explore a real record book — Denver Christian boys basketball →</a>
+          <a href="/teams/cedar-hollow-high-school-basketball-boys" target="_blank" rel="noreferrer" style={{ color:"#1a56db", fontWeight:700, fontSize:15, textDecoration:"none" }}>▶ Explore an example record book — Cedar Hollow boys basketball →</a>
         </div>
       </div>
 
