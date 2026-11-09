@@ -43,6 +43,8 @@ FOOTBALL — use these EXACT stat names (the coach's set), mapping the column wi
 - "Punts" section: P→"Punts", Yds→"Punt Yards", Lng→"Longest Punt"
 - "Kickoffs" section: KO→"Kick Offs", Yds→"Kick Off Yards", Lng→"Longest Kick Off"
 - "Kickoff and Punt Returns" section: "KO Rets"→"Kick Off Returns", the Yds right after KO Rets→"Kick Off Return Yards", any TD there→"Kick Off Return TDs"; "P Rets"→"Punt Returns", the Yds right after P Rets→"Punt Return Yards", any TD there→"Punt Return TDs", the KO Ret Lng→"Longest Kick Off Return", the P Ret Lng→"Longest Punt Return" (ignore Avg/FC and the combined "KR Yds" total)
+- "Conversions" section (the dedicated 2-point-conversion table; columns are #, Athlete Name, GP, C Rush, C Rec, Total): map Total→"2 Point Conversions" — the COUNT of 2-point conversions a player scored (Total = C Rush + C Rec). Rows frequently OMIT a zero component column, so a player with no receiving conversion shows just ONE number between GP and Total; read "2 Point Conversions" as the LAST (rightmost) number in that athlete's row, NEVER by fixed column position, and never mistake C Rush or C Rec alone for the Total.
+- IGNORE the "Scoring" section entirely (its columns: Points, TDs, TD Pts, Conv, S, Kick Pts, Tot Pts, P/G) — those are derived point totals the app recomputes from the counting stats above. In particular its "Conv" column is conversion POINTS (2× the count), NOT a count — do NOT map it to "2 Point Conversions"; always take the count from the "Conversions" section's Total instead.
 - Also include "Total TDs" = Rushing TDs + Receiving TDs (do NOT count passing TDs).
 
 FLAG FOOTBALL (girls flag football) — read Passing/Rushing/Receiving exactly like FOOTBALL above, PLUS:
