@@ -5212,6 +5212,7 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
   const [selected, setSelected] = useState([]);   // honor keys picked (multi-select, like the Seasons-tab note chips)
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [nameFocus, setNameFocus] = useState(false);
   const isCoach = form.scope === "coach";
   const honorOptions = isCoach
     ? [{ key:"coy_league", kind:"coach_of_year", level:"league", label:"League Coach of the Year" },
@@ -5264,10 +5265,37 @@ function AwardsModal({ school, awards, onClose, onChanged }) {
               <input value={form.season} onChange={e=>setForm(f=>({...f, season:e.target.value}))} placeholder="2024-2025" style={{...inp, width:"100%"}} />
             </div>
           </div>
-          <div style={{ marginBottom:10 }}>
+          <div style={{ marginBottom:10, position:"relative" }}>
             <label style={lbl}>{isCoach ? "Coach" : "Player"} name</label>
-            <input list="awards-names" value={form.holder_name} onChange={e=>setForm(f=>({...f, holder_name:e.target.value}))} placeholder="Start typing a name…" style={{...inp, width:"100%"}} />
-            <datalist id="awards-names">{(isCoach ? coachNames : playerNames).map(n=><option key={n} value={n} />)}</datalist>
+            <input
+              value={form.holder_name}
+              onChange={e=>{ setForm(f=>({...f, holder_name:e.target.value})); setNameFocus(true); }}
+              onFocus={()=>setNameFocus(true)}
+              onBlur={()=>setTimeout(()=>setNameFocus(false), 150)}
+              placeholder="Start typing a name…"
+              autoComplete="off"
+              style={{...inp, width:"100%"}}
+            />
+            {nameFocus && form.holder_name.trim().length > 0 && (() => {
+              const q = form.holder_name.trim().toLowerCase();
+              const matches = (isCoach ? coachNames : playerNames).filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+              if (!matches.length) return null;
+              return (
+                <div style={{ position:"absolute", left:0, right:0, top:"100%", zIndex:30, background:"#fff", border:"1px solid #d1d5db", borderRadius:8, boxShadow:"0 8px 24px rgba(0,0,0,0.12)", marginTop:4, maxHeight:220, overflowY:"auto" }}>
+                  {matches.map(n => (
+                    <div
+                      key={n}
+                      onMouseDown={e=>{ e.preventDefault(); setForm(f=>({...f, holder_name:n})); setNameFocus(false); }}
+                      onMouseEnter={e=>{ e.currentTarget.style.background = "#f3f4f6"; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.background = "#fff"; }}
+                      style={{ padding:"8px 12px", fontSize:13, color:"#111", background:"#fff", cursor:"pointer" }}
+                    >
+                      {n}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <div style={{ marginBottom:12 }}>
             <label style={lbl}>Honors — pick one or more</label>
