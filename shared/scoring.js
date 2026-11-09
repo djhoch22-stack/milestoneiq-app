@@ -25,6 +25,11 @@ export function withDerivedStats(stats, sport) {
     // wasn't entered. DERIVED so it auto-covers every historical season/career and never goes stale.
     const compTD = n("Rushing TDs") + n("Receiving TDs") + n("Punt Return TDs") + n("Kick Off Return TDs");
     const scoredTD = Math.max(n("Total TDs"), compTD);
+    // Surface Total TDs from its components when only those were entered (e.g. a manual "add a rushing TD"
+    // left Total TDs blank) so the season view + Points agree. Never lowers a stored value (defensive/
+    // return TDs live only in Total TDs) — same max() as scoredTD. The career rollup applies the identical
+    // per-season GREATEST in recompute_career_from_seasons so the all-time Points record can't go stale.
+    if (scoredTD > 0) out["Total TDs"] = scoredTD;
     let pts;
     if (sport === "football") {
       // 6×TD + 3×FG + 1×PAT + 2×2-pt conversion + 2×safety
