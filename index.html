@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- App is light-only: force native controls (datalist popups, selects) to light so
+         their text stays dark-on-white on dark-mode OSes (fixes invisible autocomplete names in Safari). -->
+    <meta name="color-scheme" content="light" />
+    <style>:root { color-scheme: light; }</style>
 
     <!-- Primary meta -->
     <title>RaftersIQ — High School Stats, Records &amp; Hall of Fame Software</title>
