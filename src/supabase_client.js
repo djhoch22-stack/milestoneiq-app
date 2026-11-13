@@ -286,6 +286,27 @@ export const recomputeCareerFromSeasons = async (programId) => {
   return { error };
 };
 
+// ── Per-game box scores (player_games) ───────────────────────────────────────
+// Each box score is ONE game, keyed by its own UUID. Save = delete that game's rows then insert, so
+// re-dropping the same file replaces it (idempotent — never double-counts). rows: [{ player_name, jersey, stats }].
+export const savePlayerGames = async (programId, season, gameId, opponent, rows) => {
+  const del = await supabase.from('player_games').delete().eq('program_id', programId).eq('game_id', gameId);
+  if (del.error) return { error: del.error };
+  const payload = (rows || []).map((r) => ({
+    program_id: programId, season, kind: 'game', game_id: gameId, opponent: opponent || null,
+    player_name: r.player_name, jersey: r.jersey ?? null, stats: r.stats || {},
+  }));
+  if (!payload.length) return { data: { inserted: 0 } };
+  const { error } = await supabase.from('player_games').insert(payload);
+  return error ? { error } : { data: { inserted: payload.length } };
+};
+
+// Derive a season's player_seasons rows from its games/baseline, then roll up to career (one RPC call).
+export const recomputeSeasonFromGames = async (programId, season) => {
+  const { error } = await supabase.rpc('recompute_season_from_games', { p_program: programId, p_season: season });
+  return { error };
+};
+
 // Rename a player across all of a program's data (season rows, rosters, records, awards). Renaming to a
 // name that already exists MERGES the two into one. Recompute happens server-side inside the function.
 export const renamePlayer = async (programId, oldName, newName) => {
