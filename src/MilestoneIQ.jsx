@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, withDerivedStats, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, savePlayerGames, recomputeSeasonFromGames, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, withDerivedStats, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -3658,6 +3658,51 @@ function ImportHelpModal({ sport, onClose }) {
     </div>
   );
 }
+// ── Per-game basketball box scores ───────────────────────────────────────────
+// A box score is a tiny file: line 1 = the game's own UUID, line 2 = a pipe-delimited header starting with
+// "Jersey", then one pipe-delimited row per player. Players are identified by JERSEY only, so the active
+// roster's jersey→name map resolves them at import. FG = 2PT + 3PT; each line counts as 1 game played.
+const BOXSCORE_DIRECT = {
+  Points: "Points", ThreePointsMade: "Three Pointers Made", ThreePointAttempts: "Three Pointers Attempted",
+  FreeThrowsMade: "Free Throws Made", FreeThrowAttempts: "Free Throws Attempted",
+  OffensiveRebounds: "Offensive Rebounds", DefensiveRebounds: "Defensive Rebounds", Rebounds: "Total Rebounds",
+  Assists: "Assists", BlockedShots: "Blocks", Steals: "Steals", Turnovers: "Turnovers",
+};
+const BOXSCORE_DROP = new Set(["PersonalFouls", "Deflections", "Charges"]);
+const BOXSCORE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isBoxScore(text) {
+  const ls = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return ls.length >= 3 && BOXSCORE_UUID_RE.test(ls[0]) && ls[1].includes("|") && /jersey/i.test(ls[1]);
+}
+function opponentFromBoxScoreName(fname) {
+  const b = String(fname || "").replace(/\.[^.]+$/, "");
+  const parts = b.split(/-vs-/i);
+  if (parts.length < 2) return null;
+  return parts[1].replace(/%[0-9a-f]{2}/gi, "").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim() || null;
+}
+// Parse a basketball box score → { gameId, opponent, rows:[{ jersey, stats }] } with stats already mapped to
+// the RaftersIQ set (FG = 2PT+3PT, GP = 1, zero values dropped). Returns null if the text isn't a box score.
+function parseBasketballBoxScore(text, fname) {
+  if (!isBoxScore(text)) return null;
+  const ls = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const header = ls[1].split("|").map((h) => h.trim());
+  const rows = [];
+  for (let i = 2; i < ls.length; i++) {
+    const cells = ls[i].split("|").map((c) => c.trim());
+    if (cells.length !== header.length) continue;
+    const num = (k) => { const j = header.indexOf(k); const v = j >= 0 ? Number(cells[j]) : 0; return Number.isFinite(v) ? v : 0; };
+    const stats = { "Games Played": 1,
+      "Field Goals Made": num("TwoPointsMade") + num("ThreePointsMade"),
+      "Field Goals Attempted": num("TwoPointAttempts") + num("ThreePointAttempts") };
+    for (const col of header) {
+      if (col === "Jersey" || BOXSCORE_DROP.has(col) || col.indexOf("TwoPoint") === 0) continue;
+      if (BOXSCORE_DIRECT[col]) stats[BOXSCORE_DIRECT[col]] = num(col);
+    }
+    for (const k of Object.keys(stats)) if (k !== "Games Played" && !stats[k]) delete stats[k];
+    rows.push({ jersey: num("Jersey"), stats });
+  }
+  return { gameId: ls[0], opponent: opponentFromBoxScoreName(fname), rows };
+}
 function ImportSeasons({ school, roster = [] }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -3675,6 +3720,50 @@ function ImportSeasons({ school, roster = [] }) {
     const flatFiles = files.filter((f) => /\.(csv|tsv|txt)$/i.test(f.name)); // flat one-season exports (Hudl/GameChanger)
     setBusy(true);
     try {
+      // Per-game BOX SCORES (basketball): a tiny pipe-delimited file with the game's own UUID on line 1 and
+      // jersey-only players. They can't go through the flat one-season parser, so pull them out of flatFiles
+      // and route each to player_games (idempotent by UUID), then derive the season + career from games.
+      const boxScores = [];
+      for (let bi = flatFiles.length - 1; bi >= 0; bi--) {
+        const btxt = await flatFiles[bi].text().catch(() => "");
+        if (isBoxScore(btxt)) { boxScores.unshift({ f: flatFiles[bi], text: btxt }); flatFiles.splice(bi, 1); }
+      }
+      if (boxScores.length) {
+        if (!/^basketball/.test(school.sport)) { setBusy(false); setMsg("Per-game box scores are supported for basketball so far — other sports use the season or PDF import."); return; }
+        const _now = new Date(), _y = _now.getFullYear();
+        const bSeason = _now.getMonth() >= 6 ? `${_y}-${_y + 1}` : `${_y - 1}-${_y}`;
+        const jerseyToName = new Map();
+        for (const a of (school.athletes || [])) if (a && a.jersey != null && a.name) jerseyToName.set(Number(a.jersey), a.name);
+        if (!jerseyToName.size) { setBusy(false); setMsg("Add your current roster with jersey numbers first — box scores identify players by jersey."); return; }
+        let bGames = 0, bLines = 0; const bUnmatched = new Set(); const bErrs = [];
+        for (const { f, text } of boxScores) {
+          const parsed = parseBasketballBoxScore(text, f.name);
+          if (!parsed || !parsed.rows.length) { bErrs.push(`${f.name}: couldn't read as a box score`); continue; }
+          const grows = [];
+          for (const r of parsed.rows) {
+            const nm = jerseyToName.get(Number(r.jersey));
+            if (!nm) { bUnmatched.add(r.jersey); continue; }
+            grows.push({ player_name: nm, jersey: r.jersey, stats: r.stats });
+          }
+          if (!grows.length) { bErrs.push(`${f.name}: none of its jerseys are on your roster`); continue; }
+          setMsg(`Saving game vs ${parsed.opponent || "opponent"}…`);
+          const { error: gErr } = await savePlayerGames(school.id, bSeason, parsed.gameId, parsed.opponent, grows);
+          if (gErr) { bErrs.push(`${f.name}: ${gErr.message || gErr}`); continue; }
+          bGames++; bLines += grows.length;
+        }
+        if (bGames) {
+          setMsg("Updating season & career totals…");
+          const { error: rErr } = await recomputeSeasonFromGames(school.id, bSeason);
+          if (rErr) { setBusy(false); setMsg("Saved the game(s) but the rollup failed: " + (rErr.message || rErr)); return; }
+        }
+        setBusy(false);
+        setMsg(`✓ ${bGames} game${bGames !== 1 ? "s" : ""} (${bLines} player line${bLines !== 1 ? "s" : ""}) added to ${bSeason} — season & career updated`
+          + (bUnmatched.size ? ` — ⚠️ not on your roster: #${[...bUnmatched].join(", #")} (add their jersey numbers, then re-drop the file)` : "")
+          + (bErrs.length ? ` — ${bErrs.length} issue${bErrs.length > 1 ? "s" : ""}: ${bErrs[0]}` : "")
+          + ((aiFiles.length || flatFiles.length) ? " — other files in this batch were skipped; upload them on their own" : ""));
+        setTimeout(() => window.location.reload(), (bUnmatched.size || bErrs.length) ? 5200 : 1600);
+        return;
+      }
       // PDFs: each file is ONE season's roster → AI-extract, then replace just that season
       // (other seasons untouched). Season comes from the filename, else we ask.
       // Flat CSV/TXT exports (Hudl / GameChanger) take the SAME per-season path below — they skip the
