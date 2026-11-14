@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, savePlayerGames, recomputeSeasonFromGames, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, withDerivedStats, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
+import { signOut, createProgram, seedDCPrograms, getMembers, updateMemberRole, removeMember, inviteMember, deleteMyAccount, updateProfile, getProgramOrder, deleteProgram, getPendingInvites, cancelInvite, getProgramCoaches, addProgramCoach, removeProgramCoach, sendAlerts, changePassword, sendInviteEmail, listPromoCodes, createPromoCode, setPromoActive, getPlayerSeasons as fetchPlayerSeasons, savePlayerSeason, deletePlayerSeason, replacePlayerSeasons, recomputeCareerFromSeasons, savePlayerGames, recomputeSeasonFromGames, getPlayerGames, replacePlayerSeasonRowsForSeason, getPlayerSeasonsForSeason, getAllPlayerSeasons, getAwards, withDerivedStats, saveAward, deleteAward, extractPdfStats, renamePlayer, deletePlayer, getReferralStats, supportChat } from "./supabase_client";
 import { SEED_SCHOOLS } from './seedData';
 import { ChoosePlan } from './Auth';
 import useIsMobile from './useIsMobile';
@@ -1000,6 +1000,27 @@ const PERGAME_RECORD_DEFS = [
 ];
 const PERGAME_MIN_SEASON_GP = 5;   // min games to qualify a single-season per-game record
 const PERGAME_MIN_CAREER_GP = 20;  // min games to qualify a career per-game record
+
+// Single-game record holders — the best ONE-game mark per stat, from player_games (kind='game' only).
+// Only sports with per-game uploads (basketball today) have game rows; others pass through empty. "Attempts"
+// columns are excluded (most FGA in a game isn't a celebrated record); Turnovers isn't in the list at all.
+const SINGLEGAME_RECORD_STATS = PERGAME_RECORD_DEFS.map((d) => d.stat).filter((s) => !/Attempt/.test(s));
+function singleGameRecordsFrom(gameRows, sport) {
+  const out = [];
+  if (!gameRows || !gameRows.length) return out;
+  for (const stat of SINGLEGAME_RECORD_STATS) {
+    let best = null;
+    for (const g of gameRows) {
+      const v = Number(g.stats?.[stat]);
+      if (!isNaN(v) && v > 0 && (!best || v > best.value)) {
+        const ctx = [g.opponent ? `vs ${g.opponent}` : null, g.season].filter(Boolean).join(" · ");
+        best = { value: v, holderName: g.player_name, holderYear: ctx };
+      }
+    }
+    if (best) out.push({ id: `auto-sg-${stat}`, statName: stat, variant: "Single game", sport, auto: true, ...best });
+  }
+  return out;
+}
 function perGame(stats, statKey) {
   const v = Number(stats?.[statKey]); const g = Number(stats?.["Games Played"] ?? stats?.["Matches Played"]);
   if (!g || g <= 0 || isNaN(v) || isNaN(g)) return null;
@@ -2577,6 +2598,7 @@ function programRecordCount(school) {
     ...pctRecordsFrom(seasonRows, recPool, school.sport, school.recordMins),
     ...lowCountingRecordsFrom(seasonRows, recPool, school.sport, school.recordMins),
     ...pergameRecordsFrom(seasonRows, recPool, school.sport),
+    ...singleGameRecordsFrom(school.allGameRows || [], school.sport),
     ...longestRecordsFrom(seasonRows, school.sport),
     ...autoStatRecords(seasonRows, (school.allTimeRoster || []), statNames, school.sport),
     ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
@@ -6076,15 +6098,17 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
   const [copiedLink, setCopiedLink] = useState(false);
   // Every season row for this program — feeds the single-season shooting-% record holders.
   const [allSeasonRows, setAllSeasonRows] = useState([]);
+  const [allGameRows, setAllGameRows] = useState([]); // player_games (kind='game') → single-game records
   useEffect(() => {
     let alive = true;
-    if (!school?.id) { setAllSeasonRows([]); return; }
+    if (!school?.id) { setAllSeasonRows([]); setAllGameRows([]); return; }
     getAllPlayerSeasons(school.id).then(({ data }) => { if (alive) setAllSeasonRows((data || []).map(r => ({ ...r, stats: withDerivedStats(r.stats, school.sport) }))); });
+    getPlayerGames(school.id).then(({ data }) => { if (alive) setAllGameRows((data || []).map(r => ({ ...r, stats: withDerivedStats(r.stats, school.sport) }))); });
     return () => { alive = false; };
   }, [school.id]);
   // Full record total (auto + stored) for the header & Overview tile — memoized so it isn't recomputed
   // on every render (it builds the whole Records-tab record set).
-  const recordTotal = useMemo(() => programRecordCount({ ...school, allSeasonRows }), [school, allSeasonRows]);
+  const recordTotal = useMemo(() => programRecordCount({ ...school, allSeasonRows, allGameRows }), [school, allSeasonRows, allGameRows]);
   // Best single-season value per athlete — drives single-season record-break alerts.
   const seasonBests = useMemo(() => bestSeasonByName(allSeasonRows), [allSeasonRows]);
   // Stored + auto-computed (career & single-season) records — so "about to break a record" alerts cover
@@ -6466,6 +6490,7 @@ function SchoolDashboard({ school, allSchools = [], onBack, onUpdate, tier }) {
                     ...pctRecordsFrom(allSeasonRows, recPool, school.sport, school.recordMins),
                     ...lowCountingRecordsFrom(allSeasonRows, recPool, school.sport, school.recordMins),
                     ...pergameRecordsFrom(allSeasonRows, recPool, school.sport),
+                    ...singleGameRecordsFrom(allGameRows, school.sport),
                     ...longestRecordsFrom(allSeasonRows, school.sport),
                     ...autoStatRecords(allSeasonRows, (school.allTimeRoster||[]), statsToDisplay(recPool, school.sport).filter(s => !/^Longest /.test(s)), school.sport),
                     ...coachWinsRecordsFrom(school.seasons || [], school.sport, school.coachPrior || {}),
@@ -7515,7 +7540,7 @@ export default function App({ initialSchools, onUpdateSchool, orgId, orgName, ti
     (async () => {
       const entries = await Promise.all((schools || []).map(async (sc) => {
         if (!sc.id) return [sc.id, (sc.records || []).length, {}, (sc.records || [])];
-        try { const { data } = await getAllPlayerSeasons(sc.id); const rows = data || []; return [sc.id, programRecordCount({ ...sc, allSeasonRows: rows }), bestSeasonByName(rows), recordsForAlerts(sc, rows)]; }
+        try { const [{ data }, { data: gdata }] = await Promise.all([getAllPlayerSeasons(sc.id), getPlayerGames(sc.id)]); const rows = data || []; return [sc.id, programRecordCount({ ...sc, allSeasonRows: rows, allGameRows: gdata || [] }), bestSeasonByName(rows), recordsForAlerts(sc, rows)]; }
         catch { return [sc.id, (sc.records || []).length, {}, (sc.records || [])]; }
       }));
       if (!cancelled) {
