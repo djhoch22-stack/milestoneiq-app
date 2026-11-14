@@ -307,6 +307,16 @@ export const recomputeSeasonFromGames = async (programId, season) => {
   return { error };
 };
 
+// All GAME rows for a program (kind='game' only, not catch-up baselines) — feeds single-game records.
+export const getPlayerGames = async (programId) => {
+  const { data, error } = await supabase
+    .from('player_games')
+    .select('player_name, season, opponent, game_date, stats')
+    .eq('program_id', programId)
+    .eq('kind', 'game');
+  return { data: data || [], error };
+};
+
 // Rename a player across all of a program's data (season rows, rosters, records, awards). Renaming to a
 // name that already exists MERGES the two into one. Recompute happens server-side inside the function.
 export const renamePlayer = async (programId, oldName, newName) => {
